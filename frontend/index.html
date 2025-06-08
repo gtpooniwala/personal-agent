@@ -471,7 +471,7 @@
             <h1>Personal Agent</h1>
             <div class="tools-info" id="tools-info">
                 Loading tools...
-                <div style="font-size: 10px; color: #999; margin-top: 4px;">Time formatting v2.0 - Smart units</div>
+                <div style="font-size: 10px; color: #999; margin-top: 4px;">Backend-driven smart conversation titles</div>
             </div>
         </div>
 
@@ -625,9 +625,7 @@
                 console.error('Failed to create conversation:', error);
                 alert('Failed to create new conversation');
             }
-        }
-
-        // Load specific conversation
+        }        // Load specific conversation
         async function loadConversation(conversationId) {
             try {
                 currentConversationId = conversationId;

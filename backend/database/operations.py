@@ -165,6 +165,74 @@ class DatabaseOperations:
             }
         finally:
             session.close()
+    
+    def update_conversation_title(self, conversation_id: str, title: str) -> bool:
+        """Update the title of a conversation."""
+        session = self.get_session()
+        try:
+            conversation = session.query(Conversation).filter(
+                Conversation.id == conversation_id
+            ).first()
+            
+            if not conversation:
+                return False
+            
+            conversation.title = title
+            conversation.updated_at = datetime.utcnow()
+            session.commit()
+            return True
+        finally:
+            session.close()
+    
+    def is_conversation_untitled(self, conversation_id: str) -> bool:
+        """Check if a conversation has a default/generated title."""
+        session = self.get_session()
+        try:
+            conversation = session.query(Conversation).filter(
+                Conversation.id == conversation_id
+            ).first()
+            
+            if not conversation:
+                return False
+            
+            # Check if title looks like a default generated one
+            default_patterns = [
+                "Conversation ",
+                "New Conversation",
+                "Chat "
+            ]
+            
+            return any(conversation.title.startswith(pattern) for pattern in default_patterns)
+        finally:
+            session.close()
+
+    def delete_conversation(self, conversation_id: str) -> bool:
+        """Delete a conversation and all its related data."""
+        session = self.get_session()
+        try:
+            # First, delete all messages in the conversation
+            session.query(Message).filter(
+                Message.conversation_id == conversation_id
+            ).delete()
+            
+            # Delete all memory entries for this conversation
+            session.query(MemoryStore).filter(
+                MemoryStore.conversation_id == conversation_id
+            ).delete()
+            
+            # Finally, delete the conversation itself
+            conversation = session.query(Conversation).filter(
+                Conversation.id == conversation_id
+            ).first()
+            
+            if not conversation:
+                return False
+            
+            session.delete(conversation)
+            session.commit()
+            return True
+        finally:
+            session.close()
 
 
 # Global database operations instance

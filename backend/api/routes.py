@@ -3,11 +3,13 @@ from agent import PersonalAgent
 from api.models import (
     ChatRequest, ChatResponse, ConversationCreate, ConversationResponse,
     MessageResponse, ToolInfo, HealthResponse, DocumentUploadResponse,
-    DocumentListResponse, DocumentDeleteResponse, DocumentInfo
+    DocumentListResponse, DocumentDeleteResponse, DocumentInfo,
+    TitleGenerationResponse  # Add new model import
 )
 from services.document_service import doc_processor
 from typing import List
-from datetime import datetime
+from datetime import datetime, timedelta
+import asyncio
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,6 +19,63 @@ router = APIRouter()
 # Initialize personal agent
 agent = PersonalAgent()
 
+# Async task functions for conversation maintenance
+async def async_generate_title(conversation_id: str):
+    """Asynchronously generate title for a conversation."""
+    try:
+        logger.info(f"Starting async title generation for conversation: {conversation_id}")
+        title = await agent.generate_conversation_title(conversation_id)
+        if title:
+            logger.info(f"Successfully generated title for {conversation_id}: {title}")
+        else:
+            logger.warning(f"Title generation returned empty result for {conversation_id}")
+    except Exception as e:
+        logger.error(f"Failed to generate title for conversation {conversation_id}: {str(e)}")
+
+async def async_delete_empty_conversation(conversation_id: str):
+    """Asynchronously delete an empty old conversation."""
+    try:
+        logger.info(f"Starting async deletion of empty conversation: {conversation_id}")
+        from database.operations import DatabaseOperations
+        db_ops = DatabaseOperations()
+        db_ops.delete_conversation(conversation_id)
+        logger.info(f"Successfully deleted empty conversation: {conversation_id}")
+    except Exception as e:
+        logger.error(f"Failed to delete conversation {conversation_id}: {str(e)}")
+
+def check_conversation_maintenance(conversations: List[dict]) -> None:
+    """Check conversations for maintenance tasks and trigger them asynchronously."""
+    now = datetime.now()
+    
+    for conv in conversations:
+        conversation_id = conv["id"]
+        title = conv["title"]
+        message_count = conv["message_count"]
+        updated_at = datetime.fromisoformat(conv["updated_at"].replace("Z", "+00:00"))
+        created_at = datetime.fromisoformat(conv["created_at"].replace("Z", "+00:00"))
+        
+        # Make times timezone-naive for comparison (assuming UTC)
+        if updated_at.tzinfo:
+            updated_at = updated_at.replace(tzinfo=None)
+        if created_at.tzinfo:
+            created_at = created_at.replace(tzinfo=None)
+        
+        # Check for title generation (≥1 message, >5 minutes old, "New Conversation" title)
+        if (message_count >= 1 and 
+            title == "New Conversation" and 
+            (now - updated_at) > timedelta(minutes=5)):
+            
+            logger.info(f"Scheduling title generation for conversation {conversation_id} "
+                       f"(messages: {message_count}, age: {now - updated_at})")
+            asyncio.create_task(async_generate_title(conversation_id))
+        
+        # Check for deletion (0 messages, >1 day old)
+        elif (message_count == 0 and 
+              (now - created_at) > timedelta(days=1)):
+            
+            logger.info(f"Scheduling deletion of empty conversation {conversation_id} "
+                       f"(age: {now - created_at})")
+            asyncio.create_task(async_delete_empty_conversation(conversation_id))
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
@@ -47,6 +106,11 @@ async def get_conversations():
     """Get all conversations for the user."""
     try:
         conversations = agent.get_conversations()
+        
+        # Trigger passive maintenance tasks (title generation and cleanup)
+        logger.info(f"Running conversation maintenance check for {len(conversations)} conversations")
+        check_conversation_maintenance(conversations)
+        
         return [ConversationResponse(**conv) for conv in conversations]
     except Exception as e:
         logger.error(f"Error getting conversations: {str(e)}")
@@ -187,4 +251,26 @@ async def delete_document(document_id: str):
         raise
     except Exception as e:
         logger.error(f"Error deleting document: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/conversations/{conversation_id}/generate-title", response_model=TitleGenerationResponse)
+async def generate_conversation_title(conversation_id: str):
+    """Generate a title for a conversation using LLM."""
+    try:
+        title = await agent.generate_conversation_title(conversation_id)
+        
+        if not title:
+            raise HTTPException(status_code=400, detail="Unable to generate title - conversation may be too short or have no messages")
+        
+        return TitleGenerationResponse(
+            conversation_id=conversation_id,
+            title=title,
+            generated_at=datetime.now().isoformat()
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating conversation title: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

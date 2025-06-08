@@ -87,3 +87,10 @@ class DocumentDeleteResponse(BaseModel):
     """Response model for document deletion."""
     success: bool = Field(..., description="Whether deletion was successful")
     message: str = Field(..., description="Status message")
+
+
+class TitleGenerationResponse(BaseModel):
+    """Response model for conversation title generation."""
+    conversation_id: str = Field(..., description="Conversation ID")
+    title: str = Field(..., description="Generated title")
+    generated_at: str = Field(..., description="Title generation timestamp")

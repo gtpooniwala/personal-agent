@@ -160,3 +160,53 @@ class PersonalAgent:
             }
             for tool in tools
         ]
+    
+    async def generate_conversation_title(self, conversation_id: str) -> Optional[str]:
+        """Generate a title for a conversation based on its content."""
+        try:
+            # Get conversation history
+            messages = db_ops.get_conversation_history(conversation_id)
+            
+            if len(messages) < 2:  # Need at least user message and assistant response
+                return None
+            
+            # Take first few messages for context (limit to avoid token overflow)
+            relevant_messages = messages[:6]  # First 3 exchanges
+            
+            # Build context for title generation
+            conversation_context = "\n".join([
+                f"{msg['role'].capitalize()}: {msg['content']}"
+                for msg in relevant_messages
+            ])
+            
+            # Create title generation prompt
+            title_prompt = f"""Based on the following conversation, generate a concise, descriptive title (maximum 5 words) that captures the main topic or purpose of the conversation.
+
+Conversation:
+{conversation_context}
+
+Generate only the title, no additional text or quotes. The title should be specific and meaningful, avoiding generic phrases like "General Chat" or "Conversation".
+
+Title:"""
+
+            # Generate title using LLM
+            title = await self.llm.apredict(title_prompt)
+            
+            # Clean up the title
+            title = title.strip().strip('"\'').strip()
+            
+            # Ensure reasonable length
+            if len(title) > 50:
+                title = title[:47] + "..."
+            
+            # Update conversation title in database
+            if title:
+                db_ops.update_conversation_title(conversation_id, title)
+                logger.info(f"Generated title for conversation {conversation_id}: {title}")
+                return title
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error generating conversation title: {str(e)}")
+            return None
