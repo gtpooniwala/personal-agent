@@ -2,31 +2,66 @@
 
 ## 🎯 Development Overview
 
-This guide provides comprehensive instructions for developers who want to extend, modify, or deploy the Personal Agent MVP. The system is designed for scalability from local development to cloud deployment and from single-user to multi-user environments.
+This guide provides comprehensive instructions for developers who want to extend, modify, or deploy the Personal Agent MVP. The system implements a **hybrid intelligence routing architecture** that seamlessly blends conversational AI with tool-based functionality through agent-driven decision making.
 
 ## 🏗️ Architecture Deep Dive
 
-### System Architecture
+### Core Architecture - Hybrid Intelligence Routing
+
+The system employs a sophisticated hybrid approach where an intelligent LangChain agent dynamically decides when to use tools versus direct conversation, eliminating the need for hardcoded rule-based routing.
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Frontend      │    │   Backend       │    │   Database      │
-│   (HTML/JS)     │◄──►│   (FastAPI)     │◄──►│   (SQLite)      │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────┐
-                    │   LangChain     │
-                    │   Agent         │
-                    └─────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────┐
-                    │   External      │
-                    │   Services      │
-                    │   (OpenAI, etc) │
-                    └─────────────────┘
+┌─────────────────┐    ┌─────────────────────────────────┐    ┌─────────────────┐
+│   Frontend      │    │         Backend                 │    │   Database      │
+│   (HTML/JS)     │◄──►│      (FastAPI)                  │◄──►│   (SQLite)      │
+│                 │    │                                 │    │                 │
+│ • Chat UI       │    │  ┌─────────────────────────────┐ │    │ • Conversations │
+│ • Tool Display  │    │  │    HYBRID INTELLIGENCE      │ │    │ • Messages      │
+│ • History       │    │  │     ROUTING LAYER           │ │    │ • Tool Usage    │
+└─────────────────┘    │  │                             │ │    └─────────────────┘
+                       │  │  ┌─────────────────────────┐ │ │
+                       │  │  │   LangChain Agent       │ │ │
+                       │  │  │   (ReAct Pattern)       │ │ │
+                       │  │  │                         │ │ │
+                       │  │  │ • Analyzes user input   │ │ │
+                       │  │  │ • Decides tool usage    │ │ │
+                       │  │  │ • Manages conversation  │ │ │
+                       │  │  │ • Executes reasoning    │ │ │
+                       │  │  └─────────────────────────┘ │ │
+                       │  │              │               │ │
+                       │  │              ▼               │ │
+                       │  │  ┌─────────────────────────┐ │ │
+                       │  │  │    Tool Registry        │ │ │
+                       │  │  │                         │ │ │
+                       │  │  │ • Calculator Tool       │ │ │
+                       │  │  │ • Time Tool             │ │ │
+                       │  │  │ • Future: Gmail, etc.   │ │ │
+                       │  │  └─────────────────────────┘ │ │
+                       │  └─────────────────────────────┐ │ │
+                       └─────────────────────────────────┘ │
+                                        │                   │
+                                        ▼                   │
+                              ┌─────────────────┐           │
+                              │   OpenAI GPT    │           │
+                              │   External API  │           │
+                              └─────────────────┘           │
 ```
+
+### 🚨 Critical Architecture Decision
+
+**IMPORTANT**: The system previously used hardcoded phrase detection to determine when tools should be used. This approach was fundamentally flawed because:
+
+1. **Limited flexibility**: Required predefined phrases/patterns
+2. **Poor user experience**: Users had to know specific trigger words
+3. **Maintenance overhead**: Required constant updates to phrase lists
+4. **Defeated agent intelligence**: Bypassed the LangChain agent's reasoning capabilities
+
+**The current implementation** leverages the LangChain agent's natural intelligence to decide when tools are needed based on context, intent, and conversational flow. This approach:
+
+- ✅ **Agent-driven decisions**: The ReAct agent analyzes each message and decides whether tools are needed
+- ✅ **Natural conversation**: Users can ask questions in any natural way
+- ✅ **Context-aware**: The agent considers conversation history and context
+- ✅ **Self-improving**: Better tool selection over time through agent learning
 
 ### Key Components
 
@@ -34,28 +69,34 @@ This guide provides comprehensive instructions for developers who want to extend
    - Async HTTP server with CORS support
    - RESTful API with automatic documentation
    - Environment-based configuration
+   - Conda environment integration
 
-2. **LangChain Agent** (`backend/agent/core.py`)
-   - ReAct pattern implementation
-   - Tool registry and execution
-   - Conversation memory management
+2. **LangChain Agent** (`backend/agent/core.py`) - **RECENTLY UPDATED**
+   - **Agent-driven tool routing** (no hardcoded rules)
+   - ReAct pattern implementation with proper exception handling
+   - Dynamic tool selection based on conversation context
+   - Fallback mechanism to direct LLM when tools fail
 
 3. **Database Layer** (`backend/database/`)
    - SQLAlchemy ORM models
-   - Database operations abstraction
+   - Conversation and message persistence
+   - Tool usage tracking
    - Migration-ready design
 
 4. **Tool System** (`backend/agent/tools.py`)
    - Extensible tool registry
-   - Built-in tools (calculator, time)
-   - Placeholder for external services
+   - Currently implemented: Calculator, Time
+   - Future integrations: Gmail, Calendar, Todoist
+   - Error handling and user-friendly responses
 
 ## 🛠️ Development Setup
 
-### Environment Setup
+### Environment Setup - CRITICAL REQUIREMENTS
+
+**⚠️ IMPORTANT**: This project requires conda environment activation. The system will not work properly without it.
 
 ```bash
-# Activate the development environment
+# Activate the development environment - REQUIRED
 conda activate personalagent
 
 # Install additional development dependencies
@@ -63,6 +104,47 @@ pip install pytest black flake8 mypy
 
 # Set development environment
 export ENVIRONMENT=development
+```
+
+### 🔧 Recent Architecture Changes
+
+**Major Update**: The system architecture was recently improved to fix a critical flaw in tool execution:
+
+#### Before (Problematic Approach)
+- Used hardcoded phrase detection (`_message_needs_tools()` function)
+- Required specific trigger words like "calculate", "time", etc.
+- Limited user flexibility and agent intelligence
+- Poor user experience requiring knowledge of trigger phrases
+
+#### After (Current Approach)
+- **Agent-driven tool selection**: LangChain agent naturally decides when tools are needed
+- **Context-aware decisions**: Based on conversation flow and intent
+- **Natural language processing**: Users can ask questions in any natural way
+- **Fallback handling**: Graceful degradation when tools fail
+
+#### Key Code Changes in `backend/agent/core.py`
+
+```python
+# OLD APPROACH (removed):
+def _message_needs_tools(self, message: str) -> bool:
+    """Check if message needs tools based on hardcoded phrases."""
+    tool_indicators = ["calculate", "time", "what time"]
+    return any(indicator in message.lower() for indicator in tool_indicators)
+
+# NEW APPROACH (current):
+async def process_message(self, user_id: str, message: str) -> str:
+    """Process message using agent intelligence for tool decisions."""
+    try:
+        # Always use agent - let it decide if tools are needed
+        result = await self.agent.ainvoke({
+            "input": message,
+            "chat_history": self._format_chat_history(conversation_history)
+        })
+        return result["output"]
+    except Exception as e:
+        # Fallback to direct LLM if agent fails
+        logger.error(f"Agent execution failed: {e}")
+        return await self._fallback_to_llm(message)
 ```
 
 ### IDE Configuration

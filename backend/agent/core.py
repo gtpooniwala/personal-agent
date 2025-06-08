@@ -69,22 +69,14 @@ class PersonalAgent:
             
             # Process with agent and track token usage
             with get_openai_callback() as cb:
-                # Check if the message likely needs tools
-                needs_tools = self._message_needs_tools(message)
-                
-                if needs_tools:
-                    try:
-                        # Use agent for tool-requiring questions
-                        result = self.agent({"input": message})
-                        response = result.get("output", "")
-                        intermediate_steps = result.get("intermediate_steps", [])
-                    except Exception as e:
-                        logger.warning(f"Agent processing failed: {str(e)}")
-                        # Fallback to direct LLM
-                        response = await self.llm.apredict(message)
-                        intermediate_steps = []
-                else:
-                    # Use direct LLM for simple questions
+                try:
+                    # Always use the agent - let it decide when to use tools
+                    result = self.agent({"input": message})
+                    response = result.get("output", "")
+                    intermediate_steps = result.get("intermediate_steps", [])
+                except Exception as e:
+                    logger.warning(f"Agent processing failed: {str(e)}")
+                    # Fallback to direct LLM only if agent completely fails
                     response = await self.llm.apredict(message)
                     intermediate_steps = []
             
@@ -121,54 +113,6 @@ class PersonalAgent:
                 "error": True
             }
     
-    def _message_needs_tools(self, message: str) -> bool:
-        """Determine if a message likely needs tools."""
-        message_lower = message.lower()
-        
-        # Mathematical expressions and calculations
-        math_indicators = [
-            'calculate', 'compute', 'math', 'multiply', 'divide', 
-            'add', 'subtract', 'power', 'square', 'sum', 'product'
-        ]
-        
-        # Time-related queries
-        time_indicators = [
-            'what time', 'current time', 'what date', 'current date', 
-            'what day', 'today', 'now', 'time is it'
-        ]
-        
-        # Check for explicit mathematical expressions
-        import re
-        if re.search(r'\d+\s*[\+\-\*\/\^x]\s*\d+', message):
-            return True
-            
-        if re.search(r'\d+\s*[\*x]\s*\d+', message):  # multiplication
-            return True
-            
-        if re.search(r'\d+\s*/\s*\d+', message):  # division
-            return True
-            
-        if re.search(r'\d+\s*\+\s*\d+', message):  # addition
-            return True
-            
-        if re.search(r'\d+\s*-\s*\d+', message):  # subtraction
-            return True
-            
-        if re.search(r'\d+\^+\d+', message):  # exponentiation
-            return True
-        
-        # Check for mathematical expressions with words
-        if any(indicator in message_lower for indicator in math_indicators):
-            # But exclude general "what is" questions
-            if not any(phrase in message_lower for phrase in ['capital', 'country', 'city', 'president', 'king', 'queen']):
-                return True
-            
-        # Check for time queries
-        if any(indicator in message_lower for indicator in time_indicators):
-            return True
-            
-        return False
-
     def _extract_agent_actions(self, intermediate_steps: List = None) -> Optional[List[Dict[str, Any]]]:
         """Extract agent actions for transparency when tools are used."""
         if not intermediate_steps:

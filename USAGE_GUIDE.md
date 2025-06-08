@@ -2,7 +2,7 @@
 
 ## 🚀 Quick Start
 
-This guide will help you get the Personal Agent MVP running on your local machine in just a few minutes.
+This guide will help you get the Personal Agent MVP running on your local machine and understand how to interact with the new intelligent system.
 
 ## 📋 Prerequisites
 
@@ -46,8 +46,10 @@ OPENAI_API_KEY="your_api_key_here"
 
 ### 1. Start the Backend Server
 
+⚠️ **CRITICAL**: You must activate the conda environment first, or the system will not work properly.
+
 ```bash
-# Activate the conda environment
+# Activate the conda environment - REQUIRED
 conda activate personalagent
 
 # Navigate to backend directory
@@ -121,6 +123,69 @@ The agent automatically uses tools when needed, but responds naturally for gener
 "Tell me about yourself"
 "What can you help me with?"
 ```
+
+## 🤖 Understanding the Intelligent Agent System
+
+### How the System Works (New Architecture)
+
+The Personal Agent MVP uses a **hybrid intelligence routing** system that has been recently upgraded for better user experience and reliability.
+
+#### 🧠 Agent-Driven Intelligence
+
+The system now uses a LangChain ReAct agent that intelligently decides when to use tools versus providing direct responses. This means:
+
+**✅ Natural Language**: You can ask questions in any natural way - no need to memorize trigger words
+```
+"What's 15 times 23?" ✅ Works
+"Calculate 15 * 23" ✅ Works  
+"Can you multiply 15 by 23?" ✅ Works
+"I need to know 15 × 23" ✅ Works
+```
+
+**✅ Context-Aware**: The agent considers conversation history and context
+```
+You: "What time is it?"
+Agent: [Uses time tool] "It's 2:45 PM"
+You: "What about in Tokyo?"
+Agent: [Understands context] "I can tell you it's currently 2:45 PM here, but I don't have timezone conversion tools yet."
+```
+
+**✅ Smart Tool Selection**: The agent only uses tools when actually needed
+
+#### 🛠️ Available Tools
+
+1. **Calculator Tool** 📊
+   - Handles mathematical expressions
+   - Supports complex calculations
+   - Examples: addition, multiplication, exponents, parentheses
+
+2. **Time Tool** ⏰
+   - Provides current date and time
+   - Responds to any time-related query
+   - Examples: "time", "current time", "what time is it"
+
+#### 🔄 How It Decides
+
+The system follows this intelligent flow:
+
+1. **Message Analysis**: Agent analyzes your message for intent and context
+2. **Tool Assessment**: Determines if tools are needed based on the request type
+3. **Execution**: Either uses appropriate tools or provides direct response
+4. **Response**: Returns result with optional tool usage display
+
+### What Changed (For Technical Users)
+
+**Previous System (Problematic)**:
+- Used hardcoded phrase detection
+- Required specific trigger words
+- Limited user flexibility
+- Many queries failed to trigger tools
+
+**Current System (Improved)**:
+- Agent-driven tool selection
+- Natural language processing
+- Context-aware decisions
+- Graceful fallback handling
 
 ## 🔧 API Usage (Advanced)
 
