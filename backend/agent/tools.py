@@ -1,5 +1,5 @@
 from langchain.tools import BaseTool
-from typing import Dict, List, Type, Any
+from typing import Dict, List, Type, Any, Optional
 from datetime import datetime
 import math
 import asyncio
@@ -115,22 +115,33 @@ class DocumentQATool(BaseTool):
     name = "document_qa"
     description = "Answer questions about uploaded documents. Use this when users ask about document content, want to search documents, or need information from their uploaded PDFs."
     
-    def __init__(self, user_id: str = "default"):
+    def __init__(self, user_id: str = "default", selected_documents: Optional[List[str]] = None):
         super().__init__()
         # Use object.__setattr__ to bypass Pydantic validation
         object.__setattr__(self, '_user_id', user_id)
+        object.__setattr__(self, '_selected_documents', selected_documents or [])
     
     def _run(self, query: str) -> str:
         """Search documents and provide answers based on content."""
         try:
+            # Check if any documents are selected
+            if len(self._selected_documents) == 0:
+                return "No documents are currently selected for search. Please select documents in the sidebar to enable document Q&A functionality."
+            
             # Import here to avoid circular imports
             from services.document_service import doc_processor
             
             # Use the synchronous version to avoid event loop conflicts
-            results = doc_processor.search_documents_sync(query, self._user_id, limit=3)
+            selected_docs = self._selected_documents if len(self._selected_documents) > 0 else None
+            results = doc_processor.search_documents_sync(
+                query, 
+                self._user_id, 
+                limit=3, 
+                selected_documents=selected_docs
+            )
             
             if not results:
-                return "I couldn't find any relevant information in your uploaded documents. Please make sure you have uploaded documents and they have been processed successfully."
+                return f"I couldn't find any relevant information in the {len(self._selected_documents)} selected document(s). The query might not be related to the document content, or the documents may still be processing."
             
             # Format response with relevant document excerpts
             response_parts = ["Based on your uploaded documents, here's what I found:\n"]
@@ -163,12 +174,22 @@ class DocumentQATool(BaseTool):
     async def _arun(self, query: str) -> str:
         """Async version of the tool."""
         try:
+            # Check if any documents are selected
+            if len(self._selected_documents) == 0:
+                return "No documents are currently selected for search. Please select documents in the sidebar to enable document Q&A functionality."
+            
             from services.document_service import doc_processor
             
-            results = await doc_processor.search_documents(query, self._user_id, limit=3)
+            selected_docs = self._selected_documents if len(self._selected_documents) > 0 else None
+            results = await doc_processor.search_documents(
+                query, 
+                self._user_id, 
+                limit=3,
+                selected_documents=selected_docs
+            )
             
             if not results:
-                return "I couldn't find any relevant information in your uploaded documents. Please make sure you have uploaded documents and they have been processed successfully."
+                return f"I couldn't find any relevant information in the {len(self._selected_documents)} selected document(s). The query might not be related to the document content, or the documents may still be processing."
             
             # Format response with relevant document excerpts
             response_parts = ["Based on your uploaded documents, here's what I found:\n"]
@@ -202,8 +223,9 @@ class DocumentQATool(BaseTool):
 class ToolRegistry:
     """Registry for managing available tools."""
     
-    def __init__(self, user_id: str = "default"):
+    def __init__(self, user_id: str = "default", selected_documents: Optional[List[str]] = None):
         self.user_id = user_id
+        self.selected_documents = selected_documents or []
         self._tools = {}
         self._initialize_tools()
     
@@ -213,18 +235,28 @@ class ToolRegistry:
         self._tools["calculator"] = CalculatorTool()
         self._tools["current_time"] = CurrentTimeTool()
         
-        # Document Q&A tool with user context
-        self._tools["document_qa"] = DocumentQATool(self.user_id)
+        # Document Q&A tool with user context and selected documents
+        self._tools["document_qa"] = DocumentQATool(self.user_id, self.selected_documents)
         
         # Placeholder tools for future implementation (no user_id needed for now)
         self._tools["gmail"] = GmailTool()
         self._tools["calendar"] = CalendarTool()
         self._tools["todoist"] = TodoistTool()
     
+    def update_selected_documents(self, selected_documents: List[str]):
+        """Update selected documents and reinitialize document QA tool."""
+        self.selected_documents = selected_documents
+        self._tools["document_qa"] = DocumentQATool(self.user_id, self.selected_documents)
+    
     def get_available_tools(self) -> List[BaseTool]:
         """Get list of available tools for the agent."""
-        # Include working tools including document Q&A
-        working_tools = ["calculator", "current_time", "document_qa"]
+        # Always include basic tools
+        working_tools = ["calculator", "current_time"]
+        
+        # Only include document Q&A if documents are selected
+        if len(self.selected_documents) > 0:
+            working_tools.append("document_qa")
+        
         return [self._tools[tool_name] for tool_name in working_tools]
     
     def get_all_tools(self) -> List[BaseTool]:

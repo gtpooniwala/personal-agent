@@ -29,7 +29,11 @@ async def chat(request: ChatRequest):
             conversation_id = agent.create_conversation()
         
         # Process message with agent
-        result = await agent.process_message(request.message, conversation_id)
+        result = await agent.process_message(
+            request.message, 
+            conversation_id,
+            selected_documents=request.selected_documents
+        )
         
         return ChatResponse(**result)
         

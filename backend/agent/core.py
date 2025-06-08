@@ -32,9 +32,9 @@ class PersonalAgent:
             max_tokens=1000
         )
     
-    def _setup_agent(self, conversation_id: str):
+    def _setup_agent(self, conversation_id: str, force_refresh: bool = False):
         """Setup the LangChain agent for a specific conversation."""
-        if self.current_conversation_id == conversation_id and self.agent:
+        if self.current_conversation_id == conversation_id and self.agent and not force_refresh:
             return  # Already setup for this conversation
         
         self.current_conversation_id = conversation_id
@@ -57,12 +57,19 @@ class PersonalAgent:
     async def process_message(
         self, 
         message: str, 
-        conversation_id: str
+        conversation_id: str,
+        selected_documents: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """Process a user message and return agent response."""
         try:
-            # Setup agent for this conversation
-            self._setup_agent(conversation_id)
+            # Update tool registry with selected documents if provided
+            if selected_documents is not None:
+                self.tool_registry.update_selected_documents(selected_documents)
+                # Force agent re-setup with updated tools
+                self._setup_agent(conversation_id, force_refresh=True)
+            else:
+                # Normal setup
+                self._setup_agent(conversation_id)
             
             # Save user message to database
             db_ops.save_message(conversation_id, "user", message)
@@ -113,7 +120,7 @@ class PersonalAgent:
                 "error": True
             }
     
-    def _extract_agent_actions(self, intermediate_steps: List = None) -> Optional[List[Dict[str, Any]]]:
+    def _extract_agent_actions(self, intermediate_steps: Optional[List] = None) -> Optional[List[Dict[str, Any]]]:
         """Extract agent actions for transparency when tools are used."""
         if not intermediate_steps:
             return None
@@ -130,7 +137,7 @@ class PersonalAgent:
         
         return actions if actions else None
     
-    def create_conversation(self, title: str = None) -> str:
+    def create_conversation(self, title: Optional[str] = None) -> str:
         """Create a new conversation."""
         return db_ops.create_conversation(title, self.user_id)
     

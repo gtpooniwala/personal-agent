@@ -173,7 +173,7 @@ class DocumentProcessor:
             logger.error(f"Error extracting PDF text: {str(e)}")
             raise
     
-    async def search_documents(self, query: str, user_id: str = "default", limit: int = 5) -> List[Dict[str, Any]]:
+    async def search_documents(self, query: str, user_id: str = "default", limit: int = 5, selected_documents: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
         Search documents using semantic similarity.
         
@@ -181,6 +181,7 @@ class DocumentProcessor:
             query: Search query
             user_id: User ID for filtering documents
             limit: Maximum number of results
+            selected_documents: List of document IDs to search within (None means search all)
             
         Returns:
             List of relevant document chunks with metadata
@@ -192,11 +193,17 @@ class DocumentProcessor:
             # Get all document chunks for user
             session = db_ops.get_session()
             try:
-                # Get chunks from completed documents only
-                chunks = session.query(DocumentChunk).join(Document).filter(
+                # Build query with optional document filtering
+                query_filter = session.query(DocumentChunk).join(Document).filter(
                     Document.user_id == user_id,
                     Document.processed == "completed"
-                ).all()
+                )
+                
+                # Filter by selected documents if provided
+                if selected_documents:
+                    query_filter = query_filter.filter(Document.id.in_(selected_documents))
+                
+                chunks = query_filter.all()
                 
                 if not chunks:
                     return []
@@ -240,7 +247,7 @@ class DocumentProcessor:
             logger.error(f"Error searching documents: {str(e)}")
             return []
     
-    def search_documents_sync(self, query: str, user_id: str = "default", limit: int = 5) -> List[Dict[str, Any]]:
+    def search_documents_sync(self, query: str, user_id: str = "default", limit: int = 5, selected_documents: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
         Search documents using semantic similarity (synchronous version).
         
@@ -248,6 +255,7 @@ class DocumentProcessor:
             query: Search query
             user_id: User ID for filtering documents
             limit: Maximum number of results
+            selected_documents: List of document IDs to search within (None means search all)
             
         Returns:
             List of relevant document chunks with metadata
@@ -266,11 +274,17 @@ class DocumentProcessor:
             # Get all document chunks for user
             session = db_ops.get_session()
             try:
-                # Get chunks from completed documents only
-                chunks = session.query(DocumentChunk).join(Document).filter(
+                # Build query with optional document filtering
+                query_filter = session.query(DocumentChunk).join(Document).filter(
                     Document.user_id == user_id,
                     Document.processed == "completed"
-                ).all()
+                )
+                
+                # Filter by selected documents if provided
+                if selected_documents:
+                    query_filter = query_filter.filter(Document.id.in_(selected_documents))
+                
+                chunks = query_filter.all()
                 
                 if not chunks:
                     return []

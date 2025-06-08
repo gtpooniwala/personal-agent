@@ -7,6 +7,7 @@ class ChatRequest(BaseModel):
     """Request model for chat endpoint."""
     message: str = Field(..., description="User message")
     conversation_id: Optional[str] = Field(None, description="Conversation ID (creates new if not provided)")
+    selected_documents: Optional[List[str]] = Field(default_factory=list, description="List of selected document IDs for RAG search")
 
 
 class ChatResponse(BaseModel):

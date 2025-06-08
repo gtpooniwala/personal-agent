@@ -26,6 +26,15 @@
             overflow-y: auto;
         }
 
+        .right-sidebar {
+            width: 320px;
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            overflow-y: auto;
+            border-left: 1px solid #34495e;
+        }
+
         .sidebar h2 {
             margin-bottom: 20px;
             color: #ecf0f1;
@@ -336,6 +345,17 @@
             background-color: #4a6278;
         }
 
+        .document-checkbox {
+            margin-right: 8px;
+            width: 16px;
+            height: 16px;
+            accent-color: #3498db;
+        }
+
+        .document-item.selected {
+            background-color: #2980b9;
+        }
+
         .document-info {
             flex: 1;
         }
@@ -406,6 +426,32 @@
         .document-qa-hint strong {
             color: #2980b9;
         }
+
+        .rag-controls {
+            background-color: #34495e;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 15px;
+        }
+
+        .rag-controls h4 {
+            color: #ecf0f1;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .rag-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .rag-status {
+            font-size: 12px;
+            color: #bdc3c7;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -414,31 +460,6 @@
         <button class="new-chat-btn" onclick="createNewConversation()">+ New Chat</button>
         <div id="conversations-list" class="conversations-list">
             <!-- Conversations will be loaded here -->
-        </div>
-
-        <!-- Document Management Section -->
-        <div class="documents-section">
-            <h3>📄 Documents</h3>
-            
-            <!-- Upload Area -->
-            <div class="upload-area" onclick="document.getElementById('file-input').click()" 
-                 ondrop="handleFileDrop(event)" 
-                 ondragover="handleDragOver(event)" 
-                 ondragenter="handleDragEnter(event)" 
-                 ondragleave="handleDragLeave(event)">
-                <div class="upload-text">Click or drag PDF files here</div>
-                <div class="upload-hint">PDF files only</div>
-                <div id="upload-progress" class="upload-progress" style="display: none;">
-                    <div id="upload-progress-bar" class="upload-progress-bar"></div>
-                </div>
-            </div>
-            
-            <input type="file" id="file-input" class="upload-input" accept=".pdf" multiple onchange="handleFileSelect(event)">
-            
-            <!-- Documents List -->
-            <div id="documents-list" class="documents-list">
-                <!-- Documents will be loaded here -->
-            </div>
         </div>
     </div>
 
@@ -474,11 +495,49 @@
         </div>
     </div>
 
+    <!-- Right Sidebar for Document Management -->
+    <div class="right-sidebar">
+        <h2>📄 Documents</h2>
+        
+        <!-- RAG Controls -->
+        <div class="rag-controls">
+            <h4>🔍 Smart Search</h4>
+            <div class="rag-toggle">
+                <input type="checkbox" id="rag-enabled" checked onchange="updateRagStatus()">
+                <label for="rag-enabled" style="color: #ecf0f1; font-size: 13px;">Enable document search</label>
+            </div>
+            <div id="rag-status" class="rag-status">
+                Document search enabled • 0 files selected
+            </div>
+        </div>
+
+        <!-- Upload Area -->
+        <div class="upload-area" onclick="document.getElementById('file-input').click()" 
+             ondrop="handleFileDrop(event)" 
+             ondragover="handleDragOver(event)" 
+             ondragenter="handleDragEnter(event)" 
+             ondragleave="handleDragLeave(event)">
+            <div class="upload-text">Click or drag PDF files here</div>
+            <div class="upload-hint">PDF files only</div>
+            <div id="upload-progress" class="upload-progress" style="display: none;">
+                <div id="upload-progress-bar" class="upload-progress-bar"></div>
+            </div>
+        </div>
+        
+        <input type="file" id="file-input" class="upload-input" accept=".pdf" multiple onchange="handleFileSelect(event)">
+        
+        <!-- Documents List -->
+        <div id="documents-list" class="documents-list">
+            <!-- Documents will be loaded here -->
+        </div>
+    </div>
+
     <script>
         // Global state
         let currentConversationId = null;
         let isLoading = false;
         const API_BASE = 'http://127.0.0.1:8000/api/v1';
+        let selectedDocuments = new Set(); // Track selected documents for RAG
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', function() {
@@ -666,11 +725,15 @@
             scrollToBottom();
 
             try {
+                const ragEnabled = document.getElementById('rag-enabled').checked;
+                const selectedDocIds = ragEnabled ? Array.from(selectedDocuments) : [];
+                
                 const response = await apiCall('/chat', {
                     method: 'POST',
                     body: JSON.stringify({
                         message: message,
-                        conversation_id: currentConversationId
+                        conversation_id: currentConversationId,
+                        selected_documents: selectedDocIds
                     })
                 });
 
@@ -770,17 +833,25 @@
                 
                 if (documents.length === 0) {
                     listElement.innerHTML = '<div style="color: #bdc3c7; font-style: italic; padding: 8px; text-align: center; font-size: 12px;">No documents uploaded</div>';
+                    updateRagStatus();
                     return;
                 }
 
                 listElement.innerHTML = documents.map(doc => `
-                    <div class="document-item">
-                        <div class="document-info">
-                            <div class="document-name" title="${doc.filename}">
-                                📄 ${doc.filename.length > 20 ? doc.filename.substring(0, 17) + '...' : doc.filename}
-                            </div>
-                            <div class="document-meta">
-                                ${formatFileSize(doc.file_size)} • ${formatDate(doc.uploaded_at)}
+                    <div class="document-item ${selectedDocuments.has(doc.id) ? 'selected' : ''}" data-doc-id="${doc.id}">
+                        <div style="display: flex; align-items: center; flex: 1;">
+                            <input type="checkbox" 
+                                   class="document-checkbox" 
+                                   id="doc-${doc.id}" 
+                                   ${selectedDocuments.has(doc.id) ? 'checked' : ''}
+                                   onchange="toggleDocumentSelection('${doc.id}')">
+                            <div class="document-info">
+                                <div class="document-name" title="${doc.filename}">
+                                    📄 ${doc.filename.length > 20 ? doc.filename.substring(0, 17) + '...' : doc.filename}
+                                </div>
+                                <div class="document-meta">
+                                    ${formatFileSize(doc.file_size)} • ${formatDate(doc.uploaded_at)}
+                                </div>
                             </div>
                         </div>
                         <div class="document-actions">
@@ -790,10 +861,44 @@
                         </div>
                     </div>
                 `).join('');
+                
+                updateRagStatus();
             } catch (error) {
                 console.error('Failed to load documents:', error);
                 document.getElementById('documents-list').innerHTML = 
                     '<div style="color: #e74c3c; font-size: 12px; padding: 8px; text-align: center;">Failed to load documents</div>';
+            }
+        }
+
+        function toggleDocumentSelection(documentId) {
+            const checkbox = document.getElementById(`doc-${documentId}`);
+            const documentItem = document.querySelector(`[data-doc-id="${documentId}"]`);
+            
+            if (checkbox.checked) {
+                selectedDocuments.add(documentId);
+                documentItem.classList.add('selected');
+            } else {
+                selectedDocuments.delete(documentId);
+                documentItem.classList.remove('selected');
+            }
+            
+            updateRagStatus();
+        }
+
+        function updateRagStatus() {
+            const ragEnabled = document.getElementById('rag-enabled').checked;
+            const statusElement = document.getElementById('rag-status');
+            const selectedCount = selectedDocuments.size;
+            
+            if (!ragEnabled) {
+                statusElement.textContent = 'Document search disabled';
+                statusElement.style.color = '#e74c3c';
+            } else if (selectedCount === 0) {
+                statusElement.textContent = 'Document search enabled • No files selected';
+                statusElement.style.color = '#f39c12';
+            } else {
+                statusElement.textContent = `Document search enabled • ${selectedCount} file${selectedCount > 1 ? 's' : ''} selected`;
+                statusElement.style.color = '#27ae60';
             }
         }
 
@@ -892,6 +997,9 @@
                 await apiCall(`/documents/${documentId}`, {
                     method: 'DELETE'
                 });
+
+                // Remove from selected documents if it was selected
+                selectedDocuments.delete(documentId);
 
                 await loadDocuments();
                 console.log('Document deleted successfully');

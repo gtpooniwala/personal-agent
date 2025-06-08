@@ -23,7 +23,7 @@ class DatabaseOperations:
         """Get database session."""
         return self.SessionLocal()
     
-    def create_conversation(self, title: str = None, user_id: str = "default") -> str:
+    def create_conversation(self, title: Optional[str] = None, user_id: str = "default") -> str:
         """Create a new conversation and return its ID."""
         if not title:
             title = f"Conversation {datetime.now().strftime('%Y-%m-%d %H:%M')}"
