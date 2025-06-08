@@ -152,7 +152,7 @@ async def get_documents():
                 id=doc["id"],
                 filename=doc["filename"],
                 file_size=doc["file_size"],
-                upload_date=doc["upload_date"],
+                uploaded_at=doc["upload_date"],
                 processed=doc["processed"],
                 total_chunks=doc["total_chunks"]
             )

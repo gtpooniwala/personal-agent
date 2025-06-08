@@ -72,7 +72,7 @@ class DocumentInfo(BaseModel):
     id: str = Field(..., description="Document ID")
     filename: str = Field(..., description="Original filename")
     file_size: int = Field(..., description="File size in bytes")
-    upload_date: str = Field(..., description="Upload timestamp")
+    uploaded_at: str = Field(..., description="Upload timestamp")
     processed: str = Field(..., description="Processing status")
     total_chunks: int = Field(..., description="Number of text chunks")
 

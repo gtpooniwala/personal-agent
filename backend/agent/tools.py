@@ -9,10 +9,10 @@ logger = logging.getLogger(__name__)
 
 
 class CalculatorTool(BaseTool):
-    """Simple calculator tool for basic math operations."""
+    """Calculator tool for mathematical calculations only."""
     
     name = "calculator"
-    description = "Useful for performing basic mathematical calculations. Input should be a mathematical expression like '2+3', '10*5', '2**4' for powers."
+    description = "ALWAYS use this tool for ANY mathematical calculations, arithmetic, or numeric problems. Input should be a mathematical expression like '2+3', '10*5', '2**4'. NEVER do mental math - ALWAYS use this tool for numbers. Do NOT use for simple greetings, general conversation, or non-mathematical questions."
     
     def _run(self, query: str) -> str:
         """Execute the calculator tool."""
@@ -37,10 +37,10 @@ class CalculatorTool(BaseTool):
 
 
 class CurrentTimeTool(BaseTool):
-    """Tool to get the current date and time."""
+    """Tool to get current date and time information only."""
     
     name = "current_time"
-    description = "Get the current date and time. Use this when asked about the current time, date, or 'what time is it'. Input: just use 'now' or leave empty."
+    description = "Use ONLY when explicitly asked about current time, date, or timestamps. Examples: 'what time is it', 'what's the date', 'current time'. Do NOT use for greetings or general conversation. Input: use 'now'."
     
     def _run(self, query: str = "now") -> str:
         """Get current time."""

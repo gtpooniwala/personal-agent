@@ -27,9 +27,9 @@ class PersonalAgent:
         """Setup the language model."""
         return ChatOpenAI(
             model="gpt-3.5-turbo",
-            temperature=0.7,
+            temperature=0.3,  # Lower temperature for more focused responses
             openai_api_key=settings.openai_api_key,
-            max_tokens=1000
+            max_tokens=800   # Slightly reduced for more concise responses
         )
     
     def _setup_agent(self, conversation_id: str, force_refresh: bool = False):
@@ -42,13 +42,14 @@ class PersonalAgent:
         
         tools = self.tool_registry.get_available_tools()
         
+        # Use CONVERSATIONAL_REACT_DESCRIPTION for better conversation handling
         self.agent = initialize_agent(
             tools=tools,
             llm=self.llm,
-            agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+            agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
             memory=self.current_memory,
             verbose=True,
-            max_iterations=3,
+            max_iterations=3,  # Increased to give more thinking time for tool usage
             early_stopping_method="generate",
             handle_parsing_errors=True,
             return_intermediate_steps=True
@@ -77,7 +78,7 @@ class PersonalAgent:
             # Process with agent and track token usage
             with get_openai_callback() as cb:
                 try:
-                    # Always use the agent - let it decide when to use tools
+                    # Always use the agent - let it intelligently decide when to use tools
                     result = self.agent({"input": message})
                     response = result.get("output", "")
                     intermediate_steps = result.get("intermediate_steps", [])

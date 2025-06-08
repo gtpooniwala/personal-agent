@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Current Time Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test { margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 5px; }
+        button { padding: 10px 20px; margin: 10px 0; background: #007acc; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Current Time Formatting Test</h1>
+    
+    <button onclick="testCurrentTime()">Test Current Time</button>
+    <button onclick="testFewSecondsAgo()">Test 15 Seconds Ago</button>
+    <button onclick="testFewMinutesAgo()">Test 5 Minutes Ago</button>
+    
+    <div id="results"></div>
+
+    <script>
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diff = now - date;
+            
+            // Calculate time units
+            const seconds = Math.floor(diff / 1000);
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+            const weeks = Math.floor(days / 7);
+            const months = Math.floor(days / 30);
+            const years = Math.floor(days / 365);
+
+            console.log('formatDate called:', {
+                input: dateString,
+                diff: diff,
+                seconds: seconds,
+                minutes: minutes,
+                hours: hours,
+                days: days
+            });
+
+            // Smart unit selection
+            if (seconds < 30) return 'Just now';
+            if (seconds < 60) return `${seconds}s ago`;
+            if (minutes < 60) return `${minutes}m ago`;
+            if (hours < 24) return `${hours}h ago`;
+            if (days < 7) return `${days} day${days === 1 ? '' : 's'} ago`;
+            if (weeks < 4) return `${weeks} week${weeks === 1 ? '' : 's'} ago`;
+            if (months < 12) return `${months} month${months === 1 ? '' : 's'} ago`;
+            if (years >= 1) return `${years} year${years === 1 ? '' : 's'} ago`;
+            
+            // Fallback to formatted date for edge cases
+            return date.toLocaleDateString();
+        }
+
+        function testCurrentTime() {
+            const now = new Date().toISOString();
+            const formatted = formatDate(now);
+            document.getElementById('results').innerHTML = `
+                <div class="test">
+                    <strong>Current Time Test:</strong><br>
+                    Timestamp: ${now}<br>
+                    Formatted: <strong>${formatted}</strong>
+                </div>
+            `;
+        }
+
+        function testFewSecondsAgo() {
+            const time = new Date(Date.now() - 15000).toISOString(); // 15 seconds ago
+            const formatted = formatDate(time);
+            document.getElementById('results').innerHTML = `
+                <div class="test">
+                    <strong>15 Seconds Ago Test:</strong><br>
+                    Timestamp: ${time}<br>
+                    Formatted: <strong>${formatted}</strong>
+                </div>
+            `;
+        }
+
+        function testFewMinutesAgo() {
+            const time = new Date(Date.now() - 5 * 60 * 1000).toISOString(); // 5 minutes ago
+            const formatted = formatDate(time);
+            document.getElementById('results').innerHTML = `
+                <div class="test">
+                    <strong>5 Minutes Ago Test:</strong><br>
+                    Timestamp: ${time}<br>
+                    Formatted: <strong>${formatted}</strong>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
