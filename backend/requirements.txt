@@ -8,3 +8,8 @@ pydantic==2.7.2
 pydantic-settings==2.3.0
 sqlalchemy==2.0.30
 aiofiles==23.2.1
+# PDF processing and vector storage for document Q&A
+PyPDF2==3.0.1
+faiss-cpu==1.7.4
+langchain-text-splitters==0.2.2
+python-multipart>=0.0.7

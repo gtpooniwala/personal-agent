@@ -54,3 +54,35 @@ class HealthResponse(BaseModel):
     status: str = Field(..., description="Service status")
     timestamp: str = Field(..., description="Health check timestamp")
     version: str = Field("1.0.0", description="API version")
+
+
+# Document-related models
+class DocumentUploadResponse(BaseModel):
+    """Response model for document upload."""
+    document_id: str = Field(..., description="Unique document ID")
+    filename: str = Field(..., description="Original filename")
+    file_size: int = Field(..., description="File size in bytes")
+    status: str = Field(..., description="Processing status")
+    message: str = Field(..., description="Status message")
+
+
+class DocumentInfo(BaseModel):
+    """Information about a document."""
+    id: str = Field(..., description="Document ID")
+    filename: str = Field(..., description="Original filename")
+    file_size: int = Field(..., description="File size in bytes")
+    upload_date: str = Field(..., description="Upload timestamp")
+    processed: str = Field(..., description="Processing status")
+    total_chunks: int = Field(..., description="Number of text chunks")
+
+
+class DocumentListResponse(BaseModel):
+    """Response model for document list."""
+    documents: List[DocumentInfo] = Field(..., description="List of documents")
+    total_count: int = Field(..., description="Total number of documents")
+
+
+class DocumentDeleteResponse(BaseModel):
+    """Response model for document deletion."""
+    success: bool = Field(..., description="Whether deletion was successful")
+    message: str = Field(..., description="Status message")

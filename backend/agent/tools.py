@@ -2,6 +2,10 @@ from langchain.tools import BaseTool
 from typing import Dict, List, Type, Any
 from datetime import datetime
 import math
+import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class CalculatorTool(BaseTool):
@@ -105,6 +109,96 @@ class TodoistTool(BaseTool):
         return self._run(query)
 
 
+class DocumentQATool(BaseTool):
+    """Tool for answering questions about uploaded documents using RAG."""
+    
+    name = "document_qa"
+    description = "Answer questions about uploaded documents. Use this when users ask about document content, want to search documents, or need information from their uploaded PDFs."
+    
+    def __init__(self, user_id: str = "default"):
+        super().__init__()
+        # Use object.__setattr__ to bypass Pydantic validation
+        object.__setattr__(self, '_user_id', user_id)
+    
+    def _run(self, query: str) -> str:
+        """Search documents and provide answers based on content."""
+        try:
+            # Import here to avoid circular imports
+            from services.document_service import doc_processor
+            
+            # Use the synchronous version to avoid event loop conflicts
+            results = doc_processor.search_documents_sync(query, self._user_id, limit=3)
+            
+            if not results:
+                return "I couldn't find any relevant information in your uploaded documents. Please make sure you have uploaded documents and they have been processed successfully."
+            
+            # Format response with relevant document excerpts
+            response_parts = ["Based on your uploaded documents, here's what I found:\n"]
+            
+            for i, result in enumerate(results, 1):
+                similarity_score = result.get('similarity', 0)
+                if similarity_score > 0.7:  # High relevance
+                    relevance = "highly relevant"
+                elif similarity_score > 0.5:  # Medium relevance
+                    relevance = "moderately relevant"
+                else:
+                    relevance = "somewhat relevant"
+                
+                response_parts.append(
+                    f"**{i}. From '{result['document_name']}' (chunk {result['chunk_index'] + 1}) - {relevance}:**\n"
+                    f"{result['content'][:500]}{'...' if len(result['content']) > 500 else ''}\n"
+                )
+            
+            response_parts.append(
+                f"\n*Found {len(results)} relevant passages. "
+                f"The information comes from {len(set(r['document_name'] for r in results))} document(s).*"
+            )
+            
+            return "\n".join(response_parts)
+            
+        except Exception as e:
+            logger.error(f"Error in document Q&A: {str(e)}")
+            return f"I encountered an error while searching your documents: {str(e)}"
+    
+    async def _arun(self, query: str) -> str:
+        """Async version of the tool."""
+        try:
+            from services.document_service import doc_processor
+            
+            results = await doc_processor.search_documents(query, self._user_id, limit=3)
+            
+            if not results:
+                return "I couldn't find any relevant information in your uploaded documents. Please make sure you have uploaded documents and they have been processed successfully."
+            
+            # Format response with relevant document excerpts
+            response_parts = ["Based on your uploaded documents, here's what I found:\n"]
+            
+            for i, result in enumerate(results, 1):
+                similarity_score = result.get('similarity', 0)
+                if similarity_score > 0.7:  # High relevance
+                    relevance = "highly relevant"
+                elif similarity_score > 0.5:  # Medium relevance
+                    relevance = "moderately relevant"
+                else:
+                    relevance = "somewhat relevant"
+                
+                response_parts.append(
+                    f"**{i}. From '{result['document_name']}' (chunk {result['chunk_index'] + 1}) - {relevance}:**\n"
+                    f"{result['content'][:500]}{'...' if len(result['content']) > 500 else ''}\n"
+                )
+            
+            response_parts.append(
+                f"\n*Found {len(results)} relevant passages. "
+                f"The information comes from {len(set(r['document_name'] for r in results))} document(s).*"
+            )
+            
+            return "\n".join(response_parts)
+            
+        except Exception as e:
+            logger.error(f"Error in document Q&A: {str(e)}")
+            return f"I encountered an error while searching your documents: {str(e)}"
+
+
 class ToolRegistry:
     """Registry for managing available tools."""
     
@@ -119,6 +213,9 @@ class ToolRegistry:
         self._tools["calculator"] = CalculatorTool()
         self._tools["current_time"] = CurrentTimeTool()
         
+        # Document Q&A tool with user context
+        self._tools["document_qa"] = DocumentQATool(self.user_id)
+        
         # Placeholder tools for future implementation (no user_id needed for now)
         self._tools["gmail"] = GmailTool()
         self._tools["calendar"] = CalendarTool()
@@ -126,8 +223,8 @@ class ToolRegistry:
     
     def get_available_tools(self) -> List[BaseTool]:
         """Get list of available tools for the agent."""
-        # For MVP, only return working tools
-        working_tools = ["calculator", "current_time"]
+        # Include working tools including document Q&A
+        working_tools = ["calculator", "current_time", "document_qa"]
         return [self._tools[tool_name] for tool_name in working_tools]
     
     def get_all_tools(self) -> List[BaseTool]:

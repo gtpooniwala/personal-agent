@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Text, Integer, ForeignKey
+from sqlalchemy import Column, String, DateTime, Text, Integer, ForeignKey, LargeBinary, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -57,3 +57,43 @@ class MemoryStore(Base):
     
     # Relationship to conversation
     conversation = relationship("Conversation", back_populates="memory_entries")
+
+
+class Document(Base):
+    """Document model for storing uploaded documents."""
+    __tablename__ = "documents"
+    
+    id = Column(String, primary_key=True, default=generate_id)
+    filename = Column(String, nullable=False)
+    original_filename = Column(String, nullable=False)
+    file_size = Column(Integer, nullable=False)
+    content_type = Column(String, nullable=False, default="application/pdf")
+    upload_date = Column(DateTime, default=datetime.utcnow)
+    user_id = Column(String, default="default")  # For future multi-user support
+    
+    # Document processing status
+    processed = Column(String, default="pending")  # pending, processing, completed, failed
+    total_chunks = Column(Integer, default=0)
+    
+    # Relationship to document chunks
+    chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
+
+
+class DocumentChunk(Base):
+    """Document chunk model for storing text chunks with embeddings."""
+    __tablename__ = "document_chunks"
+    
+    id = Column(String, primary_key=True, default=generate_id)
+    document_id = Column(String, ForeignKey("documents.id"), nullable=False)
+    chunk_index = Column(Integer, nullable=False)
+    content = Column(Text, nullable=False)
+    page_number = Column(Integer, nullable=True)
+    
+    # Vector embeddings (stored as binary data)
+    embedding = Column(LargeBinary, nullable=True)
+    embedding_model = Column(String, default="text-embedding-ada-002")
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationship to document
+    document = relationship("Document", back_populates="chunks")
