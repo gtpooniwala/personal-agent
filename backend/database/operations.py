@@ -1,0 +1,171 @@
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
+from database.models import Base, Conversation, Message, MemoryStore
+from config import settings
+from typing import List, Optional, Dict, Any
+import json
+from datetime import datetime
+
+
+class DatabaseOperations:
+    """Database operations for the personal agent."""
+    
+    def __init__(self):
+        self.engine = create_engine(f"sqlite:///{settings.database_path}")
+        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+        self.init_database()
+    
+    def init_database(self):
+        """Initialize database tables."""
+        Base.metadata.create_all(bind=self.engine)
+    
+    def get_session(self) -> Session:
+        """Get database session."""
+        return self.SessionLocal()
+    
+    def create_conversation(self, title: str = None, user_id: str = "default") -> str:
+        """Create a new conversation and return its ID."""
+        if not title:
+            title = f"Conversation {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+        
+        session = self.get_session()
+        try:
+            conversation = Conversation(title=title, user_id=user_id)
+            session.add(conversation)
+            session.commit()
+            return conversation.id
+        finally:
+            session.close()
+    
+    def get_conversations(self, user_id: str = "default") -> List[Dict[str, Any]]:
+        """Get all conversations for a user."""
+        session = self.get_session()
+        try:
+            conversations = session.query(Conversation).filter(
+                Conversation.user_id == user_id
+            ).order_by(Conversation.updated_at.desc()).all()
+            
+            return [
+                {
+                    "id": conv.id,
+                    "title": conv.title,
+                    "created_at": conv.created_at.isoformat(),
+                    "updated_at": conv.updated_at.isoformat(),
+                    "message_count": len(conv.messages)
+                }
+                for conv in conversations
+            ]
+        finally:
+            session.close()
+    
+    def save_message(
+        self, 
+        conversation_id: str, 
+        role: str, 
+        content: str,
+        agent_actions: Optional[str] = None,
+        token_usage: Optional[int] = None
+    ) -> str:
+        """Save a message to the database."""
+        session = self.get_session()
+        try:
+            message = Message(
+                conversation_id=conversation_id,
+                role=role,
+                content=content,
+                agent_actions=agent_actions,
+                token_usage=token_usage
+            )
+            session.add(message)
+            
+            # Update conversation timestamp
+            conversation = session.query(Conversation).filter(
+                Conversation.id == conversation_id
+            ).first()
+            if conversation:
+                conversation.updated_at = datetime.utcnow()
+            
+            session.commit()
+            return message.id
+        finally:
+            session.close()
+    
+    def get_conversation_history(self, conversation_id: str) -> List[Dict[str, Any]]:
+        """Get conversation message history."""
+        session = self.get_session()
+        try:
+            messages = session.query(Message).filter(
+                Message.conversation_id == conversation_id
+            ).order_by(Message.timestamp.asc()).all()
+            
+            return [
+                {
+                    "id": msg.id,
+                    "role": msg.role,
+                    "content": msg.content,
+                    "timestamp": msg.timestamp.isoformat(),
+                    "agent_actions": json.loads(msg.agent_actions) if msg.agent_actions else None,
+                    "token_usage": msg.token_usage
+                }
+                for msg in messages
+            ]
+        finally:
+            session.close()
+    
+    def save_conversation_memory(self, conversation_id: str, key: str, value: str):
+        """Save conversation memory data for LangChain."""
+        session = self.get_session()
+        try:
+            # Remove existing entry for this key
+            session.query(MemoryStore).filter(
+                MemoryStore.conversation_id == conversation_id,
+                MemoryStore.key == key
+            ).delete()
+            
+            # Add new entry
+            memory_entry = MemoryStore(
+                conversation_id=conversation_id,
+                key=key,
+                value=value
+            )
+            session.add(memory_entry)
+            session.commit()
+        finally:
+            session.close()
+    
+    def load_conversation_memory(self, conversation_id: str) -> Dict[str, str]:
+        """Load conversation memory data for LangChain."""
+        session = self.get_session()
+        try:
+            memory_entries = session.query(MemoryStore).filter(
+                MemoryStore.conversation_id == conversation_id
+            ).all()
+            
+            return {entry.key: entry.value for entry in memory_entries}
+        finally:
+            session.close()
+    
+    def get_conversation(self, conversation_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific conversation by ID."""
+        session = self.get_session()
+        try:
+            conversation = session.query(Conversation).filter(
+                Conversation.id == conversation_id
+            ).first()
+            
+            if not conversation:
+                return None
+            
+            return {
+                "id": conversation.id,
+                "title": conversation.title,
+                "created_at": conversation.created_at.isoformat(),
+                "updated_at": conversation.updated_at.isoformat(),
+                "user_id": conversation.user_id
+            }
+        finally:
+            session.close()
+
+
+# Global database operations instance
+db_ops = DatabaseOperations()

@@ -1,0 +1,10 @@
+langchain==0.2.16
+langchain-openai==0.1.25
+langchain-community==0.2.16
+fastapi==0.111.0
+uvicorn[standard]==0.30.0
+python-dotenv==1.0.1
+pydantic==2.7.2
+pydantic-settings==2.3.0
+sqlalchemy==2.0.30
+aiofiles==23.2.1
