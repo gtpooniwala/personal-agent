@@ -1,0 +1,359 @@
+[
+  {
+    "query": "hi",
+    "description": "Simple greeting",
+    "response": "Hello! How can I assist you today?",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "hello",
+    "description": "Simple greeting",
+    "response": "Hello! How can I assist you today?",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "hey there",
+    "description": "Casual greeting",
+    "response": "Hello! How can I assist you today?",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "how are you?",
+    "description": "Personal greeting",
+    "response": "I'm here and ready to assist you. How can I help you today?",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "what's up",
+    "description": "Casual greeting",
+    "response": "Not much, just here to assist you with anything you need. How can I help you today?",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "How can you help me?",
+    "description": "General capability question",
+    "response": "I can help you with a wide range of tasks, from answering questions to providing explanations and discussions on various topics. Just let me know what you need assistance with!",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "What can you do?",
+    "description": "Capability inquiry",
+    "response": "I can assist with a wide range of tasks, from answering questions to providing explanations and discussions on various topics. Feel free to ask me anything you'd like help with!",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "Thank you",
+    "description": "Gratitude expression",
+    "response": "You're welcome! If you have any more questions or need assistance, feel free to ask.",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "That's interesting",
+    "description": "Conversational response",
+    "response": "I'm glad you find it interesting! Is there anything specific you'd like to learn more about or discuss further?",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "What is 15 + 27?",
+    "description": "Simple addition",
+    "response": "The result of 15 + 27 is 42. Is there anything else you would like to calculate or ask about?",
+    "tools_used": [
+      "calculator"
+    ],
+    "expected_tool": "calculator",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used only calculator"
+  },
+  {
+    "query": "Calculate 123 * 456",
+    "description": "Multiplication",
+    "response": "The result of 123 * 456 is 56,088.",
+    "tools_used": [
+      "calculator"
+    ],
+    "expected_tool": "calculator",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used only calculator"
+  },
+  {
+    "query": "What's 1000 divided by 25?",
+    "description": "Division",
+    "response": "1000 divided by 25 is 40.",
+    "tools_used": [
+      "calculator"
+    ],
+    "expected_tool": "calculator",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used only calculator"
+  },
+  {
+    "query": "What is 100 - 37?",
+    "description": "Subtraction",
+    "response": "The result of 100 - 37 is 63.",
+    "tools_used": [
+      "calculator"
+    ],
+    "expected_tool": "calculator",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used only calculator"
+  },
+  {
+    "query": "What time is it?",
+    "description": "Direct time query",
+    "response": "The current date and time is June 9, 2025, 8:51 PM.",
+    "tools_used": [
+      "current_time"
+    ],
+    "expected_tool": "current_time",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used only current_time"
+  },
+  {
+    "query": "What's the current time?",
+    "description": "Current time request",
+    "response": "The current time is 20:51:37 on June 9, 2025.",
+    "tools_used": [
+      "current_time"
+    ],
+    "expected_tool": "current_time",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used only current_time"
+  },
+  {
+    "query": "Tell me the time",
+    "description": "Time request",
+    "response": "The current date and time is 2025-06-09 20:51:39.",
+    "tools_used": [
+      "current_time"
+    ],
+    "expected_tool": "current_time",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used only current_time"
+  },
+  {
+    "query": "Save a note that the user prefers morning meetings",
+    "description": "Agent saves context",
+    "response": "Note saved that the user prefers morning meetings.",
+    "tools_used": [
+      "scratchpad"
+    ],
+    "expected_tool": "scratchpad",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used only scratchpad"
+  },
+  {
+    "query": "Remember that the current task is planning a trip",
+    "description": "Agent saves task context",
+    "response": "Got it! I've saved the current task as \"Planning a trip\" in my memory. How can I assist you with planning your trip?",
+    "tools_used": [
+      "scratchpad"
+    ],
+    "expected_tool": "scratchpad",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used only scratchpad"
+  },
+  {
+    "query": "Add to scratchpad: user mentioned budget of $5000",
+    "description": "Agent saves important details",
+    "response": "Got it, I've noted that the user mentioned a budget of $5000. How can I assist you further?",
+    "tools_used": [
+      "scratchpad"
+    ],
+    "expected_tool": "scratchpad",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used only scratchpad"
+  },
+  {
+    "query": "Show my scratchpad",
+    "description": "Agent reads context",
+    "response": "Here is the content of your scratchpad:\n\n1. User prefers morning meetings\n2. Current task: Planning a trip\n3. User mentioned a budget of $5000\n\nIs there anything specific you would like to do with this information?",
+    "tools_used": [
+      "scratchpad"
+    ],
+    "expected_tool": "scratchpad",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used only scratchpad"
+  },
+  {
+    "query": "What context do I have saved?",
+    "description": "Agent displays context",
+    "response": "Here is the context you have saved in your scratchpad:\n\n1. User prefers morning meetings.\n2. Current task: planning a trip.\n3. User mentioned a budget of $5000.",
+    "tools_used": [
+      "scratchpad"
+    ],
+    "expected_tool": "scratchpad",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used only scratchpad"
+  },
+  {
+    "query": "Search scratchpad for budget",
+    "description": "Agent searches context",
+    "response": "I found a note in the scratchpad where you mentioned a budget of $5000 on June 9, 2025.",
+    "tools_used": [
+      "scratchpad"
+    ],
+    "expected_tool": "scratchpad",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used only scratchpad"
+  },
+  {
+    "query": "Update note 1 with new information",
+    "description": "Agent updates context",
+    "response": "Note #1 has been successfully updated with the new information.",
+    "tools_used": [
+      "scratchpad",
+      "scratchpad"
+    ],
+    "expected_tool": "scratchpad",
+    "should_not_use_tools": false,
+    "passed": false,
+    "reason": "\u274c Used scratchpad but also used other tools: ['scratchpad', 'scratchpad']"
+  },
+  {
+    "query": "Clear my scratchpad when done",
+    "description": "Agent clears context",
+    "response": "Your scratchpad has been cleared. How can I assist you further?",
+    "tools_used": [
+      "scratchpad"
+    ],
+    "expected_tool": "scratchpad",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used only scratchpad"
+  },
+  {
+    "query": "Save progress: completed step 1 of the plan",
+    "description": "Agent tracks progress",
+    "response": "Great job on completing step 1 of the plan! What's next on your agenda?",
+    "tools_used": [
+      "scratchpad"
+    ],
+    "expected_tool": "scratchpad",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used only scratchpad"
+  },
+  {
+    "query": "Remember the user's timezone is PST",
+    "description": "Agent saves user preference",
+    "response": "Got it! I've saved the user's timezone as PST in my memory. How can I assist you further?",
+    "tools_used": [
+      "scratchpad"
+    ],
+    "expected_tool": "scratchpad",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used only scratchpad"
+  },
+  {
+    "query": "What information is in my documents?",
+    "description": "Document query without actual documents",
+    "response": "I currently do not have access to your documents or personal information. If you have any specific questions or need assistance with a particular topic, feel free to ask!",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "Tell me about the uploaded files",
+    "description": "File query without actual documents",
+    "response": "I don't have access to information about uploaded files. Could you provide more details or context so I can better assist you?",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "Search my documents for information about AI",
+    "description": "Search query without actual documents",
+    "response": "I have saved your request to search your documents for information about AI. Let me know if there is anything specific you are looking for or if you need any assistance with that search.",
+    "tools_used": [
+      "scratchpad"
+    ],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": false,
+    "reason": "\u274c Unexpectedly used tools: ['scratchpad']"
+  },
+  {
+    "query": "hi",
+    "description": "Historical issue: returned '12' from calculator",
+    "response": "Hello! How can I assist you today?",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "hello",
+    "description": "Historical issue: returned 'N/A'",
+    "response": "Hello! How can I assist you today?",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "how are you",
+    "description": "Historical issue: empty response",
+    "response": "I'm just a computer program, so I don't have feelings, but I'm here and ready to assist you with any questions or tasks you have. How can I help you today?",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  }
+]

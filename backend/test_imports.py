@@ -13,13 +13,13 @@ sys.path.insert(0, backend_dir)
 print("Testing imports...")
 
 try:
-    from agent.core import PersonalAgent
-    print("✅ PersonalAgent import successful")
+    from orchestrator.core import CoreOrchestrator
+    print("✅ CoreOrchestrator import successful")
 except Exception as e:
-    print(f"❌ PersonalAgent import failed: {e}")
+    print(f"❌ CoreOrchestrator import failed: {e}")
 
 try:
-    from agent.tools import ToolRegistry
+    from orchestrator.tool_registry import ToolRegistry
     print("✅ ToolRegistry import successful")
 except Exception as e:
     print(f"❌ ToolRegistry import failed: {e}")

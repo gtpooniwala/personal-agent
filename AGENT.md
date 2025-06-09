@@ -1,35 +1,44 @@
-# Personal Agent MVP - AI Agent Technical Documentation
+# Personal Agent MVP - Orchestrator Architecture Technical Documentation
 
-This document provides comprehensive technical implementation details, architecture insights, and development guidance specifically designed for AI agents contributing to the Personal Agent MVP codebase. For user-facing documentation, see [README.md](README.md).
+This document provides comprehensive technical implementation details for the **orchestrator architecture**, designed specifically for AI agents and developers contributing to the Personal Agent MVP codebase. For user-facing documentation, see [README.md](README.md).
 
-## 🎯 Core Architecture & Innovation
+## 🎯 Core Orchestrator Architecture & Innovation
 
-### Hybrid Intelligence Routing System
+### Modular Orchestrator System
 
-The Personal Agent MVP implements a sophisticated **hybrid intelligence routing system** that solves a fundamental problem in AI assistants: when to use tools vs. when to respond naturally.
+The Personal Agent MVP implements a sophisticated **modular orchestrator architecture** that solves fundamental scalability problems in AI assistant systems: centralized decision-making with distributed specialized capabilities.
 
-**Key Innovation**: The system uses **agent-driven tool selection** rather than hardcoded rules, allowing the LangChain ReAct agent to intelligently decide when tools are needed based on natural language understanding and context.
+**Key Innovation**: The system uses a **CoreOrchestrator** that serves as an intelligent hub, delegating to specialized tools/agents rather than managing everything monolithically. This enables:
+
+- **Scalable Tool Addition**: New capabilities require only implementing the tool + minimal orchestrator updates
+- **Context-Aware Tool Management**: Tools can be dynamically available based on user context
+- **Separation of Concerns**: Each tool focuses on its specific domain expertise
+- **Maintainable Architecture**: Clear boundaries between orchestration logic and tool implementation
 
 ### Architecture Flow
 
 ```text
-User Query → LangChain Agent Intelligence → Dynamic Route Decision
-                                                    ↓
-        General Knowledge → Direct LLM → Natural Response (Fast)
-                                                    ↓  
-        Computational Task → Agent + Tools → Tool-Enhanced Response
+User Request → CoreOrchestrator → Tool Analysis → Delegation Decision
+                    ↓                                       ↓
+           Context Assessment                      Tool Selection
+                    ↓                                       ↓
+           Available Tools Query                   Specialized Tool
+                    ↓                                       ↓
+           Dynamic Tool Registry              Tool Execution & Response
+                    ↓                                       ↓
+           Orchestrated Response ←─────────── Result Integration
 ```
 
-**Critical Architectural Decision**: The system previously used hardcoded phrase detection (`_message_needs_tools()` function) which was removed in favor of agent intelligence. This change enables:
+**Critical Architectural Decision**: The system moved from a monolithic `PersonalAgent` to a modular `CoreOrchestrator` + specialized tools architecture. This change enables:
 
-- Natural conversation without trigger words
-- Context-aware tool selection
-- Better user experience
-- Self-improving tool usage
+- Easy addition of new capabilities
+- Better separation of concerns
+- Context-dependent tool availability
+- Scalable maintenance and development
 
 ## 🏗️ Technical Implementation
 
-### Backend Structure (FastAPI + LangChain)
+### Orchestrator Architecture (FastAPI + LangChain + Modular Tools)
 
 ```text
 ┌─────────────────┐    ┌─────────────────────────────────┐    ┌─────────────────┐
@@ -37,35 +46,140 @@ User Query → LangChain Agent Intelligence → Dynamic Route Decision
 │   (HTML/JS)     │◄──►│      (FastAPI)                  │◄──►│   (SQLite)      │
 │                 │    │                                 │    │                 │
 │ • Chat UI       │    │  ┌─────────────────────────────┐ │    │ • Conversations │
-│ • Tool Display  │    │  │    HYBRID INTELLIGENCE      │ │    │ • Messages      │
-│ • History       │    │  │     ROUTING LAYER           │ │    │ • Tool Usage    │
-└─────────────────┘    │  │                             │ │    └─────────────────┘
-                       │  │  ┌─────────────────────────┐ │ │
-                       │  │  │   LangChain Agent       │ │ │
-                       │  │  │   (ReAct Pattern)       │ │ │
-                       │  │  │                         │ │ │
-                       │  │  │ • Analyzes user input   │ │ │
-                       │  │  │ • Decides tool usage    │ │ │
-                       │  │  │ • Manages conversation  │ │ │
-                       │  │  │ • Executes reasoning    │ │ │
+│ • Tool Display  │    │  │    CORE ORCHESTRATOR        │ │    │ • Messages      │
+│ • History       │    │  │     ARCHITECTURE            │ │    │ • Tool Actions  │
+└─────────────────┘    │  │                             │ │    │ • Documents     │
+                       │  │  ┌─────────────────────────┐ │ │    │ • Embeddings    │
+                       │  │  │   CoreOrchestrator      │ │ │    └─────────────────┘
+                       │  │  │   (Decision Maker)      │ │ │              │
+                       │  │  │                         │ │ │              │
+                       │  │  │ • Analyzes user input   │ │ │              │
+                       │  │  │ • Queries tool registry │ │ │              │
+                       │  │  │ • Delegates to tools    │ │ │              │
+                       │  │  │ • Manages conversation  │ │ │              │
+                       │  │  └─────────────────────────┘ │ │              │
+                       │  │                             │ │              │
+                       │  │  ┌─────────────────────────┐ │ │              │
+                       │  │  │   ToolRegistry          │ │ │              │
+                       │  │  │   (Dynamic Management)  │ │ │              │
+                       │  │  │                         │ │ │              │
+                       │  │  │ • Available tools       │ │ │              │
+                       │  │  │ • Context dependencies  │ │ │              │
+                       │  │  │ • Tool metadata         │ │ │              │
+                       │  │  └─────────────────────────┘ │ │              │
+                       │  │                             │ │              │
+                       │  │  ┌─────────────────────────┐ │ │              │
+                       │  │  │   Specialized Tools     │ │ │              │
+                       │  │  │   (Domain Experts)      │ │ │              │
+                       │  │  │                         │ │ │              │
+                       │  │  │ ✅ Calculator Tool       │ │ │              │
+                       │  │  │ ✅ Time Tool             │ │ │              │
+                       │  │  │ ✅ Document Q&A Tool     │ │ │◄─────────────┘
+                       │  │  │ 🚧 Gmail Tool            │ │ │
+                       │  │  │ 🚧 Calendar Tool         │ │ │
+                       │  │  │ 🚧 Todoist Tool          │ │ │
                        │  │  └─────────────────────────┘ │ │
-                       │  │              │               │ │
-                       │  │              ▼               │ │
-                       │  │  ┌─────────────────────────┐ │ │
-                       │  │  │    Tool Registry        │ │ │
-                       │  │  │                         │ │ │
-                       │  │  │ • Calculator Tool       │ │ │
-                       │  │  │ • Time Tool             │ │ │
-                       │  │  │ • Future: Gmail, etc.   │ │ │
-                       │  │  └─────────────────────────┘ │ │
-                       │  └─────────────────────────────┐ │ │
-                       └─────────────────────────────────┘ │
-                                        │                   │
-                                        ▼                   │
-                              ┌─────────────────┐           │
-                              │   OpenAI GPT    │           │
-                              │   External API  │           │
-                              └─────────────────┘           │
+                       │  └─────────────────────────────┘ │
+                       └─────────────────────────────────┘
+                                        │
+                                        ▼
+                              ┌─────────────────┐
+                              │   OpenAI APIs   │
+                              │                 │
+                              │ • GPT-3.5-turbo │
+                              │ • text-embedding│
+                              │   -ada-002      │
+                              └─────────────────┘
+```
+
+### Detailed Information Flow Architecture
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                USER REQUEST                                     │
+└─────────────────────────────┬───────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                          CORE ORCHESTRATOR                                     │
+│                                                                                 │
+│  STEP 1: Intent Analysis                                                        │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │ GPT-3.5-turbo analyzes user request for:                                 │   │
+│  │ • Mathematical expressions                                                │   │
+│  │ • Time/date queries                                                       │   │
+│  │ • Document references                                                     │   │
+│  │ • Email/calendar/task mentions                                            │   │
+│  │ • General conversation                                                    │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                                      │                                          │
+│                                      ▼                                          │
+│  STEP 2: Context Assessment                                                     │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │ Tool Registry checks:                                                     │   │
+│  │ • Are documents selected? → Document Q&A available                       │   │
+│  │ • User authentication status → Integration tools availability             │   │
+│  │ • Previous conversation context                                           │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                                      │                                          │
+│                                      ▼                                          │
+│  STEP 3: Tool Selection Decision                                                │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │ Orchestrator decides:                                                     │   │
+│  │ ├─ Direct response (no tools needed)                                      │   │
+│  │ ├─ Calculator Tool (math expressions)                                     │   │
+│  │ ├─ Time Tool (date/time queries)                                          │   │
+│  │ ├─ Document Q&A Tool (document questions)                                 │   │
+│  │ └─ Integration Tools (email/calendar/tasks)                               │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────┬───────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                            TOOL EXECUTION                                      │
+├─────────────────┬─────────────────┬─────────────────┬─────────────────────────────┤
+│                 │                 │                 │                             │
+│  ✅ IMPLEMENTED  │  ✅ IMPLEMENTED  │  ✅ IMPLEMENTED  │     🚧 PLACEHOLDERS         │
+│                 │                 │                 │                             │
+│ ┌─────────────┐ │ ┌─────────────┐ │ ┌─────────────┐ │ ┌─────────────────────────┐ │
+│ │ Calculator  │ │ │    Time     │ │ │ Document    │ │ │ Gmail | Calendar |     │ │
+│ │    Tool     │ │ │    Tool     │ │ │  Q&A Tool   │ │ │       | Tool     | Todoist│ │
+│ │             │ │ │             │ │ │             │ │ │       |          | Tool   │ │
+│ │• Math eval  │ │ │• Current    │ │ │• Vector     │ │ │• "Not implemented"      │ │
+│ │• Security   │ │ │  time/date  │ │ │  search     │ │ │• Framework ready        │ │
+│ │• Error      │ │ │• Natural    │ │ │• Embeddings │ │ │• OAuth required         │ │
+│ │  handling   │ │ │  language   │ │ │• RAG        │ │ │• API integration needed │ │
+│ │             │ │ │             │ │ │  response   │ │ │                         │ │
+│ └─────────────┘ │ └─────────────┘ │ └─────────────┘ │ └─────────────────────────┘ │
+├─────────────────┼─────────────────┼─────────────────┼─────────────────────────────┤
+│     Result      │     Result      │     Result      │     "Not Available"         │
+│   (Computed)    │  (Timestamp)    │ (Document Info) │       Messages              │
+└─────────────────┴─────────────────┴─────────────────┴─────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                        RESPONSE GENERATION                                     │
+│                                                                                 │
+│  Orchestrator (GPT-3.5-turbo) compiles final response:                         │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │ • Integrates tool results into natural language                          │   │
+│  │ • Maintains conversation context and memory                               │   │
+│  │ • Provides source attribution (for document results)                     │   │
+│  │ • Returns structured response with metadata                               │   │
+│  │ • Tracks token usage and costs                                            │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────┬───────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                             USER RESPONSE                                      │
+│                                                                                 │
+│  Response includes:                                                             │
+│  • Natural language answer                                                      │
+│  • Tool usage transparency (if tools were used)                                │
+│  • Source information (for document queries)                                   │
+│  • Error messages (if tools failed)                                            │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Key Components & File Locations
@@ -179,47 +293,342 @@ function createAgentActionsHtml(agentActions) {
 }
 ```
 
-## 🔧 Current Tool System
+## 🔧 Comprehensive Tool System Architecture
+
+### Tool Implementation Status Overview
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           TOOL ECOSYSTEM                                       │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  ✅ PRODUCTION READY (4/6 tools)          🚧 FRAMEWORK READY (2/6 tools)        │
+│                                                                                 │
+│  ┌─────────────────────────────────┐     ┌─────────────────────────────────┐   │
+│  │         Calculator Tool         │     │          Gmail Tool             │   │
+│  │                                 │     │                                 │   │
+│  │ • Mathematical expressions      │     │ • Email search & management     │   │
+│  │ • Security validation           │     │ • Compose & send messages       │   │
+│  │ • Error handling                │     │ • Email automation              │   │
+│  │ • Exponentiation support        │     │ • OAuth integration needed      │   │
+│  │                                 │     │                                 │   │
+│  │ Status: ✅ IMPLEMENTED           │     │ Status: 🚧 PLACEHOLDER           │   │
+│  │ Availability: Always            │     │ Availability: Not available     │   │
+│  └─────────────────────────────────┘     └─────────────────────────────────┘   │
+│                                                                                 │
+│  ┌─────────────────────────────────┐     ┌─────────────────────────────────┐   │
+│  │           Time Tool             │     │        Calendar Tool            │   │
+│  │                                 │     │                                 │   │
+│  │ • Current date/time             │     │ • Event management              │   │
+│  │ • Multiple formats              │     │ • Meeting scheduling            │   │
+│  │ • Natural language queries      │     │ • Reminder system               │   │
+│  │ • Timezone awareness            │     │ • Google Calendar API needed    │   │
+│  │                                 │     │                                 │   │
+│  │ Status: ✅ IMPLEMENTED           │     │ Status: 🚧 PLACEHOLDER           │   │
+│  │ Availability: Always            │     │ Availability: Not available     │   │
+│  └─────────────────────────────────┘     └─────────────────────────────────┘   │
+│                                                                                 │
+│  ┌─────────────────────────────────┐     ┌─────────────────────────────────┐   │
+│  │         Scratchpad Tool         │     │         Todoist Tool            │   │
+│  │                                 │     │                                 │   │
+│  │ • Persistent note-taking        │     │ • Task management               │   │
+│  │ • User-specific storage         │     │ • Project organization          │   │
+│  │ • Search functionality          │     │ • Priority & due dates          │   │
+│  │ • Full CRUD operations          │     │ • Progress tracking             │   │
+│  │ • Context preservation          │     │                                 │   │
+│  │                                 │     │ Status: 🚧 PLACEHOLDER           │   │
+│  │ Status: ✅ IMPLEMENTED           │     │ Availability: Not available     │   │
+│  │ Availability: Always            │     │                                 │   │
+│  └─────────────────────────────────┘     └─────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Detailed Tool Specifications
+
+#### ✅ **Calculator Tool** (`backend/orchestrator/tools/calculator.py`)
+
+**Implementation Status**: ✅ Production Ready
+
+**Core Capabilities**:
+- Mathematical expression evaluation with security validation
+- Automatic conversion of `^` to `**` for user-friendly exponentiation
+- Input sanitization to prevent code injection
+- Comprehensive error handling for invalid expressions
+
+**Technical Details**:
+```python
+class CalculatorTool(BaseTool):
+    name = "calculator"
+    description = "Mathematical calculation tool for ANY numeric computations"
+    
+    def _run(self, query: str) -> str:
+        # Security validation
+        # Expression evaluation  
+        # Error handling
+```
+
+**Usage Examples**:
+- Input: "What is 2^4?" → Output: "The result is: 16"
+- Input: "Calculate 15 * 27" → Output: "The result is: 405"
+- Input: "invalid_function()" → Output: "Error: Invalid characters in mathematical expression"
+
+**Availability**: Always available to orchestrator
+
+---
+
+#### ✅ **Time Tool** (`backend/orchestrator/tools/time.py`)
+
+**Implementation Status**: ✅ Production Ready
+
+**Core Capabilities**:
+- Current date and time retrieval in multiple formats
+- Natural language processing for various time query formats
+- Timezone-aware responses
+- Flexible output formatting
+
+**Technical Details**:
+```python
+class CurrentTimeTool(BaseTool):
+    name = "current_time"
+    description = "Get current date and time information"
+    
+    def _run(self, query: str) -> str:
+        # Datetime processing
+        # Format detection
+        # Natural language response
+```
+
+**Usage Examples**:
+- Input: "What time is it?" → Output: "Current time: 2:30:45 PM EST, June 9, 2025"
+- Input: "What's today's date?" → Output: "Today is Monday, June 9, 2025"
+
+**Availability**: Always available to orchestrator
+
+---
+
+#### ✅ **Scratchpad Tool** (`backend/orchestrator/tools/scratchpad.py`)
+
+**Implementation Status**: ✅ Production Ready
+
+**Core Capabilities**:
+- Persistent note-taking and information storage across conversations
+- User-specific note management with JSON file storage
+- Search functionality for finding specific notes
+- Full CRUD operations (create, read, update, delete)
+- Conversation context preservation
+
+**Technical Details**:
+```python
+class ScratchpadTool(BaseTool):
+    name = "scratchpad"
+    description = "Persistent note-taking tool for saving and retrieving information"
+    
+    def __init__(self, user_id: str = "default"):
+        # User-specific note storage initialization
+        
+    def _run(self, query: str) -> str:
+        # Command parsing (save, read, search, delete, clear)
+        # JSON file operations
+        # User-friendly response formatting
+```
+
+**Usage Examples**:
+- Input: "Save a note that I need to call the dentist tomorrow" → Output: "✅ Note saved: 'I need to call the dentist tomorrow'"
+- Input: "Show my notes" → Output: "📝 Your Scratchpad (1 note(s)): 1. I need to call the dentist tomorrow"
+- Input: "Search for dentist" → Output: "🔍 Search results for 'dentist' (1 found): 1. I need to call the dentist tomorrow"
+
+**Implementation Highlights**:
+- User-specific storage in `/data/scratchpad_notes/`
+- Persistent JSON storage with timestamps
+- Graceful error handling and user feedback
+- Search functionality with case-insensitive matching
+
+**Availability**: Always available to orchestrator
+
+---
+
+#### ✅ **Document Q&A Tool** (`backend/orchestrator/tools/document_qa.py`)
+
+**Implementation Status**: ✅ Production Ready
+
+**Core Capabilities**:
+- RAG (Retrieval Augmented Generation) implementation
+- Vector semantic search using OpenAI text-embedding-ada-002
+- Multi-document search with relevance scoring
+- Source attribution and context preservation
+- Dynamic availability based on document selection
+
+**Technical Details**:
+```python
+class DocumentQATool(BaseTool):
+    name = "document_qa"
+    description = "Search and answer questions about uploaded documents"
+    
+    def __init__(self, user_id: str, selected_documents: List[str]):
+        # Context-dependent initialization
+        
+    def _run(self, query: str) -> str:
+        # Vector search implementation
+        # Relevance scoring
+        # Response formatting with sources
+```
+
+**Usage Examples**:
+- Input: "What does my contract say about termination?" → Output: "Based on your uploaded documents... [with source attribution]"
+- Input: "Search for pricing information" → Output: "Found relevant information in document X, page Y..."
+
+**Availability**: Context-dependent (only when documents are selected)
+
+**Vector Search Implementation**:
+- Uses OpenAI text-embedding-ada-002 model
+- Cosine similarity for relevance scoring
+- Chunk-based retrieval with metadata preservation
+
+---
+
+#### 🚧 **Gmail Tool** (`backend/orchestrator/tools/integrations.py`)
+
+**Implementation Status**: 🚧 Placeholder Framework
+
+**Planned Capabilities**:
+- Email search and filtering
+- Message composition and sending
+- Email organization (labels, folders)
+- Automation workflows
+- Intelligent email management
+
+**Current State**:
+```python
+class GmailTool(BaseIntegrationTool):
+    name = "gmail_search"
+    description = "Gmail integration tool for email management"
+    
+    def _run(self, query: str) -> str:
+        return "Gmail integration is not yet implemented..."
+```
+
+**Implementation Requirements**:
+- Gmail API integration
+- OAuth 2.0 authentication flow
+- Email processing and formatting
+- Security and privacy considerations
+
+**Availability**: Not available (placeholder implementation)
+
+---
+
+#### 🚧 **Calendar Tool** (`backend/orchestrator/tools/integrations.py`)
+
+**Implementation Status**: 🚧 Placeholder Framework
+
+**Planned Capabilities**:
+- Calendar event reading and creation
+- Meeting scheduling assistance
+- Reminder and notification management
+- Intelligent scheduling decisions
+
+**Current State**:
+```python
+class CalendarTool(BaseIntegrationTool):
+    name = "calendar_events"
+    description = "Google Calendar integration for schedule management"
+    
+    def _run(self, query: str) -> str:
+        return "Calendar integration is not yet implemented..."
+```
+
+**Implementation Requirements**:
+- Google Calendar API integration
+- OAuth 2.0 authentication
+- Natural language scheduling interpretation
+- Conflict resolution logic
+
+**Availability**: Not available (placeholder implementation)
+
+---
+
+#### 🚧 **Todoist Tool** (`backend/orchestrator/tools/integrations.py`)
+
+**Implementation Status**: 🚧 Placeholder Framework
+
+**Planned Capabilities**:
+- Task creation and management
+- Project organization
+- Priority and due date handling
+- Progress tracking and analytics
+
+**Current State**:
+```python
+class TodoistTool(BaseIntegrationTool):
+    name = "todoist_tasks"
+    description = "Todoist integration for task and project management"
+    
+    def _run(self, query: str) -> str:
+        return "Todoist integration is not yet implemented..."
+```
+
+**Implementation Requirements**:
+- Todoist API integration
+- Authentication handling
+- Task intelligence and organization
+- Project management workflows
+
+**Availability**: Not available (placeholder implementation)
+
+### Tool Registry Management
+
+The `ToolRegistry` (`backend/orchestrator/tool_registry.py`) manages tool lifecycle and availability:
+
+```python
+class ToolRegistry:
+    def _initialize_tools(self):
+        # Core computational tools (always available)
+        self._tools["calculator"] = CalculatorTool()
+        self._tools["current_time"] = CurrentTimeTool()
+        self._tools["scratchpad"] = ScratchpadTool()
+        
+        # Context-dependent tools
+        self._tools["document_qa"] = DocumentQATool(self.user_id, self.selected_documents)
+        
+        # Future integration tools (placeholders)
+        self._tools["gmail"] = GmailTool()
+        self._tools["calendar"] = CalendarTool()
+        self._tools["todoist"] = TodoistTool()
+    
+    def get_available_tools(self) -> List[Any]:
+        # Dynamic tool availability based on context
+        available_tools = ["calculator", "current_time", "scratchpad"]
+        
+        if len(self.selected_documents) > 0:
+            available_tools.append("document_qa")
+            
+        # Future: Conditional inclusion based on authentication
+        # if self.user_has_gmail_access:
+        #     available_tools.append("gmail")
+        
+        return [self._tools[tool_name] for tool_name in available_tools]
+```
 
 ### Working Tools
 
 #### Calculator Tool
 
-- **Purpose**: Mathematical expressions and calculations
-- **Key Feature**: Automatic `^` to `**` conversion for exponentiation
-- **Safety**: Validates input characters to prevent code injection
-- **Error Handling**: Graceful error messages for invalid expressions
-- **Usage Examples**:
-  - "What is 2^4?" → Uses calculator → "16"
-  - "Calculate 364 * 3" → Uses calculator → "1092"
+### Legacy Tool System Summary
 
-#### Current Time Tool
+> **Note**: For comprehensive tool documentation, see the "🔧 Comprehensive Tool System Architecture" section above.
 
-- **Purpose**: Date and time queries
-- **Natural Language**: Handles various query formats
-- **Usage Examples**:
-  - "What time is it?" → Uses time tool → Current timestamp
-  - "What's today's date?" → Uses time tool → Current date
+#### Quick Reference - Implemented Tools
 
-### Placeholder Tools (Ready for Implementation)
+**Calculator Tool**: ✅ Production ready - Mathematical expressions with security validation
+**Time Tool**: ✅ Production ready - Date/time queries with natural language processing  
+**Scratchpad Tool**: ✅ Production ready - Persistent note-taking and information storage
+**Document Q&A Tool**: ✅ Production ready - RAG-based document search (context-dependent)
 
-#### Gmail Tool (`GmailTool` class structure exists)
+#### Quick Reference - Placeholder Tools
 
-- Framework for email management
-- Read, send, search operations
-- OAuth integration ready
-
-#### Calendar Tool (`CalendarTool` class structure exists)
-
-- Google Calendar integration framework
-- Event creation, scheduling, reminders
-- OAuth integration ready
-
-#### Todoist Tool (`TodoistTool` class structure exists)
-
-- Task and project management
-- API integration framework
-- CRUD operations for tasks
+**Gmail Tool**: 🚧 Framework ready - Email management (OAuth needed)
+**Calendar Tool**: 🚧 Framework ready - Schedule management (Google API needed)
+**Todoist Tool**: 🚧 Framework ready - Task management (Todoist API needed)
 
 ## 📊 System Performance & Behavior
 
@@ -392,7 +801,7 @@ def get_available_tools(self) -> List[BaseTool]:
 
 ```text
 personal-agent/
-├── README.md                    # User-facing documentation
+├── README.md                    # User-facing documentation  
 ├── AGENT.md                     # This AI agent technical documentation
 ├── setup.sh                     # Automated conda environment setup
 ├── docs/                        # Detailed documentation
@@ -406,24 +815,40 @@ personal-agent/
 │   ├── main.py                 # FastAPI app entry point with CORS and lifespan
 │   ├── requirements.txt        # Python dependencies list
 │   ├── .env.example           # Environment configuration template
-│   ├── agent/                  # LangChain agent implementation
+│   ├── orchestrator/           # 🎯 CORE ORCHESTRATOR ARCHITECTURE
 │   │   ├── __init__.py        # Module initialization
-│   │   ├── core.py            # CRITICAL: Main PersonalAgent class with smart routing
+│   │   ├── core.py            # CoreOrchestrator - main decision maker
+│   │   ├── tool_registry.py   # Dynamic tool management system
+│   │   ├── memory.py          # Conversation memory system
+│   │   └── tools/             # Individual specialized tool modules
+│   │       ├── __init__.py        # Module initialization
+│   │       ├── calculator.py      # ✅ Mathematical calculations
+│   │       ├── time.py            # ✅ Date/time queries
+│   │       ├── scratchpad.py        # ✅ Persistent note-taking
+│   │       ├── document_qa.py     # ✅ RAG-based document search
+│   │       └── integrations.py    # 🚧 Gmail, Calendar, Todoist placeholders
+│   ├── agent/                  # Legacy agent implementation (compatibility)
+│   │   ├── __init__.py        # Module initialization
+│   │   ├── core.py            # PersonalAgent class with smart routing
 │   │   ├── memory.py          # Custom SQLite-backed LangChain memory
-│   │   └── tools.py           # Tool implementations and registry
+│   │   └── tools.py           # Original tool implementations and registry
 │   ├── api/                   # FastAPI routes and models
 │   │   ├── __init__.py        # Module initialization
 │   │   ├── models.py          # Pydantic request/response models
-│   │   └── routes.py          # API endpoint definitions
+│   │   └── routes.py          # API endpoint definitions using orchestrator
 │   ├── config/                # Configuration management
 │   │   ├── __init__.py        # Settings class with environment-based config
 │   │   └── settings.py        # Additional settings (currently minimal)
 │   ├── database/              # Database layer
 │   │   ├── __init__.py        # Module initialization
-│   │   ├── models.py          # SQLAlchemy models for conversations/messages
+│   │   ├── models.py          # SQLAlchemy models for conversations/messages/documents
 │   │   └── operations.py      # Database operations abstraction layer
+│   ├── services/              # External service integrations
+│   │   ├── __init__.py        # Module initialization
+│   │   └── document_service.py # PDF processing & vector search
 │   └── data/                  # SQLite database storage
-│       └── agent.db           # Auto-created SQLite database
+│       ├── agent.db           # Auto-created SQLite database
+│       └── uploads/           # Document upload directory
 ├── frontend/                  # Web interface
 │   └── index.html             # Complete single-page chat application
 └── tests/                     # Test infrastructure
@@ -431,6 +856,12 @@ personal-agent/
     ├── backend/tests/         # Backend test files
     └── html/                  # Frontend test files
 ```
+
+**Architecture Highlights**:
+- 🎯 **New `orchestrator/`**: Modular architecture with specialized tools
+- ✅ **Implemented Tools**: 4/6 tools production ready
+- 🚧 **Placeholder Tools**: 2/6 tools framework ready
+- 🔄 **Legacy `agent/`**: Backward compatibility maintained
 
 ## 🔄 Recent Major Changes (Important for Context)
 
@@ -463,6 +894,7 @@ personal-agent/
 - **Smart Agent Routing**: LangChain agent intelligently decides tool usage
 - **Calculator Tool**: Mathematical expressions with exponentiation support
 - **Current Time Tool**: Date/time queries with natural language processing
+- **Scratchpad Tool**: Persistent note-taking and information storage
 - **Conversation Memory**: Persistent SQLite-backed chat history
 - **Web Interface**: Professional tool display and conversation management
 - **Token Tracking**: Real-time OpenAI API cost monitoring

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from agent import PersonalAgent
+from orchestrator import CoreOrchestrator
 from api.models import (
     ChatRequest, ChatResponse, ConversationCreate, ConversationResponse,
     MessageResponse, ToolInfo, HealthResponse, DocumentUploadResponse,
@@ -16,15 +16,15 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Initialize personal agent
-agent = PersonalAgent()
+# Initialize core orchestrator
+orchestrator = CoreOrchestrator()
 
 # Async task functions for conversation maintenance
 async def async_generate_title(conversation_id: str):
     """Asynchronously generate title for a conversation."""
     try:
         logger.info(f"Starting async title generation for conversation: {conversation_id}")
-        title = await agent.generate_conversation_title(conversation_id)
+        title = await orchestrator.generate_conversation_title(conversation_id)
         if title:
             logger.info(f"Successfully generated title for {conversation_id}: {title}")
         else:
@@ -85,16 +85,24 @@ async def chat(request: ChatRequest):
         
         # Create new conversation if not provided
         if not conversation_id:
-            conversation_id = agent.create_conversation()
+            conversation_id = orchestrator.create_conversation()
         
-        # Process message with agent
-        result = await agent.process_message(
-            request.message, 
-            conversation_id,
+        # Process message with orchestrator
+        result = await orchestrator.process_request(
+            user_request=request.message, 
+            conversation_id=conversation_id,
             selected_documents=request.selected_documents
         )
         
-        return ChatResponse(**result)
+        # Return orchestrator response
+        return ChatResponse(
+            response=result["response"],
+            conversation_id=result["conversation_id"],
+            agent_actions=result.get("orchestration_actions"),
+            token_usage=result.get("token_usage"),
+            cost=result.get("cost"),
+            error=result.get("error", False)
+        )
         
     except Exception as e:
         logger.error(f"Error in chat endpoint: {str(e)}")
@@ -105,7 +113,7 @@ async def chat(request: ChatRequest):
 async def get_conversations():
     """Get all conversations for the user."""
     try:
-        conversations = agent.get_conversations()
+        conversations = orchestrator.get_conversations()
         
         # Trigger passive maintenance tasks (title generation and cleanup)
         logger.info(f"Running conversation maintenance check for {len(conversations)} conversations")
@@ -121,10 +129,10 @@ async def get_conversations():
 async def create_conversation(request: ConversationCreate):
     """Create a new conversation."""
     try:
-        conversation_id = agent.create_conversation(request.title or "New Conversation")
+        conversation_id = orchestrator.create_conversation(request.title or "New Conversation")
         
         # Get the created conversation details
-        conversations = agent.get_conversations()
+        conversations = orchestrator.get_conversations()
         conversation = next((c for c in conversations if c["id"] == conversation_id), None)
         
         if not conversation:
@@ -141,7 +149,7 @@ async def create_conversation(request: ConversationCreate):
 async def get_conversation_messages(conversation_id: str):
     """Get messages for a specific conversation."""
     try:
-        messages = agent.get_conversation_history(conversation_id)
+        messages = orchestrator.get_conversation_history(conversation_id)
         return [MessageResponse(**msg) for msg in messages]
     except Exception as e:
         logger.error(f"Error getting conversation messages: {str(e)}")
@@ -152,7 +160,7 @@ async def get_conversation_messages(conversation_id: str):
 async def get_available_tools():
     """Get list of available tools."""
     try:
-        tools = agent.get_available_tools()
+        tools = orchestrator.get_available_tools()
         return [ToolInfo(**tool) for tool in tools]
     except Exception as e:
         logger.error(f"Error getting tools: {str(e)}")
@@ -258,7 +266,7 @@ async def delete_document(document_id: str):
 async def generate_conversation_title(conversation_id: str):
     """Generate a title for a conversation using LLM."""
     try:
-        title = await agent.generate_conversation_title(conversation_id)
+        title = await orchestrator.generate_conversation_title(conversation_id)
         
         if not title:
             raise HTTPException(status_code=400, detail="Unable to generate title - conversation may be too short or have no messages")
