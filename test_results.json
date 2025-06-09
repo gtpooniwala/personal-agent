@@ -1,0 +1,236 @@
+[
+  {
+    "query": "hi",
+    "description": "Simple greeting",
+    "response": "Hello! How can I assist you today?",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "hello",
+    "description": "Simple greeting",
+    "response": "Hello! How can I assist you today?",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "hey there",
+    "description": "Casual greeting",
+    "response": "Hello! How can I assist you today?",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "how are you?",
+    "description": "Personal greeting",
+    "response": "I'm just a computer program, so I don't have feelings, but I'm here and ready to assist you with anything you need. How can I help you today?",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "what's up",
+    "description": "Casual greeting",
+    "response": "Not much, just here to assist you with anything you need. How can I help you today?",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "How can you help me?",
+    "description": "General capability question",
+    "response": "I can help you with a wide range of tasks, from answering questions to providing explanations and engaging in discussions on various topics. Just let me know what you need assistance with!",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "What can you do?",
+    "description": "Capability inquiry",
+    "response": "I can assist with a wide range of tasks, from answering questions to providing explanations and engaging in discussions on various topics. Just let me know how I can help!",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "Thank you",
+    "description": "Gratitude expression",
+    "response": "You're welcome! If you have any more questions or need assistance, feel free to ask.",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "That's interesting",
+    "description": "Conversational response",
+    "response": "I'm glad you find it interesting! Is there anything specific you'd like to learn more about or discuss further?",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "What is 15 + 27?",
+    "description": "Simple addition",
+    "response": "The result of 15 + 27 is 42. How can I assist you further?",
+    "tools_used": [
+      "calculator"
+    ],
+    "expected_tool": "calculator",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used calculator"
+  },
+  {
+    "query": "Calculate 123 * 456",
+    "description": "Multiplication",
+    "response": "The result of 123 * 456 is 56,088. Let me know if you need help with anything else!",
+    "tools_used": [
+      "calculator"
+    ],
+    "expected_tool": "calculator",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used calculator"
+  },
+  {
+    "query": "What's 1000 divided by 25?",
+    "description": "Division",
+    "response": "1000 divided by 25 is 40.",
+    "tools_used": [
+      "calculator"
+    ],
+    "expected_tool": "calculator",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used calculator"
+  },
+  {
+    "query": "What is 100 - 37?",
+    "description": "Subtraction",
+    "response": "The result of 100 - 37 is 63.",
+    "tools_used": [
+      "calculator"
+    ],
+    "expected_tool": "calculator",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used calculator"
+  },
+  {
+    "query": "What time is it?",
+    "description": "Direct time query",
+    "response": "The current date and time is June 9, 2025, 7:30 PM. How can I assist you further?",
+    "tools_used": [
+      "current_time"
+    ],
+    "expected_tool": "current_time",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used current_time"
+  },
+  {
+    "query": "What's the current time?",
+    "description": "Current time request",
+    "response": "The current time is 19:30:51 on June 9, 2025. How can I assist you further?",
+    "tools_used": [
+      "current_time"
+    ],
+    "expected_tool": "current_time",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used current_time"
+  },
+  {
+    "query": "Tell me the time",
+    "description": "Time request",
+    "response": "The current date and time is June 9, 2025, 7:30 PM. How can I assist you further?",
+    "tools_used": [
+      "current_time"
+    ],
+    "expected_tool": "current_time",
+    "should_not_use_tools": false,
+    "passed": true,
+    "reason": "\u2705 Correctly used current_time"
+  },
+  {
+    "query": "What information is in my documents?",
+    "description": "Document query without actual documents",
+    "response": "I'm sorry, but I don't have access to your personal documents. If you have specific questions or need assistance with a particular topic, feel free to ask and I'll do my best to help!",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "Tell me about the uploaded files",
+    "description": "File query without actual documents",
+    "response": "The uploaded files are documents, images, or other types of files that have been added to a system or platform. They can contain information, data, or media that can be accessed, viewed, or shared by users. If you have any specific questions about the uploaded files, feel free to ask!",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "Search my documents for information about AI",
+    "description": "Search query without actual documents",
+    "response": "I can't search your documents directly, but I can provide information about AI. Artificial Intelligence (AI) is a branch of computer science that focuses on creating machines that can perform tasks that typically require human intelligence, such as visual perception, speech recognition, decision-making, and language translation. AI technologies are used in a wide range of applications, including virtual assistants, self-driving cars, medical diagnosis, and more. If you have any specific questions about AI, feel free to ask!",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "hi",
+    "description": "Historical issue: returned '12' from calculator",
+    "response": "Hello! How can I assist you today?",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "hello",
+    "description": "Historical issue: returned 'N/A'",
+    "response": "Hello! How can I assist you today?",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  },
+  {
+    "query": "how are you",
+    "description": "Historical issue: empty response",
+    "response": "I'm just a computer program, so I don't have feelings, but I'm here and ready to assist you with any questions or tasks you have. How can I help you today?",
+    "tools_used": [],
+    "expected_tool": null,
+    "should_not_use_tools": true,
+    "passed": true,
+    "reason": "\u2705 Correctly avoided using tools"
+  }
+]

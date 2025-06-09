@@ -12,9 +12,11 @@ This directory contains all test files for the Personal Agent project, organized
 - `time_formatting_test.html` - Time formatting validation test
 
 ### `/backend/tests/` - Backend Test Files
-- `test_comprehensive.py` - Main comprehensive test suite (22 test cases)
+- `test_comprehensive.py` - Main comprehensive test suite (22 test cases) **[MOVED TO `backend/test_comprehensive.py`]**
   - Tests agent behavior, tool usage, mathematical calculations, time queries, document Q&A, and historical edge cases
-  - **Run with**: `python backend/tests/test_comprehensive.py`
+  - **Run with**: `python backend/test_comprehensive.py`
+- `test_imports.py` - Environment validation and import testing **[MOVED TO `backend/test_imports.py`]**
+  - **Run with**: `python backend/test_imports.py`
 
 ### `/backend/tests/legacy/` - Legacy/Utility Scripts
 - `fix_document_timestamps.py` - Database utility script for fixing document timestamps
@@ -26,9 +28,22 @@ This directory contains all test files for the Personal Agent project, organized
 
 ## Running Tests
 
+### Quick Environment Check
+```bash
+cd backend
+conda activate personalagent
+python test_imports.py
+```
+
 ### Main Test Suite
 ```bash
 cd backend
+conda activate personalagent
+python test_comprehensive.py
+```
+
+### Legacy Tests (in tests/ subdirectory)
+```bash
 python tests/test_comprehensive.py
 ```
 
