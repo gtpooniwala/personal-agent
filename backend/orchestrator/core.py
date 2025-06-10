@@ -64,23 +64,21 @@ class CoreOrchestrator:
         
         # Get available tools from the registry (no need for manual tool descriptions!)
         available_tools = self.tool_registry.get_available_tools()
-        
+
         # Get document context to inform the agent about document availability
         document_context = self._get_document_context()
-        
-        # Setup system prompt using best practices: no hard-coded tool descriptions or selection criteria
-        system_prompt = f"""# PERSONAL ASSISTANT CORE ORCHESTRATOR
+
+        # Default system prompt (always included)
+        system_prompt = """# PERSONAL ASSISTANT CORE ORCHESTRATOR
 
 ## IDENTITY & ROLE
 You are an intelligent personal assistant orchestrator. Your purpose is to understand user needs and execute appropriate tools to fulfill them efficiently. You operate using a Reasoning-Acting (ReAct) framework.
 
-## CONTEXT
-The following documents have been selected for this conversation:
-{self._format_document_status(document_context)}
-
 ## AGENT BEHAVIOR GUIDELINES
 - Use available tools when appropriate to answer user queries or perform actions.
 - Respond conversationally and naturally when no tool is needed.
+- For general knowledge questions (e.g., "What is the capital of France?"), answer directly using your own knowledge without invoking document or search tools.
+- Only mention missing document information if the answer cannot be found in the documents or via general knowledge.
 - Never ask the user for clarification; always attempt to execute the task to the best of your ability with the information provided.
 - Never explain which tool you will use—just use it.
 - Never guess or use a tool inappropriately; if unsure, do your best with the available information.
@@ -93,6 +91,11 @@ Your effectiveness is measured by:
 1. **Accuracy**: Right tool for the right query
 2. **Efficiency**: No unnecessary tool usage
 3. **Naturalness**: Smooth, conversational responses"""
+
+        # If files are available, append document context
+        if document_context.get('has_documents', False) and document_context.get('selected_count', 0) > 0:
+            system_prompt += f"""
+\n## CONTEXT\nThe following documents have been selected and available to you. Use search_document tool in case you need additional context for this conversation:\n{self._format_document_status(document_context)}"""
 
         # Create memory saver for this conversation
         memory = MemorySaver()
@@ -137,33 +140,32 @@ Your effectiveness is measured by:
             with get_openai_callback() as cb:
                 try:
                     # Let the LangGraph agent analyze and delegate
-                    # LangGraph uses messages format instead of input/output
                     config = {"configurable": {"thread_id": conversation_id}}
-                    
-                    # Create message format for LangGraph
                     messages = [HumanMessage(content=user_request)]
-                    
-                    # Run the agent
-                    result = self.orchestrator_agent.invoke(
-                        {"messages": messages}, 
-                        config=config
-                    )
-                    
-                    # Extract response and tool actions from LangGraph result
-                    if result and "messages" in result:
-                        # Get the last AI message as the response
+                    result = self.orchestrator_agent.invoke({"messages": messages}, config=config)
+
+                    # Extract tool usage from all messages in the conversation
+                    orchestration_actions = self._extract_langgraph_actions(result["messages"]) if result and "messages" in result else []
+
+                    # Prepare tool results for response agent
+                    tool_results = orchestration_actions if orchestration_actions else []
+
+                    # Call the response agent tool to synthesize the final response
+                    response_agent_tool = self.tool_registry._tools.get("response_agent")
+                    if response_agent_tool:
+                        conversation_history = db_ops.get_conversation_history(conversation_id)
+                        response = response_agent_tool._run(
+                            user_query=user_request,
+                            tool_results=tool_results,
+                            conversation_history=conversation_history
+                        )
+                    else:
+                        # Fallback: Use last AI message as response if response agent is missing
                         ai_messages = [msg for msg in result["messages"] if isinstance(msg, AIMessage)]
                         if ai_messages:
                             response = ai_messages[-1].content
                         else:
                             response = "I apologize, but I couldn't process your request properly."
-                        
-                        # Extract tool usage from all messages in the conversation
-                        orchestration_actions = self._extract_langgraph_actions(result["messages"])
-                    else:
-                        response = "I apologize, but I encountered an issue processing your request."
-                        orchestration_actions = []
-                        
                 except Exception as e:
                     logger.warning(f"LangGraph agent processing failed: {str(e)}")
                     # Fallback to direct LLM only if agent completely fails

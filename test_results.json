@@ -13,7 +13,7 @@
   {
     "query": "hello",
     "description": "Simple greeting",
-    "response": "Hi there! How can I help you today?",
+    "response": "Hello! How can I assist you today?",
     "tools_used": [],
     "expected_tool": null,
     "should_not_use_tools": true,
@@ -35,7 +35,7 @@
   {
     "query": "how are you?",
     "description": "Personal greeting",
-    "response": "I'm here and ready to help you with anything you need. How can I assist you today?",
+    "response": "I'm here and ready to assist you with anything you need. How can I help you today?",
     "tools_used": [],
     "expected_tool": null,
     "should_not_use_tools": true,
@@ -46,7 +46,7 @@
   {
     "query": "what's up",
     "description": "Casual greeting",
-    "response": "I'm here to help you with any questions or tasks you have. How can I assist you today?",
+    "response": "I'm here to help you with anything you need. Just let me know how I can assist you today!",
     "tools_used": [],
     "expected_tool": null,
     "should_not_use_tools": true,
@@ -57,7 +57,7 @@
   {
     "query": "How can you help me?",
     "description": "General capability question",
-    "response": "I can assist you with a wide range of tasks such as answering questions, providing information, performing calculations, setting reminders, and more. Just let me know what you need help with, and I'll do my best to assist you!",
+    "response": "I can assist you with a wide range of tasks such as providing information, answering questions, offering suggestions, and helping you find what you need. Feel free to ask me anything you'd like help with!",
     "tools_used": [],
     "expected_tool": null,
     "should_not_use_tools": true,
@@ -68,7 +68,7 @@
   {
     "query": "What can you do?",
     "description": "Capability inquiry",
-    "response": "I can help you with a variety of tasks such as answering questions, providing information from uploaded documents, performing calculations, setting reminders, and more. Feel free to let me know what you need assistance with, and I'll do my best to help!",
+    "response": "I can assist you with a wide range of tasks such as finding information, setting reminders, providing recommendations, and much more. Feel free to ask me anything you need help with, and I'll do my best to assist you!",
     "tools_used": [],
     "expected_tool": null,
     "should_not_use_tools": true,
@@ -79,7 +79,7 @@
   {
     "query": "Thank you",
     "description": "Gratitude expression",
-    "response": "You're welcome! If you have any more questions or need assistance in the future, feel free to reach out. Have a great day!",
+    "response": "You're welcome! If you have any more questions or need further assistance, feel free to ask.",
     "tools_used": [],
     "expected_tool": null,
     "should_not_use_tools": true,
@@ -90,7 +90,7 @@
   {
     "query": "That's interesting",
     "description": "Conversational response",
-    "response": "I'm glad you find it interesting! If you have any specific questions or tasks in mind, feel free to let me know how I can assist you further.",
+    "response": "I'm glad you found it interesting! If you have any questions or need more information, feel free to ask.",
     "tools_used": [],
     "expected_tool": null,
     "should_not_use_tools": true,
@@ -101,7 +101,7 @@
   {
     "query": "What is 15 + 27?",
     "description": "Simple addition",
-    "response": "The result of 15 + 27 is 42. If you have any more calculations or questions, feel free to ask!",
+    "response": "The sum of 15 and 27 is 42.",
     "tools_used": [
       "calculator"
     ],
@@ -114,7 +114,7 @@
   {
     "query": "Calculate 123 * 456",
     "description": "Multiplication",
-    "response": "The result of 123 * 456 is 56,088. If you have any more calculations or questions, feel free to ask!",
+    "response": "The result of multiplying 123 by 456 is 56,088.",
     "tools_used": [
       "calculator"
     ],
@@ -127,7 +127,7 @@
   {
     "query": "What's 1000 divided by 25?",
     "description": "Division",
-    "response": "1000 divided by 25 is 40. If you have any more calculations or questions, feel free to ask!",
+    "response": "1000 divided by 25 is 40. If you divide 1000 by 25, the answer is 40.",
     "tools_used": [
       "calculator"
     ],
@@ -140,7 +140,7 @@
   {
     "query": "What is 100 - 37?",
     "description": "Subtraction",
-    "response": "The result of 100 - 37 is 63. If you have any more calculations or questions, feel free to ask!",
+    "response": "The result of subtracting 37 from 100 is 63.",
     "tools_used": [
       "calculator"
     ],
@@ -153,7 +153,7 @@
   {
     "query": "What time is it?",
     "description": "Direct time query",
-    "response": "The current date and time is June 10, 2025, 10:07 AM. If you need any more information or assistance, feel free to let me know!",
+    "response": "It is currently 11:41 AM.",
     "tools_used": [
       "calculator",
       "current_time"
@@ -167,7 +167,7 @@
   {
     "query": "What's the current time?",
     "description": "Current time request",
-    "response": "The current date and time is June 10, 2025, 10:07 AM. If you need any more information or assistance, feel free to let me know!",
+    "response": "The current time is 11:41 AM.",
     "tools_used": [
       "calculator",
       "current_time"
@@ -181,7 +181,7 @@
   {
     "query": "Tell me the time",
     "description": "Time request",
-    "response": "The current time is 10:07 AM. If you need any more information or assistance, feel free to let me know!",
+    "response": "The current time is 11:41 AM.",
     "tools_used": [
       "calculator",
       "current_time"
@@ -195,18 +195,20 @@
   {
     "query": "What information is in my documents?",
     "description": "Document query with documents",
-    "response": "It seems like you have uploaded some documents, but you haven't selected any for me to search through. Please select the documents you would like me to retrieve information from.",
-    "tools_used": [],
+    "response": "I've checked the documents you uploaded, but I couldn't find specific information related to their content. If you have any particular questions or topics in mind, feel free to ask, or you can try rephrasing your query for more specific details.",
+    "tools_used": [
+      "search_documents"
+    ],
     "expected_tool": "search_documents",
     "should_not_use_tools": false,
-    "passed": false,
+    "passed": true,
     "warning": false,
-    "reason": "\u274c Expected search_documents, got []"
+    "reason": "\u2705 Correctly used search_documents"
   },
   {
     "query": "Tell me about the uploaded files",
     "description": "File query with documents",
-    "response": "It seems that I couldn't find any relevant information in the uploaded documents. If you have any specific questions or need assistance with something else, feel free to let me know!",
+    "response": "I couldn't find specific details in the uploaded files related to your query. It's possible the information isn't in those documents or they are still being processed. You may want to try rephrasing your question or selecting different files for more relevant results. If you have any other questions or need assistance with something else, feel free to let me know!",
     "tools_used": [
       "search_documents"
     ],
@@ -219,7 +221,7 @@
   {
     "query": "Search my documents for information about AI",
     "description": "Search query with documents",
-    "response": "It seems that there is no information about AI in the selected documents. If you have any other specific queries or topics you would like me to search for, feel free to let me know!",
+    "response": "I searched through your documents but couldn't find any information related to AI. It's possible that the specific content you're looking for isn't in the documents you selected. You may want to try different keywords or search in other documents to find the information you need. If you have more documents or specific details, feel free to provide them for a more targeted search.",
     "tools_used": [
       "search_documents"
     ],
@@ -232,7 +234,7 @@
   {
     "query": "hi",
     "description": "Historical issue: returned '12' from calculator",
-    "response": "Hello! How can I assist you today?",
+    "response": "It seems there was no relevant information found in the documents I searched. If you have any specific questions or need assistance with something else, feel free to ask!",
     "tools_used": [
       "search_documents"
     ],
@@ -245,7 +247,7 @@
   {
     "query": "hello",
     "description": "Historical issue: returned 'N/A'",
-    "response": "Hello! How can I help you today?",
+    "response": "It seems there was no relevant information found in the documents for the query you entered. If you have any other questions or need assistance with something else, feel free to ask!",
     "tools_used": [
       "search_documents"
     ],
@@ -258,7 +260,7 @@
   {
     "query": "how are you",
     "description": "Historical issue: empty response",
-    "response": "I'm here and ready to assist you! How can I help you today?",
+    "response": "I'm here and ready to assist you with any questions or tasks you have. If there's anything specific you'd like to know or need help with, feel free to ask!",
     "tools_used": [
       "search_documents"
     ],

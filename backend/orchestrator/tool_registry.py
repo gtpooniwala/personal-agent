@@ -4,6 +4,7 @@ from orchestrator.tools.time import CurrentTimeTool
 from orchestrator.tools.search_documents import SearchDocumentsTool
 from orchestrator.tools.scratchpad import ScratchpadTool
 from orchestrator.tools.integrations import GmailTool, CalendarTool, TodoistTool
+from orchestrator.tools.response_agent import ResponseAgentTool
 import logging
 
 logger = logging.getLogger(__name__)
@@ -32,53 +33,46 @@ class ToolRegistry:
     def _initialize_tools(self):
         """
         Initialize all available tools/agents.
-        
-        This is where new tools are registered. To add a new tool:
-        1. Import it at the top of this file
-        2. Add it to this method
-        3. That's it! The orchestrator will automatically discover it.
         """
         # Core computational tools (always available)
         self._tools["calculator"] = CalculatorTool()
         self._tools["current_time"] = CurrentTimeTool()
         self._tools["scratchpad"] = ScratchpadTool(self.user_id)
-        
-        # Context-dependent tools (available based on user state)
-        self._tools["search_documents"] = SearchDocumentsTool(self.user_id, self.selected_documents)
-        
+
+        # Context-dependent tools (only if documents are selected)
+        if self.selected_documents and len(self.selected_documents) > 0:
+            self._tools["search_documents"] = SearchDocumentsTool(self.user_id, self.selected_documents)
+
         # Future integration tools (placeholders for now)
         self._tools["gmail"] = GmailTool()
         self._tools["calendar"] = CalendarTool()
         self._tools["todoist"] = TodoistTool()
-    
+
+        # Response agent tool (for handling responses)
+        self._tools["response_agent"] = ResponseAgentTool()
+
     def update_selected_documents(self, selected_documents: List[str]):
         """
         Update the context for document-dependent tools.
-        
-        This demonstrates how tools can be dynamically reconfigured
-        based on changing user context.
         """
         self.selected_documents = selected_documents
         # Reinitialize document search tool with new context
-        self._tools["search_documents"] = SearchDocumentsTool(self.user_id, self.selected_documents)
+        if self.selected_documents and len(self.selected_documents) > 0:
+            self._tools["search_documents"] = SearchDocumentsTool(self.user_id, self.selected_documents)
+        elif "search_documents" in self._tools:
+            del self._tools["search_documents"]
         logger.info(f"Updated tool registry with {len(selected_documents)} selected documents")
-    
+
     def get_available_tools(self) -> List[Any]:
         """
         Get list of tools that should be available to the orchestrator.
-        
-        This method determines which tools are actually provided to the orchestrator
-        based on current context. The search_documents tool is always available
-        but handles the no-documents case internally.
         """
         # Always include all core tools
-        available_tools = ["calculator", "current_time", "scratchpad", "search_documents"]
-        
-        # Future: Add more conditional tool inclusion logic here
-        # if self.user_has_gmail_access:
-        #     available_tools.append("gmail")
-        
-        return [self._tools[tool_name] for tool_name in available_tools]
+        available_tools = ["calculator", "current_time", "scratchpad"]
+        # Only include search_documents if documents are selected
+        if self.selected_documents and len(self.selected_documents) > 0:
+            available_tools.append("search_documents")
+        return [self._tools[tool_name] for tool_name in available_tools if tool_name in self._tools]
     
     def get_all_tools(self) -> List[Any]:
         """Get all tools including inactive/placeholder ones."""
