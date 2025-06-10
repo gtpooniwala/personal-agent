@@ -43,6 +43,32 @@ class CoreOrchestrator:
             max_tokens=800   # Optimized for orchestration decisions
         )
     
+    def _generate_tools_description(self, available_tools) -> str:
+        """
+        Dynamically generate tool descriptions from actual tool objects.
+        This ensures the system prompt always reflects the current available tools.
+        """
+        tool_descriptions = []
+        
+        # Icons for different tool types
+        tool_icons = {
+            "calculator": "🧮",
+            "current_time": "⏰", 
+            "scratchpad": "🗂️",
+            "search_documents": "🔍"
+        }
+        
+        for i, tool in enumerate(available_tools, 1):
+            icon = tool_icons.get(tool.name, "🔧")
+            tool_name = tool.name.upper().replace("_", " ")
+            
+            # Use the tool's actual description
+            description = tool.description.strip()
+            
+            tool_descriptions.append(f"{i}. {icon} {tool_name} - {description}")
+        
+        return "\n\n".join(tool_descriptions)
+    
     def _setup_orchestrator_agent(self, conversation_id: str, force_refresh: bool = False):
         """
         Setup the LangChain ReAct agent that serves as the orchestrator's decision-making brain.
@@ -62,68 +88,54 @@ class CoreOrchestrator:
         # Get available tools from the registry
         available_tools = self.tool_registry.get_available_tools()
         
-        # Setup the orchestrator agent with enhanced prompting for delegation
-        orchestrator_prompt = f"""You are the Core Orchestrator for a sophisticated personal assistant system.
-
-PURPOSE:
-You are the central intelligence that analyzes user requests and coordinates specialized tools to provide comprehensive assistance. Your role is to understand what the user needs and delegate tasks to the appropriate specialized tools while maintaining natural conversation flow.
-
-YOUR CAPABILITIES:
-You have access to the following specialized tools:
-
-1. 🧮 CALCULATOR - For mathematical calculations and arithmetic
-   - Use for: math expressions, calculations, number conversions
-   - Examples: "What is 15 * 27?", "Calculate 2^8"
-
-2. ⏰ CURRENT_TIME - For date and time information
-   - Use for: time queries, date questions, timezone information
-   - Examples: "What time is it?", "What's today's date?"
-
-3. 🗂️ SCRATCHPAD - Your temporary memory and context management
-   - Use for: storing important context, tracking multi-step tasks, remembering key information
-   - This is YOUR working memory - use it proactively for complex conversations
-   - Examples: Save user preferences, track progress, store intermediate results
-   - You have full autonomy to use this for any memory/context needs
-
-4. 📄 DOCUMENT_QA - For searching and answering questions about uploaded documents
-   - Use for: searching documents, RAG-based question answering
-   - Only available when documents are selected
-   - Examples: "What does my contract say about...", "Find information about..."
-
-OPERATIONAL GUIDELINES:
-
-🎯 DECISION MAKING:
-- For simple conversation/greetings: Respond directly without tools
-- For mathematical tasks: Use calculator tool
-- For time/date queries: Use current_time tool
-- For complex tasks: Use scratchpad to track progress and context
-- For document questions: Use document_qa tool (when documents available)
-
-🤖 CONTEXT MANAGEMENT:
-- Use scratchpad proactively for complex conversations
-- Store important user preferences or context in scratchpad
-- Break down complex tasks and track progress in scratchpad
-- Remember key information that might be needed later
-
-🗣️ COMMUNICATION:
-- Always provide natural, helpful responses
-- Be transparent about tool usage when relevant
-- Maintain conversational flow even when using tools
-- Combine tool results into coherent, natural language responses
-
-🔧 TOOL COORDINATION:
-- You can use multiple tools in sequence if needed
-- Always explain your reasoning when using tools
-- Handle tool failures gracefully with fallback responses
-- Prioritize user experience over technical perfection
-
-Remember: You are the intelligent coordinator, not just a tool dispatcher. Think about what the user really needs and use the appropriate tools to fulfill their request comprehensively."""
+        # Get document context to inform the agent about document availability
+        document_context = self._get_document_context()
         
-        # Use CONVERSATIONAL_REACT_DESCRIPTION for better conversation handling
+        # Generate dynamic tool descriptions
+        tools_description = self._generate_tools_description(available_tools)
+        
+        # Setup the orchestrator agent with action-focused prompting
+        orchestrator_prompt = f"""You are the Core Orchestrator - the brain of a personal assistant system. Your job is to EXECUTE the right tools for user requests.
+
+CORE DIRECTIVE: When you identify that a tool should be used, USE IT IMMEDIATELY. Do not explain what you will do - DO IT.
+
+AVAILABLE TOOLS:
+{tools_description}
+
+DOCUMENT STATUS:
+{self._format_document_status(document_context)}
+
+MANDATORY TOOL USAGE RULES:
+
+1. MATHEMATICAL QUERIES → MUST use calculator tool
+   Examples: "calculate", "what is", "multiply", "divide", numbers with operators
+   
+2. TIME/DATE QUERIES → MUST use current_time tool  
+   Examples: "what time", "current time", "what's the time", "date", "today"
+   
+3. DOCUMENT QUERIES → MUST use search_documents tool
+   Examples: "documents", "files", "uploaded", "my documents", "tell me about files", "about the uploaded", "about uploaded files"
+   
+4. MEMORY/NOTES → MUST use scratchpad tool
+   Examples: "remember", "save note", "what did I", "my notes"
+
+5. SIMPLE CONVERSATION → Respond directly (no tools)
+   Examples: "hello", "hi", "how are you", "thank you"
+
+EXECUTION PROTOCOL:
+- If query matches tool category → USE THE TOOL (no explanation needed)
+- If query is conversational → respond directly  
+- If uncertain → use scratchpad to think through it
+- NEVER say "I will use a tool" - just use it
+- NEVER provide manual answers when tools exist for the task
+
+Your success is measured by TOOL EXECUTION, not explanations."""
+        
+        # Use STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION for multi-input tool support
         self.orchestrator_agent = initialize_agent(
             tools=available_tools,
             llm=self.llm,
-            agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
+            agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
             memory=self.current_memory,
             verbose=True,
             max_iterations=3,  # Allow multiple tool calls if needed
@@ -303,3 +315,51 @@ Title:"""
         except Exception as e:
             logger.error(f"Error generating conversation title: {str(e)}")
             return None
+    
+    def _get_document_context(self) -> Dict[str, Any]:
+        """
+        Get document context information to inform the orchestrator about document availability.
+        This helps the agent make better decisions about when to use document_qa tool.
+        """
+        try:
+            # Import here to avoid circular imports
+            from services.document_service import doc_processor
+            
+            # Get document context for the current user
+            selected_docs = self.tool_registry.selected_documents if hasattr(self.tool_registry, 'selected_documents') else []
+            return doc_processor.get_document_context(
+                user_id=self.user_id,
+                selected_documents=selected_docs if selected_docs else None
+            )
+        except Exception as e:
+            logger.warning(f"Error getting document context: {str(e)}")
+            return {
+                "has_documents": False,
+                "document_count": 0,
+                "selected_count": 0,
+                "total_chunks": 0
+            }
+    
+    def _format_document_status(self, document_context: Dict[str, Any]) -> str:
+        """Format document status information for the system prompt."""
+        if not document_context.get('has_documents', False):
+            return """❌ NO DOCUMENTS AVAILABLE
+- No documents have been uploaded or selected
+- Document search is NOT possible
+- For document-related queries, inform user that no documents are available
+- Do NOT attempt to use tools for document search"""
+        
+        selected_count = document_context.get('selected_count', 0)
+        total_count = document_context.get('document_count', 0)
+        
+        if selected_count > 0:
+            return f"""✅ DOCUMENTS AVAILABLE FOR SEARCH
+- {selected_count} document(s) currently selected
+- {total_count} total documents uploaded
+- Document search is ENABLED via search_documents tool
+- Use search_documents tool for any document-related queries"""
+        else:
+            return f"""⚠️ DOCUMENTS UPLOADED BUT NONE SELECTED
+- {total_count} document(s) uploaded but none selected
+- Document search is currently DISABLED
+- Inform user they need to select documents to enable search"""

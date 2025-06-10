@@ -32,7 +32,7 @@
   {
     "query": "how are you?",
     "description": "Personal greeting",
-    "response": "I'm just a computer program, so I don't have feelings, but I'm here and ready to assist you with anything you need. How can I help you today?",
+    "response": "I'm here to help you with any questions or tasks you have. How can I assist you today?",
     "tools_used": [],
     "expected_tool": null,
     "should_not_use_tools": true,
@@ -42,7 +42,7 @@
   {
     "query": "what's up",
     "description": "Casual greeting",
-    "response": "Not much, just here to assist you with anything you need. How can I help you today?",
+    "response": "I'm here to help you with any questions or tasks you have. How can I assist you today?",
     "tools_used": [],
     "expected_tool": null,
     "should_not_use_tools": true,
@@ -52,7 +52,7 @@
   {
     "query": "How can you help me?",
     "description": "General capability question",
-    "response": "I can help you with a wide range of tasks, from answering questions to providing explanations and engaging in discussions on various topics. Just let me know what you need assistance with!",
+    "response": "I can assist you with a wide range of tasks including calculations, information retrieval, scheduling, and more. Feel free to ask me anything you need help with!",
     "tools_used": [],
     "expected_tool": null,
     "should_not_use_tools": true,
@@ -62,7 +62,7 @@
   {
     "query": "What can you do?",
     "description": "Capability inquiry",
-    "response": "I can assist with a wide range of tasks, from answering questions to providing explanations and engaging in discussions on various topics. Just let me know how I can help!",
+    "response": "I can perform calculations, provide the current time and date, manage context, search through uploaded documents, and more. Feel free to ask me anything you need help with!",
     "tools_used": [],
     "expected_tool": null,
     "should_not_use_tools": true,
@@ -82,7 +82,7 @@
   {
     "query": "That's interesting",
     "description": "Conversational response",
-    "response": "I'm glad you find it interesting! Is there anything specific you'd like to learn more about or discuss further?",
+    "response": "What specifically caught your interest?",
     "tools_used": [],
     "expected_tool": null,
     "should_not_use_tools": true,
@@ -92,7 +92,7 @@
   {
     "query": "What is 15 + 27?",
     "description": "Simple addition",
-    "response": "The result of 15 + 27 is 42. How can I assist you further?",
+    "response": "{\n  \"action\": \"Final Answer\",\n  \"action_input\": \"The sum of 15 and 27 is 42.\"\n}",
     "tools_used": [
       "calculator"
     ],
@@ -104,7 +104,7 @@
   {
     "query": "Calculate 123 * 456",
     "description": "Multiplication",
-    "response": "The result of 123 * 456 is 56,088. Let me know if you need help with anything else!",
+    "response": "{\n  \"action\": \"Final Answer\",\n  \"action_input\": \"56088\"\n}",
     "tools_used": [
       "calculator"
     ],
@@ -116,7 +116,7 @@
   {
     "query": "What's 1000 divided by 25?",
     "description": "Division",
-    "response": "1000 divided by 25 is 40.",
+    "response": "{\n  \"action\": \"Final Answer\",\n  \"action_input\": \"The result is 40.0\"\n}",
     "tools_used": [
       "calculator"
     ],
@@ -140,7 +140,7 @@
   {
     "query": "What time is it?",
     "description": "Direct time query",
-    "response": "The current date and time is June 9, 2025, 7:30 PM. How can I assist you further?",
+    "response": "{\n  \"action\": \"Final Answer\",\n  \"action_input\": \"The current time is 01:54 AM on June 10, 2025.\"\n}",
     "tools_used": [
       "current_time"
     ],
@@ -152,19 +152,17 @@
   {
     "query": "What's the current time?",
     "description": "Current time request",
-    "response": "The current time is 19:30:51 on June 9, 2025. How can I assist you further?",
-    "tools_used": [
-      "current_time"
-    ],
+    "response": "I will use the current_time tool to provide the current time.",
+    "tools_used": [],
     "expected_tool": "current_time",
     "should_not_use_tools": false,
-    "passed": true,
-    "reason": "\u2705 Correctly used current_time"
+    "passed": false,
+    "reason": "\u274c Expected current_time, got []"
   },
   {
     "query": "Tell me the time",
     "description": "Time request",
-    "response": "The current date and time is June 9, 2025, 7:30 PM. How can I assist you further?",
+    "response": "{\n  \"action\": \"current_time\",\n  \"action_input\": {\n    \"query\": \"Current time\"\n  }\n}",
     "tools_used": [
       "current_time"
     ],
@@ -175,33 +173,37 @@
   },
   {
     "query": "What information is in my documents?",
-    "description": "Document query without actual documents",
-    "response": "I'm sorry, but I don't have access to your personal documents. If you have specific questions or need assistance with a particular topic, feel free to ask and I'll do my best to help!",
-    "tools_used": [],
-    "expected_tool": null,
-    "should_not_use_tools": true,
+    "description": "Document query with documents",
+    "response": "I couldn't find any relevant information in the selected documents for the query about the information in your documents. If you have specific topics or keywords in mind, feel free to ask about them, or you can provide more context for a more targeted search. Let me know how you'd like to proceed!",
+    "tools_used": [
+      "search_documents"
+    ],
+    "expected_tool": "search_documents",
+    "should_not_use_tools": false,
     "passed": true,
-    "reason": "\u2705 Correctly avoided using tools"
+    "reason": "\u2705 Correctly used search_documents"
   },
   {
     "query": "Tell me about the uploaded files",
-    "description": "File query without actual documents",
-    "response": "The uploaded files are documents, images, or other types of files that have been added to a system or platform. They can contain information, data, or media that can be accessed, viewed, or shared by users. If you have any specific questions about the uploaded files, feel free to ask!",
-    "tools_used": [],
-    "expected_tool": null,
-    "should_not_use_tools": true,
+    "description": "File query with documents",
+    "response": "It seems like the search didn't yield any relevant information on the topic of \"summary\" from the uploaded documents. If you have specific questions or need information on another topic, feel free to ask or upload different documents for me to search through. How can I assist you further?",
+    "tools_used": [
+      "search_documents"
+    ],
+    "expected_tool": "search_documents",
+    "should_not_use_tools": false,
     "passed": true,
-    "reason": "\u2705 Correctly avoided using tools"
+    "reason": "\u2705 Correctly used search_documents"
   },
   {
     "query": "Search my documents for information about AI",
-    "description": "Search query without actual documents",
-    "response": "I can't search your documents directly, but I can provide information about AI. Artificial Intelligence (AI) is a branch of computer science that focuses on creating machines that can perform tasks that typically require human intelligence, such as visual perception, speech recognition, decision-making, and language translation. AI technologies are used in a wide range of applications, including virtual assistants, self-driving cars, medical diagnosis, and more. If you have any specific questions about AI, feel free to ask!",
+    "description": "Search query with documents",
+    "response": "{\n  \"action\": \"search_documents\",\n  \"action_input\": {\n    \"query\": \"AI\",\n    \"max_results\": 3\n  }\n}",
     "tools_used": [],
-    "expected_tool": null,
-    "should_not_use_tools": true,
-    "passed": true,
-    "reason": "\u2705 Correctly avoided using tools"
+    "expected_tool": "search_documents",
+    "should_not_use_tools": false,
+    "passed": false,
+    "reason": "\u274c Expected search_documents, got []"
   },
   {
     "query": "hi",
@@ -226,7 +228,7 @@
   {
     "query": "how are you",
     "description": "Historical issue: empty response",
-    "response": "I'm just a computer program, so I don't have feelings, but I'm here and ready to assist you with any questions or tasks you have. How can I help you today?",
+    "response": "I'm here and ready to assist you with any questions or tasks you have. How can I help you today?",
     "tools_used": [],
     "expected_tool": null,
     "should_not_use_tools": true,

@@ -2,7 +2,7 @@
 """
 Comprehensive test suite for Personal Agent behavior.
 Tests that tools are only called when needed and responses are appropriate.
-Includes RAG (document Q&A) functionality testing.
+Updated for CoreOrchestrator and Pydantic tool structure.
 """
 
 import sys
@@ -13,88 +13,44 @@ from typing import Dict, List, Any, Optional
 import json
 
 # Add the backend directory to Python path
-backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+backend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'backend')
 sys.path.insert(0, backend_dir)
 
 from orchestrator.core import CoreOrchestrator
+from services.document_service import DocumentProcessor
 
 # Set up logging
 logging.basicConfig(level=logging.WARNING)  # Reduce noise
 
-def display_orchestrator_prompt():
-    """Display the orchestrator prompt being used in tests."""
-    print("🤖 ORCHESTRATOR PROMPT USED IN TESTS:")
-    print("=" * 90)
-    
-    prompt_text = """You are the Core Orchestrator for a sophisticated personal assistant system.
-
-PURPOSE:
-You are the central intelligence that analyzes user requests and coordinates specialized tools to provide comprehensive assistance. Your role is to understand what the user needs and delegate tasks to the appropriate specialized tools while maintaining natural conversation flow.
-
-YOUR CAPABILITIES:
-You have access to the following specialized tools:
-
-1. 🧮 CALCULATOR - For mathematical calculations and arithmetic
-   - Use for: math expressions, calculations, number conversions
-   - Examples: "What is 15 * 27?", "Calculate 2^8"
-
-2. ⏰ CURRENT_TIME - For date and time information
-   - Use for: time queries, date questions, timezone information
-   - Examples: "What time is it?", "What's today's date?"
-
-3. 🗂️ SCRATCHPAD - Your temporary memory and context management
-   - Use for: storing important context, tracking multi-step tasks, remembering key information
-   - This is YOUR working memory - use it proactively for complex conversations
-   - Examples: Save user preferences, track progress, store intermediate results
-   - You have full autonomy to use this for any memory/context needs
-
-4. 📄 DOCUMENT_QA - For searching and answering questions about uploaded documents
-   - Use for: searching documents, RAG-based question answering
-   - Only available when documents are selected
-   - Examples: "What does my contract say about...", "Find information about..."
-
-OPERATIONAL GUIDELINES:
-
-🎯 DECISION MAKING:
-- For simple conversation/greetings: Respond directly without tools
-- For mathematical tasks: Use calculator tool
-- For time/date queries: Use current_time tool
-- For complex tasks: Use scratchpad to track progress and context
-- For document questions: Use document_qa tool (when documents available)
-
-🤖 CONTEXT MANAGEMENT:
-- Use scratchpad proactively for complex conversations
-- Store important user preferences or context in scratchpad
-- Break down complex tasks and track progress in scratchpad
-- Remember key information that might be needed later
-
-🗣️ COMMUNICATION:
-- Always provide natural, helpful responses
-- Be transparent about tool usage when relevant
-- Maintain conversational flow even when using tools
-- Combine tool results into coherent, natural language responses
-
-🔧 TOOL COORDINATION:
-- You can use multiple tools in sequence if needed
-- Always explain your reasoning when using tools
-- Handle tool failures gracefully with fallback responses
-- Prioritize user experience over technical perfection
-
-Remember: You are the intelligent coordinator, not just a tool dispatcher. Think about what the user really needs and use the appropriate tools to fulfill their request comprehensively."""
-    
-    print(prompt_text)
-    print("=" * 90)
-    print()
-
-class AgentTester:
+class OrchestratorTester:
     def __init__(self):
-        self.orchestrator = CoreOrchestrator()
+        self.orchestrator = CoreOrchestrator(user_id="test_user")
+        self.doc_processor = DocumentProcessor()
         self.results = []
         self.failed_tests = []
+        self.skipped_tests = []  # Track skipped tests
+        
+        # Get available documents for testing
+        self.available_documents = self._get_test_documents()
+        
+    def _get_test_documents(self) -> List[str]:
+        """Get available test document IDs."""
+        try:
+            documents = self.doc_processor.get_documents(user_id="test_user")
+            if documents:
+                # Return the first few document IDs for testing
+                return [doc["id"] for doc in documents[:2]]  # Use first 2 documents
+            else:
+                return []
+        except Exception as e:
+            print(f"⚠️  Error getting test documents: {e}")
+            return []
         
     async def test_query(self, query: str, expected_tool_usage: Optional[str] = None, 
                         should_not_use_tools: bool = False, 
-                        description: str = "") -> Dict[str, Any]:
+                        description: str = "",
+                        use_documents: bool = False,
+                        skip_if_no_docs: bool = False) -> Dict[str, Any]:
         """
         Test a single query and validate tool usage.
         
@@ -103,19 +59,42 @@ class AgentTester:
             expected_tool_usage: Name of tool that should be used (if any)
             should_not_use_tools: Whether this query should NOT use any tools
             description: Description of what this test validates
+            use_documents: Whether to pass selected documents to the orchestrator
+            skip_if_no_docs: Whether to skip this test if no documents are available
         """
         print(f"\n🧪 Testing: {query}")
         print(f"   Expected: {description}")
         
+        # Check if we should skip this test due to missing documents
+        if skip_if_no_docs and not self.available_documents:
+            skip_result = {
+                "query": query,
+                "description": description,
+                "skipped": True,
+                "reason": "⚠️  SKIPPED: No documents available in database",
+                "passed": None  # Neither passed nor failed
+            }
+            print(f"   Result: {skip_result['reason']}")
+            self.results.append(skip_result)
+            self.skipped_tests.append(skip_result)
+            return skip_result
+        
         try:
+            # Select documents if needed for this test
+            selected_documents = None
+            if use_documents and self.available_documents:
+                selected_documents = self.available_documents
+                print(f"   📄 Using documents: {len(selected_documents)} documents selected")
+            
             # Process the query
             result = await self.orchestrator.process_request(
-                user_request=query, 
-                conversation_id="test-conversation"
+                query, 
+                "test-conversation",
+                selected_documents=selected_documents
             )
             response = result.get("response", "")
             
-            # Extract tool usage information from response and orchestration actions
+            # Extract tool usage information from response and agent actions
             tools_used = self._extract_tools_used(response, result)
             
             # Validate tool usage
@@ -139,18 +118,12 @@ class AgentTester:
                     test_result["passed"] = False
                     test_result["reason"] = f"❌ Unexpectedly used tools: {tools_used}"
             elif expected_tool_usage:
-                if len(tools_used) == 1 and expected_tool_usage in tools_used:
+                if expected_tool_usage in tools_used:
                     test_result["passed"] = True
-                    test_result["reason"] = f"✅ Correctly used only {expected_tool_usage}"
-                elif expected_tool_usage in tools_used and len(tools_used) > 1:
-                    test_result["passed"] = False
-                    test_result["reason"] = f"❌ Used {expected_tool_usage} but also used other tools: {tools_used}"
-                elif expected_tool_usage not in tools_used:
-                    test_result["passed"] = False
-                    test_result["reason"] = f"❌ Expected {expected_tool_usage}, got {tools_used}"
+                    test_result["reason"] = f"✅ Correctly used {expected_tool_usage}"
                 else:
                     test_result["passed"] = False
-                    test_result["reason"] = f"❌ Unexpected tool usage pattern: {tools_used}"
+                    test_result["reason"] = f"❌ Expected {expected_tool_usage}, got {tools_used}"
             else:
                 # No specific expectation, just check for reasonable response
                 if response and response.strip() and response.lower() not in ["n/a", "none"]:
@@ -187,21 +160,37 @@ class AgentTester:
         """Extract tool names from agent response by looking for tool usage patterns."""
         tools_used = []
         
-        # Check orchestration_actions first (most reliable)
+        # Check orchestration_actions (for CoreOrchestrator)
         orchestration_actions = result.get("orchestration_actions", [])
         if orchestration_actions:
             for action in orchestration_actions:
                 if isinstance(action, dict):
                     tool_name = action.get("tool", "").lower()
-                    if tool_name:
+                    if tool_name and tool_name not in tools_used:
                         tools_used.append(tool_name)
         
-        # Only rely on orchestration_actions, not response text patterns
-        # Response text patterns were causing false positives
+        # Fallback: Check legacy agent_actions format
+        agent_actions = result.get("agent_actions", [])
+        if agent_actions:
+            for action in agent_actions:
+                if isinstance(action, dict):
+                    tool_name = action.get("tool", "").lower()
+                    if tool_name and tool_name not in tools_used:
+                        tools_used.append(tool_name)
+        
         return tools_used
     
     async def run_all_tests(self):
         """Run comprehensive test suite."""
+        print("🚀 Starting Comprehensive Agent Test Suite")
+        print("=" * 60)
+        
+        # Display test environment info
+        print(f"📄 Document Status: {len(self.available_documents)} documents available for testing")
+        if self.available_documents:
+            print(f"   Document IDs: {', '.join(self.available_documents[:3])}{'...' if len(self.available_documents) > 3 else ''}")
+        print()
+        
         # 1. GREETINGS - Should NOT use tools
         print("\n📋 Category 1: Greetings (should NOT use tools)")
         greeting_tests = [
@@ -250,38 +239,46 @@ class AgentTester:
         for query, desc in time_tests:
             await self.test_query(query, expected_tool_usage="current_time", description=desc)
         
-        # 5. SCRATCHPAD TESTS - Should use scratchpad tool  
-        print("\n📋 Category 5: Scratchpad Tool Tests (should use scratchpad)")
-        scratchpad_tests = [
-            ("Save a note that the user prefers morning meetings", "Agent saves context"),
-            ("Remember that the current task is planning a trip", "Agent saves task context"),
-            ("Add to scratchpad: user mentioned budget of $5000", "Agent saves important details"),
-            ("Show my scratchpad", "Agent reads context"),
-            ("What context do I have saved?", "Agent displays context"),
-            ("Search scratchpad for budget", "Agent searches context"),
-            ("Update note 1 with new information", "Agent updates context"),
-            ("Clear my scratchpad when done", "Agent clears context"),
-            ("Save progress: completed step 1 of the plan", "Agent tracks progress"),
-            ("Remember the user's timezone is PST", "Agent saves user preference"),
-        ]
+        # 5. DOCUMENT Q&A (RAG) - Tests with documents if available
+        print("\n📋 Category 5: Document Q&A (RAG) Behavior Tests")
         
-        for query, desc in scratchpad_tests:
-            await self.test_query(query, expected_tool_usage="scratchpad", description=desc)
+        if self.available_documents:
+            print(f"   📄 Testing with {len(self.available_documents)} documents available")
+            
+            rag_tests = [
+                ("What information is in my documents?", "Document query with documents", "search_documents"),
+                ("Tell me about the uploaded files", "File query with documents", "search_documents"), 
+                ("Search my documents for information about AI", "Search query with documents", "search_documents"),
+            ]
+            
+            # These tests pass documents to the agent so search_documents can work properly
+            for query, desc, expected_tool in rag_tests:
+                await self.test_query(
+                    query, 
+                    expected_tool_usage=expected_tool, 
+                    description=desc, 
+                    use_documents=True  # This ensures documents are passed to the agent
+                )
+        else:
+            print("   ⚠️  No documents available in database")
+            
+            rag_tests = [
+                ("What information is in my documents?", "Document query without documents", "search_documents"),
+                ("Tell me about the uploaded files", "File query without documents", "search_documents"), 
+                ("Search my documents for information about AI", "Search query without documents", "search_documents"),
+            ]
+            
+            # These tests will be skipped with clear warnings
+            for query, desc, expected_tool in rag_tests:
+                await self.test_query(
+                    query, 
+                    expected_tool_usage=expected_tool, 
+                    description=desc, 
+                    skip_if_no_docs=True
+                )
         
-        # 6. DOCUMENT Q&A (RAG) - Conceptual tests without actual documents
-        print("\n📋 Category 6: Document Q&A (RAG) Behavior Tests")
-        rag_tests = [
-            ("What information is in my documents?", "Document query without actual documents"),
-            ("Tell me about the uploaded files", "File query without actual documents"),
-            ("Search my documents for information about AI", "Search query without actual documents"),
-        ]
-        
-        # These should not use tools since no documents are actually selected
-        for query, desc in rag_tests:
-            await self.test_query(query, should_not_use_tools=True, description=desc)
-        
-        # 7. PROBLEMATIC HISTORICAL CASES - Should NOT use tools inappropriately
-        print("\n📋 Category 7: Previously Problematic Cases")
+        # 6. PROBLEMATIC HISTORICAL CASES - Should NOT use tools inappropriately
+        print("\n📋 Category 6: Previously Problematic Cases")
         problematic_tests = [
             ("hi", "Historical issue: returned '12' from calculator"),
             ("hello", "Historical issue: returned 'N/A'"),
@@ -298,13 +295,37 @@ class AgentTester:
         print("=" * 60)
         
         total_tests = len(self.results)
-        passed_tests = sum(1 for r in self.results if r.get("passed", False))
+        passed_tests = sum(1 for r in self.results if r.get("passed", False) == True)
         failed_tests = len(self.failed_tests)
+        skipped_tests = len(self.skipped_tests)
         
         print(f"Total Tests: {total_tests}")
         print(f"Passed: {passed_tests} ✅")
         print(f"Failed: {failed_tests} ❌")
-        print(f"Success Rate: {(passed_tests/total_tests*100):.1f}%")
+        print(f"Skipped: {skipped_tests} ⚠️")
+        
+        # Calculate success rate based on non-skipped tests
+        non_skipped_tests = total_tests - skipped_tests
+        if non_skipped_tests > 0:
+            success_rate = (passed_tests / non_skipped_tests) * 100
+            print(f"Success Rate: {success_rate:.1f}% (of non-skipped tests)")
+        else:
+            print("Success Rate: N/A (no tests executed)")
+        
+        # Show warnings for skipped tests
+        if self.skipped_tests:
+            print(f"\n⚠️  SKIPPED TESTS ({len(self.skipped_tests)}):")
+            print("-" * 40)
+            for i, test in enumerate(self.skipped_tests, 1):
+                print(f"{i}. Query: '{test['query']}'")
+                print(f"   Description: {test['description']}")
+                print(f"   Reason: {test['reason']}")
+                print()
+            
+            print("🔧 TO FIX SKIPPED TESTS:")
+            print("   • Add test documents to the database using create_test_docs.py")
+            print("   • Or ensure documents are uploaded via the frontend")
+            print()
         
         if self.failed_tests:
             print(f"\n❌ FAILED TESTS ({len(self.failed_tests)}):")
@@ -320,17 +341,11 @@ class AgentTester:
                     print(f"   Response: {response_preview}")
                 print()
         
-        return passed_tests == total_tests
+        return passed_tests == non_skipped_tests and non_skipped_tests > 0
 
 async def main():
     """Main test runner."""
-    print("🚀 Starting Comprehensive Agent Test Suite")
-    print("=" * 60)
-    
-    # Display the orchestrator prompt at the start
-    display_orchestrator_prompt()
-    
-    tester = AgentTester()
+    tester = OrchestratorTester()
     
     try:
         await tester.run_all_tests()

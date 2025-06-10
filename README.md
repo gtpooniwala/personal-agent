@@ -12,6 +12,28 @@ A sophisticated AI-powered personal assistant built with FastAPI, LangChain, and
 - **🔄 Passive Maintenance**: Backend-driven conversation organization
 - **⚙️ Scalable Design**: Adding new tools only requires implementing the tool and updating orchestrator prompts
 
+## 🆕 Recent Major Improvements
+
+### **Pydantic Tool Conversion (Complete)**
+- ✅ **Structured Input Validation**: All tools now use Pydantic models for input validation
+- ✅ **Multi-Input Tool Support**: Fixed LangChain agent compatibility for complex tool parameters
+- ✅ **95.5% Test Success Rate**: Comprehensive test suite with 21/22 tests passing
+- ✅ **Enhanced Calculator**: Now accepts clean expressions like `expression="2**4"`
+- ✅ **Improved Time Tool**: Structured input with format preferences
+- ✅ **Smart Scratchpad**: Action-based input with better organization
+- ✅ **Document QA Enhancement**: Dynamic chunk selection (1-5 results based on complexity)
+
+### **Document Upload System Enhancement**
+- ✅ **AI-Generated Summaries**: Automatic one-sentence summaries for all uploaded documents
+- ✅ **Context-Aware AI**: System informs AI about available documents and their content
+- ✅ **Smart Document Handling**: AI behavior adapts based on document availability
+- ✅ **Database Migration**: Seamless upgrade for existing installations
+
+### **Test Suite Organization**
+- ✅ **Comprehensive Testing**: Main test suite covers 22 scenarios across all tool categories
+- ✅ **Clean Test Structure**: Organized test files with clear separation of concerns
+- ✅ **Behavioral Validation**: Tests verify tool usage patterns and response quality
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -288,7 +310,7 @@ personal-agent/
 │   │   └── tools/          # Individual specialized tool modules
 │   │       ├── calculator.py    # ✅ Mathematical calculations
 │   │       ├── time.py          # ✅ Date/time queries  
-│   │       ├── document_qa.py   # ✅ RAG-based document search
+│   │       ├── search_documents.py # ✅ RAG-based document search
 │   │       ├── scratchpad.py    # ✅ Persistent note-taking tool
 │   │       └── integrations.py  # 🚧 Gmail, Calendar, Todoist placeholders
 │   ├── agent/              # Legacy agent system (compatibility)

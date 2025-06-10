@@ -11,7 +11,7 @@ from io import BytesIO
 import logging
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from database.models import Document, DocumentChunk
 from database.operations import db_ops
 from config import settings
@@ -26,6 +26,12 @@ class DocumentProcessor:
         self.embeddings = OpenAIEmbeddings(
             openai_api_key=settings.openai_api_key,
             model="text-embedding-ada-002"
+        )
+        self.llm = ChatOpenAI(
+            model="gpt-3.5-turbo",
+            temperature=0.1,
+            openai_api_key=settings.openai_api_key,
+            max_tokens=150  # For concise summaries
         )
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
@@ -96,10 +102,13 @@ class DocumentProcessor:
             raise
     
     async def _process_document_content(self, document_id: str, file_path: Path):
-        """Extract text from PDF and create embeddings."""
+        """Extract text from PDF, generate summary, and create embeddings."""
         try:
             # Extract text from PDF
             text_content = self._extract_pdf_text(file_path)
+            
+            # Generate document summary
+            summary = await self._generate_document_summary(text_content)
             
             # Split text into chunks
             chunks = self.text_splitter.split_text(text_content)
@@ -124,18 +133,19 @@ class DocumentProcessor:
                     )
                     session.add(chunk)
                 
-                # Update document status
+                # Update document status and summary
                 document = session.query(Document).filter(Document.id == document_id).first()
                 if document:
                     document.processed = "completed"
                     document.total_chunks = len(chunks)
+                    document.summary = summary
                 
                 session.commit()
                 
             finally:
                 session.close()
             
-            logger.info(f"Successfully processed document {document_id} with {len(chunks)} chunks")
+            logger.info(f"Successfully processed document {document_id} with {len(chunks)} chunks and summary: {summary}")
             
         except Exception as e:
             logger.error(f"Error processing document content: {str(e)}")
@@ -173,6 +183,50 @@ class DocumentProcessor:
             logger.error(f"Error extracting PDF text: {str(e)}")
             raise
     
+    async def _generate_document_summary(self, text_content: str) -> str:
+        """
+        Generate a concise one-sentence summary of the document content.
+        
+        Args:
+            text_content: Full text content of the document
+            
+        Returns:
+            str: One-sentence summary of the document
+        """
+        try:
+            # Truncate text if too long (to avoid token limits)
+            max_chars = 8000  # Roughly 2000 tokens
+            if len(text_content) > max_chars:
+                text_content = text_content[:max_chars] + "..."
+            
+            summary_prompt = f"""Analyze the following document content and generate a single, concise sentence that summarizes what this document is about. Focus on the main topic, purpose, or subject matter.
+
+Document content:
+{text_content}
+
+Generate only one clear, informative sentence that captures the essence of this document. Do not include any additional text, quotes, or explanations.
+
+Summary:"""
+
+            summary = await self.llm.apredict(summary_prompt)
+            
+            # Clean up the summary
+            summary = summary.strip().strip('"\'').strip()
+            
+            # Ensure it's a single sentence
+            if '.' in summary:
+                summary = summary.split('.')[0] + '.'
+            
+            # Limit length
+            if len(summary) > 200:
+                summary = summary[:197] + "..."
+            
+            return summary
+            
+        except Exception as e:
+            logger.warning(f"Error generating document summary: {str(e)}")
+            return "Document content available for search"
+
     async def search_documents(self, query: str, user_id: str = "default", limit: int = 5, selected_documents: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
         Search documents using semantic similarity.
@@ -377,6 +431,82 @@ class DocumentProcessor:
             return False
         finally:
             session.close()
+
+    def get_document_context(self, user_id: str = "default", selected_documents: Optional[List[str]] = None) -> Dict[str, Any]:
+        """
+        Get document context information for the orchestrator.
+        
+        Args:
+            user_id: User ID for filtering documents
+            selected_documents: List of document IDs to get context for (None means all user documents)
+            
+        Returns:
+            Dict containing document summaries, counts, and metadata for orchestrator context
+        """
+        try:
+            session = db_ops.get_session()
+            try:
+                # Build query for user documents
+                query_filter = session.query(Document).filter(
+                    Document.user_id == user_id,
+                    Document.processed == "completed"
+                )
+                
+                # Filter by selected documents if provided
+                if selected_documents:
+                    query_filter = query_filter.filter(Document.id.in_(selected_documents))
+                
+                documents = query_filter.all()
+                
+                if not documents:
+                    return {
+                        "has_documents": False,
+                        "document_count": 0,
+                        "total_chunks": 0,
+                        "document_summaries": [],
+                        "context_message": "No documents are currently available for search."
+                    }
+                
+                # Collect document information
+                document_summaries = []
+                total_chunks = 0
+                
+                for doc in documents:
+                    total_chunks += doc.total_chunks or 0
+                    document_summaries.append({
+                        "id": doc.id,
+                        "filename": doc.original_filename,
+                        "summary": doc.summary or "Document content available for search",
+                        "chunks": doc.total_chunks or 0,
+                        "upload_date": doc.upload_date.strftime("%Y-%m-%d") if doc.upload_date else "Unknown"
+                    })
+                
+                # Create context message
+                if len(documents) == 1:
+                    context_message = f"📄 1 document available: '{documents[0].original_filename}' ({documents[0].total_chunks} searchable sections)"
+                else:
+                    context_message = f"📄 {len(documents)} documents available ({total_chunks} total searchable sections)"
+                
+                return {
+                    "has_documents": True,
+                    "document_count": len(documents),
+                    "total_chunks": total_chunks,
+                    "document_summaries": document_summaries,
+                    "context_message": context_message
+                }
+                
+            finally:
+                session.close()
+                
+        except Exception as e:
+            logger.error(f"Error getting document context: {str(e)}")
+            return {
+                "has_documents": False,
+                "document_count": 0,
+                "total_chunks": 0,
+                "document_summaries": [],
+                "context_message": "Error retrieving document information."
+            }
 
 
 # Global document processor instance

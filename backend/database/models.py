@@ -75,6 +75,9 @@ class Document(Base):
     processed = Column(String, default="pending")  # pending, processing, completed, failed
     total_chunks = Column(Integer, default=0)
     
+    # Document summary for context
+    summary = Column(Text, nullable=True)  # AI-generated one-sentence summary
+    
     # Relationship to document chunks
     chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
 

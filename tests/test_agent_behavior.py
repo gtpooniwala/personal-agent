@@ -2,7 +2,7 @@
 """
 Comprehensive test suite for Personal Agent behavior.
 Tests that tools are only called when needed and responses are appropriate.
-Includes RAG (document Q&A) functionality testing.
+Updated for CoreOrchestrator and Pydantic tool structure.
 """
 
 import sys
@@ -13,17 +13,17 @@ from typing import Dict, List, Any, Optional
 import json
 
 # Add the backend directory to Python path
-backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+backend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'backend')
 sys.path.insert(0, backend_dir)
 
-from agent.core import PersonalAgent
+from orchestrator.core import CoreOrchestrator
 
 # Set up logging
 logging.basicConfig(level=logging.WARNING)  # Reduce noise
 
-class AgentTester:
+class OrchestratorTester:
     def __init__(self):
-        self.agent = PersonalAgent()
+        self.orchestrator = CoreOrchestrator(user_id="test_user")
         self.results = []
         self.failed_tests = []
         
@@ -44,7 +44,7 @@ class AgentTester:
         
         try:
             # Process the query
-            result = await self.agent.process_message(query, "test-conversation")
+            result = await self.orchestrator.process_request(query, "test-conversation")
             response = result.get("response", "")
             
             # Extract tool usage information from response and agent actions
@@ -113,17 +113,24 @@ class AgentTester:
         """Extract tool names from agent response by looking for tool usage patterns."""
         tools_used = []
         
-        # Check agent_actions first (most reliable)
+        # Check orchestration_actions (for CoreOrchestrator)
+        orchestration_actions = result.get("orchestration_actions", [])
+        if orchestration_actions:
+            for action in orchestration_actions:
+                if isinstance(action, dict):
+                    tool_name = action.get("tool", "").lower()
+                    if tool_name and tool_name not in tools_used:
+                        tools_used.append(tool_name)
+        
+        # Fallback: Check legacy agent_actions format
         agent_actions = result.get("agent_actions", [])
         if agent_actions:
             for action in agent_actions:
                 if isinstance(action, dict):
                     tool_name = action.get("tool", "").lower()
-                    if tool_name:
+                    if tool_name and tool_name not in tools_used:
                         tools_used.append(tool_name)
         
-        # Only rely on agent_actions, not response text patterns
-        # Response text patterns were causing false positives
         return tools_used
     
     async def run_all_tests(self):
@@ -235,7 +242,7 @@ class AgentTester:
 
 async def main():
     """Main test runner."""
-    tester = AgentTester()
+    tester = OrchestratorTester()
     
     try:
         await tester.run_all_tests()

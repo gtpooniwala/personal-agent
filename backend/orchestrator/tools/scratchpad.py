@@ -1,16 +1,56 @@
 from langchain.tools import BaseTool
-from typing import Dict, Any, Optional
+from pydantic import BaseModel, Field, validator
+from typing import Dict, Any, Optional, Literal
 import json
 import os
 from pathlib import Path
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
 
+class ScratchpadInput(BaseModel):
+    """Input model for scratchpad tool - expects structured commands from LLM."""
+    
+    action: Literal["save", "read", "search", "delete", "clear", "update", "help"] = Field(
+        description="The action to perform: save, read, search, delete, clear, update, or help"
+    )
+    
+    content: Optional[str] = Field(
+        default=None,
+        description="Content for save/search/update operations. Required for save, search, and update actions."
+    )
+    
+    note_number: Optional[int] = Field(
+        default=None,
+        description="Note number for delete/update operations. Required for delete and update actions."
+    )
+    
+    @validator('content')
+    def validate_content_for_action(cls, v, values):
+        """Validate that content is provided when required for specific actions."""
+        action = values.get('action')
+        
+        if action in ['save', 'search', 'update'] and not v:
+            raise ValueError(f"Content is required for '{action}' action")
+            
+        return v
+    
+    @validator('note_number')
+    def validate_note_number_for_action(cls, v, values):
+        """Validate that note_number is provided when required for specific actions."""
+        action = values.get('action')
+        
+        if action in ['delete', 'update'] and v is None:
+            raise ValueError(f"Note number is required for '{action}' action")
+            
+        return v
+
+
 class ScratchpadTool(BaseTool):
     """
-    Scratchpad tool for the agent's temporary memory and context management.
+    Agent's temporary memory and context management tool with Pydantic input validation.
     
     This tool serves as the agent's working memory for managing context, tasks, and information
     across complex conversations and multi-step operations. The agent should use this tool to:
@@ -31,26 +71,24 @@ class ScratchpadTool(BaseTool):
     name = "scratchpad"
     description = """Agent's temporary memory and context management tool.
 
-Use this tool as your working memory to:
-- Remember important context during complex conversations
-- Track progress on multi-step tasks and plans
-- Store intermediate results when breaking down problems
-- Keep reference notes when handling multiple subtasks
-- Maintain important user preferences or details
-- Create and reference action plans as work progresses
-- Remember key decisions or facts that may be relevant later
+Use this tool to manage your working memory with structured commands:
 
-You have full autonomy to use this for any memory/context needs.
+Required parameters:
+- action: The action to perform (save/read/search/delete/clear/update/help)
+- content: Text content (required for save, search, update actions)  
+- note_number: Integer ID (required for delete, update actions)
 
-Commands:
-- "save <note>" - Save important context or information
-- "read" - Review all your current notes and context
-- "search <term>" - Find specific information in your notes
-- "delete <number>" - Remove specific notes when no longer needed
-- "clear" - Clear all notes when starting fresh or task is complete
-- "update <number> <new_content>" - Update existing note
+Examples:
+- To save: action="save", content="User prefers morning meetings"
+- To read all: action="read"
+- To search: action="search", content="meetings" 
+- To update: action="update", note_number=2, content="Updated content"
+- To delete: action="delete", note_number=3
+- To clear all: action="clear"
 
-The agent should proactively use this tool for better context management."""
+Use this proactively for context management during complex conversations."""
+    
+    args_schema = ScratchpadInput
     
     def __init__(self, user_id: str = "default"):
         super().__init__()
@@ -87,25 +125,22 @@ The agent should proactively use this tool for better context management."""
             logger.error(f"Error saving notes: {str(e)}")
             return False
     
-    def _run(self, query: str) -> str:
-        """Execute scratchpad operations."""
+    def _run(self, action: str, content: Optional[str] = None, note_number: Optional[int] = None) -> str:
+        """Execute scratchpad operations using Pydantic-validated input."""
         try:
             from datetime import datetime
-            query = query.strip().lower()
             
             # Load existing notes
             notes = self._load_notes()
             
-            # Parse command
-            if query.startswith(('save ', 'write ', 'add ')):
-                # Save new note
-                note_content = query.split(' ', 1)[1] if ' ' in query else ""
-                if not note_content:
+            # Execute action based on structured input
+            if action == 'save':
+                if not content:
                     return "Please provide the note content. Example: 'save Remember to buy groceries'"
                 
                 new_note = {
                     "id": len(notes) + 1,
-                    "content": note_content,
+                    "content": content,
                     "timestamp": datetime.now().isoformat(),
                     "created": datetime.now().strftime("%Y-%m-%d %H:%M")
                 }
@@ -113,11 +148,11 @@ The agent should proactively use this tool for better context management."""
                 notes.append(new_note)
                 
                 if self._save_notes(notes):
-                    return f"✅ Note saved: \"{note_content}\"\n\nYou now have {len(notes)} note(s) in your scratchpad."
+                    return f"✅ Note saved: \"{content}\"\n\nYou now have {len(notes)} note(s) in your scratchpad."
                 else:
                     return "❌ Error: Could not save note. Please try again."
             
-            elif query in ['read', 'show', 'show notes', 'list', 'all']:
+            elif action == 'read':
                 # Show all notes
                 if not notes:
                     return "📝 Your scratchpad is empty. Use 'save <note>' to add your first note."
@@ -129,119 +164,79 @@ The agent should proactively use this tool for better context management."""
                 
                 return response.strip()
             
-            elif query.startswith('search '):
+            elif action == 'search':
                 # Search notes
-                search_term = query.split(' ', 1)[1] if ' ' in query else ""
-                if not search_term:
+                if not content:
                     return "Please provide a search term. Example: 'search dentist'"
                 
                 matching_notes = [
                     note for note in notes 
-                    if search_term.lower() in note['content'].lower()
+                    if content.lower() in note['content'].lower()
                 ]
                 
                 if not matching_notes:
-                    return f"🔍 No notes found containing '{search_term}'"
+                    return f"🔍 No notes found containing '{content}'"
                 
-                response = f"🔍 **Search results for '{search_term}'** ({len(matching_notes)} found):\n\n"
+                response = f"🔍 **Search results for '{content}'** ({len(matching_notes)} found):\n\n"
                 for note in matching_notes:
                     response += f"**{note['id']}.** {note['content']}\n"
                     response += f"   *Saved: {note['created']}*\n\n"
                 
                 return response.strip()
             
-            elif query.startswith('update '):
+            elif action == 'update':
                 # Update existing note
-                try:
-                    parts = query.split(' ', 2)
-                    if len(parts) < 3:
-                        return "❌ Invalid update format. Example: 'update 2 New content for this note'"
-                    
-                    note_id = int(parts[1])
-                    new_content = parts[2]
-                    
-                    note_to_update = next((note for note in notes if note['id'] == note_id), None)
-                    
-                    if not note_to_update:
-                        return f"❌ Note #{note_id} not found. Use 'read' to see all notes."
-                    
-                    old_content = note_to_update['content']
-                    note_to_update['content'] = new_content
-                    note_to_update['updated'] = datetime.now().strftime("%Y-%m-%d %H:%M")
-                    
-                    if self._save_notes(notes):
-                        return f"✅ Updated note #{note_id}\n\nOld: \"{old_content}\"\nNew: \"{new_content}\""
-                    else:
-                        return "❌ Error: Could not update note. Please try again."
-                        
-                except ValueError:
-                    return "❌ Invalid note number. Example: 'update 3 Updated note content'"
+                if not note_number or not content:
+                    return "❌ Invalid update format. Example: 'update 2 New content for this note'"
+                
+                note_to_update = next((note for note in notes if note['id'] == note_number), None)
+                
+                if not note_to_update:
+                    return f"❌ Note #{note_number} not found. Use 'read' to see all notes."
+                
+                old_content = note_to_update['content']
+                note_to_update['content'] = content
+                note_to_update['updated'] = datetime.now().strftime("%Y-%m-%d %H:%M")
+                
+                if self._save_notes(notes):
+                    return f"✅ Updated note #{note_number}\n\nOld: \"{old_content}\"\nNew: \"{content}\""
+                else:
+                    return "❌ Error: Could not update note. Please try again."
             
-            elif query.startswith('update '):
-                # Update existing note
-                try:
-                    parts = query.split(' ', 2)
-                    if len(parts) < 3:
-                        return "❌ Invalid update format. Example: 'update 2 New content for this note'"
-                    
-                    note_id = int(parts[1])
-                    new_content = parts[2]
-                    
-                    note_to_update = next((note for note in notes if note['id'] == note_id), None)
-                    
-                    if not note_to_update:
-                        return f"❌ Note #{note_id} not found. Use 'read' to see all notes."
-                    
-                    from datetime import datetime
-                    old_content = note_to_update['content']
-                    note_to_update['content'] = new_content
-                    note_to_update['updated'] = datetime.now().strftime("%Y-%m-%d %H:%M")
-                    
-                    if self._save_notes(notes):
-                        return f"✅ Updated note #{note_id}\n\nOld: \"{old_content}\"\nNew: \"{new_content}\""
-                    else:
-                        return "❌ Error: Could not update note. Please try again."
-                        
-                except ValueError:
-                    return "❌ Invalid note number. Example: 'update 3 Updated note content'"
-            
-            elif query.startswith('delete '):
+            elif action == 'delete':
                 # Delete specific note
-                try:
-                    note_id = int(query.split(' ', 1)[1])
-                    note_to_delete = next((note for note in notes if note['id'] == note_id), None)
-                    
-                    if not note_to_delete:
-                        return f"❌ Note #{note_id} not found. Use 'show notes' to see all notes."
-                    
-                    notes = [note for note in notes if note['id'] != note_id]
-                    
-                    if self._save_notes(notes):
-                        return f"✅ Deleted note #{note_id}: \"{note_to_delete['content']}\"\n\nYou now have {len(notes)} note(s) remaining."
-                    else:
-                        return "❌ Error: Could not delete note. Please try again."
-                        
-                except ValueError:
-                    return "❌ Invalid note number. Example: 'delete 3'"
+                if not note_number:
+                    return "❌ Invalid delete format. Example: 'delete 3'"
+                
+                note_to_delete = next((note for note in notes if note['id'] == note_number), None)
+                
+                if not note_to_delete:
+                    return f"❌ Note #{note_number} not found. Use 'read' to see all notes."
+                
+                notes = [note for note in notes if note['id'] != note_number]
+                
+                if self._save_notes(notes):
+                    return f"✅ Deleted note #{note_number}: \"{note_to_delete['content']}\"\n\nYou now have {len(notes)} note(s) remaining."
+                else:
+                    return "❌ Error: Could not delete note. Please try again."
             
-            elif query in ['clear', 'clear all', 'delete all']:
+            elif action == 'clear':
                 # Clear all notes
                 if not notes:
                     return "📝 Your scratchpad is already empty."
                 
+                note_count = len(notes)
                 if self._save_notes([]):
-                    return f"✅ Cleared all {len(notes)} note(s) from your scratchpad."
+                    return f"✅ Cleared all {note_count} note(s) from your scratchpad."
                 else:
                     return "❌ Error: Could not clear notes. Please try again."
             
-            elif query in ['help', 'commands']:
+            elif action == 'help':
                 # Show help
                 return """📝 **Agent Scratchpad Commands:**
 
 **Save context:**
 - `save <note>` - Save important context or information
-- `write <note>` - Same as save
-- `add <note>` - Same as save
 
 **Review context:**
 - `read` - Review all current notes and context
@@ -262,23 +257,23 @@ Use this as your working memory for complex tasks and conversations."""
             
             else:
                 # Unknown command
-                return f"""❌ Unknown scratchpad command: '{query}'
+                return f"""❌ Unknown scratchpad action: '{action}'
 
-Available commands:
-- save <note> - Save important context
+Available actions:
+- save - Save important context (requires content)
 - read - Review all notes
-- search <term> - Find specific information
-- update <number> <content> - Update existing note
-- delete <number> - Remove note when no longer needed
+- search - Find specific information (requires content)
+- update - Update existing note (requires note_number and content)
+- delete - Remove note (requires note_number)
 - clear - Clear all notes when starting fresh
 - help - Show detailed help
 
-Example: "save User prefers morning meetings" """
+Example structured input: action="save", content="User prefers morning meetings" """
         
         except Exception as e:
             logger.error(f"Scratchpad tool error: {str(e)}")
             return f"❌ Error in scratchpad: {str(e)}"
-    
-    async def _arun(self, query: str) -> str:
+
+    async def _arun(self, action: str, content: Optional[str] = None, note_number: Optional[int] = None) -> str:
         """Async version of the scratchpad tool."""
-        return self._run(query)
+        return self._run(action, content, note_number)

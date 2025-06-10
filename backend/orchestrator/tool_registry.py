@@ -1,7 +1,7 @@
 from typing import Dict, List, Type, Any, Optional
 from orchestrator.tools.calculator import CalculatorTool
 from orchestrator.tools.time import CurrentTimeTool
-from orchestrator.tools.document_qa import DocumentQATool
+from orchestrator.tools.search_documents import DocumentQATool
 from orchestrator.tools.scratchpad import ScratchpadTool
 from orchestrator.tools.integrations import GmailTool, CalendarTool, TodoistTool
 import logging
@@ -44,7 +44,7 @@ class ToolRegistry:
         self._tools["scratchpad"] = ScratchpadTool(self.user_id)
         
         # Context-dependent tools (available based on user state)
-        self._tools["document_qa"] = DocumentQATool(self.user_id, self.selected_documents)
+        self._tools["search_documents"] = DocumentQATool(self.user_id, self.selected_documents)
         
         # Future integration tools (placeholders for now)
         self._tools["gmail"] = GmailTool()
@@ -59,8 +59,8 @@ class ToolRegistry:
         based on changing user context.
         """
         self.selected_documents = selected_documents
-        # Reinitialize document QA tool with new context
-        self._tools["document_qa"] = DocumentQATool(self.user_id, self.selected_documents)
+        # Reinitialize document search tool with new context
+        self._tools["search_documents"] = DocumentQATool(self.user_id, self.selected_documents)
         logger.info(f"Updated tool registry with {len(selected_documents)} selected documents")
     
     def get_available_tools(self) -> List[Any]:
@@ -68,15 +68,11 @@ class ToolRegistry:
         Get list of tools that should be available to the orchestrator.
         
         This method determines which tools are actually provided to the orchestrator
-        based on current context. For example, document_qa is only provided
-        when documents are selected.
+        based on current context. The search_documents tool is always available
+        but handles the no-documents case internally.
         """
-        # Always include basic computational tools
-        available_tools = ["calculator", "current_time", "scratchpad"]
-        
-        # Context-dependent tool inclusion
-        if len(self.selected_documents) > 0:
-            available_tools.append("document_qa")
+        # Always include all core tools
+        available_tools = ["calculator", "current_time", "scratchpad", "search_documents"]
         
         # Future: Add more conditional tool inclusion logic here
         # if self.user_has_gmail_access:

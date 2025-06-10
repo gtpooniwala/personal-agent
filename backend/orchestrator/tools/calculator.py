@@ -1,100 +1,90 @@
 from langchain.tools import BaseTool
+from pydantic import BaseModel, Field, validator
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
 
+class CalculatorInput(BaseModel):
+    """Input model for calculator tool - expects structured mathematical expression from LLM."""
+    
+    expression: str = Field(
+        description="Clean mathematical expression to evaluate (e.g., '2**4', '15+27', '100/25'). Use ** for exponentiation, not ^.",
+        min_length=1
+    )
+    
+    @validator('expression')
+    def validate_expression(cls, v: str) -> str:
+        """Validate that the expression contains only safe mathematical characters."""
+        if not isinstance(v, str):
+            raise ValueError("Expression must be a string")
+            
+        v = v.strip()
+        if not v:
+            raise ValueError("Expression cannot be empty")
+        
+        # Only allow safe mathematical characters
+        allowed_chars = set('0123456789+-*/.() ')
+        if not all(c in allowed_chars for c in v):
+            raise ValueError("Expression contains invalid characters. Only numbers and operators (+, -, *, /, **, parentheses) are allowed")
+        
+        # Basic syntax check
+        try:
+            compile(v, '<string>', 'eval')
+        except SyntaxError:
+            raise ValueError("Invalid mathematical expression syntax")
+            
+        return v
+
+
 class CalculatorTool(BaseTool):
     """
-    Mathematical calculation tool/agent.
+    Mathematical calculation tool expecting structured input from LLM.
     
-    This is a specialized tool that handles all mathematical computations.
-    It's designed to be safe, reliable, and transparent about its operations.
-    
-    Features:
-    - Supports basic arithmetic (+, -, *, /)
-    - Handles exponentiation (^ converted to **)
-    - Input validation for security
-    - Clear error reporting
+    The LLM should provide clean mathematical expressions ready for evaluation.
     """
     
     name = "calculator"
-    description = """Mathematical calculation tool. Use this for ANY mathematical calculations, arithmetic, or numeric problems. 
+    description = """Mathematical calculation tool. Provide a clean mathematical expression for evaluation.
 
-Examples of when to use:
-- "What is 2 + 3?"
-- "Calculate 15 * 27"  
-- "What's 2^4?"
-- "Divide 100 by 25"
+IMPORTANT: 
+- Use ** for exponentiation, not ^
+- Provide expressions ready for evaluation: '2**4', '15+27', '100/25'
+- Do not include natural language - only mathematical expressions
 
-Input should be a mathematical expression like '2+3', '10*5', '2**4'.
-NEVER do mental math - ALWAYS use this tool for numbers.
-Do NOT use for simple greetings, general conversation, or non-mathematical questions."""
+Examples:
+- For "2 to the power of 4": use expression="2**4"
+- For "15 plus 27": use expression="15+27"  
+- For "100 divided by 25": use expression="100/25"
+
+The LLM should parse natural language and convert to proper mathematical notation."""
     
-    def _run(self, query: str) -> str:
+    args_schema = CalculatorInput
+    
+    def _run(self, expression: str) -> str:
         """
-        Execute mathematical calculation.
+        Execute mathematical calculation with validated expression.
         
-        This is the core calculation logic that:
-        1. Extracts mathematical expressions from natural language
-        2. Sanitizes input for security
-        3. Converts user-friendly notation (^ to **)
-        4. Safely evaluates the expression
-        5. Returns clear results or error messages
+        Args:
+            expression: Clean mathematical expression (validated by Pydantic)
+            
+        Returns:
+            String containing the calculation result
         """
         try:
-            # Extract mathematical expression from natural language
-            import re
-            
-            # Common word-to-operator mappings
-            query = query.lower().strip()
-            query = re.sub(r'\bdivided by\b', '/', query)
-            query = re.sub(r'\btimes\b', '*', query)
-            query = re.sub(r'\bplus\b', '+', query)
-            query = re.sub(r'\bminus\b', '-', query)
-            query = re.sub(r'\bto the power of\b', '**', query)
-            
-            # Extract numbers and mathematical operators using regex first
-            # Match mathematical expressions including numbers, operators, and parentheses
-            math_expressions = re.findall(r'\d+(?:\.\d+)?(?:\s*[+\-*/^]\s*\d+(?:\.\d+)?)*', query)
-            
-            if math_expressions:
-                # Use the longest mathematical expression found
-                expression = max(math_expressions, key=len)
-            else:
-                # Fallback: try to extract any sequence with numbers and operators
-                expression = re.sub(r'[^0-9+\-*/^().\s]', '', query)
-                
-            # Replace ^ with ** for exponentiation (user-friendly input) AFTER extraction
-            expression = expression.replace('^', '**')
-                
-            # Clean up the expression
-            expression = expression.strip()
-            if not expression:
-                return "Error: No valid mathematical expression found."
-            
-            # Replace multiple spaces with single space and clean up
-            expression = re.sub(r'\s+', '', expression)  # Remove all spaces for evaluation
-            
-            # Final security check - only allow safe mathematical characters
-            allowed_chars = set('0123456789+-*/.() ')
-            if not all(c in allowed_chars for c in expression):
-                return "Error: Invalid characters in mathematical expression. Only numbers and basic operators (+, -, *, /, ^, parentheses) are allowed."
-            
-            # Evaluate the mathematical expression
+            # Pydantic has already validated the expression
             result = eval(expression)
             
-            logger.info(f"Calculator tool executed: {query} -> {expression} = {result}")
+            logger.info(f"Calculator tool executed: {expression} = {result}")
             return f"The result is: {result}"
             
         except ZeroDivisionError:
             return "Error: Division by zero is not allowed."
-        except SyntaxError:
-            return "Error: Invalid mathematical expression. Please check your syntax."
         except Exception as e:
             logger.error(f"Calculator tool error: {str(e)}")
             return f"Error calculating: {str(e)}"
     
-    async def _arun(self, query: str) -> str:
+    async def _arun(self, expression: str) -> str:
         """Async version of the calculation tool."""
-        return self._run(query)
+        return self._run(expression)
