@@ -1,5 +1,4 @@
 from langchain_core.tools import BaseTool
-from langchain.chains import LLMChain
 from langchain.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
@@ -16,13 +15,13 @@ class ResponseAgentInput(BaseModel):
 class ResponseAgentTool(BaseTool):
     """
     Tool: response_agent
-    Description: Synthesizes a final, user-facing response from the user query, tool results, and conversation history using an LLMChain. This tool does not select or invoke other tools; it only generates the final answer for the user based on provided context and tool outputs.
+    Description: Synthesizes a final, user-facing response from the user query, tool results, and conversation history using a modern LangChain Runnable (prompt | llm). This tool does not select or invoke other tools; it only generates the final answer for the user based on provided context and tool outputs.
     """
     name: str = "response_agent"
     description: str = (
         "Given a user query, a list of tool results, and optional conversation history, generates a clear, natural, and helpful response for the user. "
         "This tool is for synthesizing the final answer after all tool calls are complete. "
-        "It does not select or invoke tools itself."
+        "It does not select or invoke tools itself." \
     )
     args_schema: Type[BaseModel] = ResponseAgentInput
 
@@ -32,20 +31,30 @@ class ResponseAgentTool(BaseTool):
         prompt = ChatPromptTemplate.from_messages([
             ("system", "You are a helpful personal assistant. Given the user's query, the results from all tools used, and optional conversation history, craft a clear, natural, and helpful response for the user. Integrate tool results smoothly, avoid technical jargon, and ensure the answer is easy to understand. Do not decide which tools to use—only synthesize the provided information into a final response. Do not refuse to answer or say 'I don't know' unless absolutely necessary. If you can answer the question directly, do so without relying on the tools."),
             ("user", "{user_query}"),
+            ("system", "Here is the recent conversation history (if any):\n{conversation_history_str}"),
             ("assistant", "{tool_results_str}"),
             ("system", "Now, using all the above information, write a single, clear, natural, and helpful response for the user. Do not echo the user query. Do not mention tool names. Just answer as a helpful assistant.")
         ])
-        object.__setattr__(self, "chain", LLMChain(llm=llm, prompt=prompt))
+        
+        # Use the new RunnableSequence pattern: prompt | llm
+        object.__setattr__(self, "chain", prompt | llm)
 
     def _run(self, user_query: str, tool_results: List[Dict[str, Any]], conversation_history: Optional[List[Dict[str, str]]] = None) -> str:
         # Prepare tool results as a string for the prompt
         tool_results_str = "\n".join([
             f"[{tr.get('tool', 'tool')}] {tr.get('output', '')}" for tr in tool_results if tr.get('output', '')
         ]) if tool_results else ""
-        # Optionally, you could also include conversation_history in the prompt if needed
+        # Format conversation history for the prompt
+        if conversation_history:
+            conversation_history_str = "\n".join([
+                f"{msg.get('role', '').capitalize()}: {msg.get('content', '')}" for msg in conversation_history
+            ])
+        else:
+            conversation_history_str = "(No prior conversation history)"
         inputs = {
             "user_query": user_query,
             "tool_results_str": tool_results_str,
+            "conversation_history_str": conversation_history_str,
         }
         response = self.chain.invoke(inputs)
-        return response["text"] if isinstance(response, dict) and "text" in response else str(response)
+        return response.content if hasattr(response, "content") else str(response)

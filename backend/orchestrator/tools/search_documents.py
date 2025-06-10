@@ -60,6 +60,15 @@ class SearchDocumentsTool(BaseTool):
         object.__setattr__(self, '_user_id', user_id)
         object.__setattr__(self, '_selected_documents', selected_documents or [])
     
+    def _format_document_summaries(self, documents):
+        if not documents:
+            return "No documents are available."
+        summary_lines = ["\n---\n**Here is a list of all Documents available and their Summaries:**"]
+        for doc in documents:
+            summary = doc.get("summary") or "No summary available."
+            summary_lines.append(f"- **{doc.get('filename', 'Untitled')}**: {summary}")
+        return "\n".join(summary_lines)
+
     def _run(self, query: str, max_results: int = 3) -> str:
         """
         Search ALL selected documents and provide answers based on content.
@@ -95,50 +104,47 @@ class SearchDocumentsTool(BaseTool):
                 selected_documents=selected_docs
             )
             
+            # Append all available document summaries 
+            all_docs = doc_processor.get_documents(self._user_id)
+            response = self._format_document_summaries(all_docs)
             if not search_results:
-                return f"""I couldn't find any relevant information in the {len(self._selected_documents)} selected document(s) for your query: "{query}"
-
-This could mean:
-- The information isn't in the selected documents
-- The documents are still being processed
-- Try rephrasing your question with different keywords
-
-You can try asking about different topics or selecting different documents."""
-            
-            # Format response with relevant document excerpts
-            response_parts = ["Based on your uploaded documents, here's what I found:\n"]
-            
-            for i, result in enumerate(search_results, 1):
-                similarity_score = result.get('similarity', 0)
+                response += f"""I couldn't find any relevant information in the {len(self._selected_documents)} selected document(s) for your query: \"{query}\"\n\nThis could mean:\n- The information isn't in the selected documents\n- The documents are still being processed\n- Try rephrasing your question with different keywords\n\nYou can try asking about different topics or selecting different documents."""
+            else:
+                # Format response with relevant document excerpts
+                response_parts = ["Based on your the uploaded documents, here's what I found relevant to the query:\n"]
                 
-                # Determine relevance level
-                if similarity_score > 0.7:
-                    relevance = "highly relevant"
-                elif similarity_score > 0.5:
-                    relevance = "moderately relevant"
-                else:
-                    relevance = "somewhat relevant"
+                for i, result in enumerate(search_results, 1):
+                    similarity_score = result.get('similarity', 0)
+                    
+                    # Determine relevance level
+                    if similarity_score > 0.7:
+                        relevance = "highly relevant"
+                    elif similarity_score > 0.5:
+                        relevance = "moderately relevant"
+                    else:
+                        relevance = "somewhat relevant"
+                    
+                    # Format each result with clear source attribution
+                    content_preview = result['content'][:500]
+                    if len(result['content']) > 500:
+                        content_preview += "..."
+                    
+                    response_parts.append(
+                        f"**{i}. From '{result['document_name']}' (section {result['chunk_index'] + 1}) - {relevance}:**\n"
+                        f"{content_preview}\n"
+                    )
                 
-                # Format each result with clear source attribution
-                content_preview = result['content'][:500]
-                if len(result['content']) > 500:
-                    content_preview += "..."
-                
+                # Add summary footer
+                unique_documents = len(set(r['document_name'] for r in search_results))
                 response_parts.append(
-                    f"**{i}. From '{result['document_name']}' (section {result['chunk_index'] + 1}) - {relevance}:**\n"
-                    f"{content_preview}\n"
+                    f"\n*Found {len(search_results)} relevant passages from {unique_documents} document(s). "
+                    f"Results ranked by relevance to your query.*"
                 )
-            
-            # Add summary footer
-            unique_documents = len(set(r['document_name'] for r in search_results))
-            response_parts.append(
-                f"\n*Found {len(search_results)} relevant passages from {unique_documents} document(s). "
-                f"Results ranked by relevance to your query.*"
-            )
-            
-            logger.info(f"Document Q&A tool found {len(search_results)} results for query: {query} (max_results: {max_results})")
-            return "\n".join(response_parts)
-            
+                
+                response += "\n".join(response_parts)
+
+            logger.info(f"Document Q&A tool found {len(search_results) if search_results else 0} results for query: {query} (max_results: {max_results})")
+            return response
         except Exception as e:
             logger.error(f"Error in search documents tool: {str(e)}")
             return f"I encountered an error while searching your documents: {str(e)}\n\nPlease try again or contact support if the issue persists."
@@ -167,49 +173,45 @@ You can try asking about different topics or selecting different documents."""
             )
             
             if not search_results:
-                return f"""I couldn't find any relevant information in the {len(self._selected_documents)} selected document(s) for your query: "{query}"
-
-This could mean:
-- The information isn't in the selected documents
-- The documents are still being processed
-- Try rephrasing your question with different keywords
-
-You can try asking about different topics or selecting different documents."""
-            
-            # Format response with relevant document excerpts
-            response_parts = ["Based on your uploaded documents, here's what I found:\n"]
-            
-            for i, result in enumerate(search_results, 1):
-                similarity_score = result.get('similarity', 0)
+                response = f"""I couldn't find any relevant information in the {len(self._selected_documents)} selected document(s) for your query: \"{query}\"\n\nThis could mean:\n- The information isn't in the selected documents\n- The documents are still being processed\n- Try rephrasing your question with different keywords\n\nYou can try asking about different topics or selecting different documents."""
+            else:
+                # Format response with relevant document excerpts
+                response_parts = ["Based on your uploaded documents, here's what I found:\n"]
                 
-                # Determine relevance level
-                if similarity_score > 0.7:
-                    relevance = "highly relevant"
-                elif similarity_score > 0.5:
-                    relevance = "moderately relevant"
-                else:
-                    relevance = "somewhat relevant"
+                for i, result in enumerate(search_results, 1):
+                    similarity_score = result.get('similarity', 0)
+                    
+                    # Determine relevance level
+                    if similarity_score > 0.7:
+                        relevance = "highly relevant"
+                    elif similarity_score > 0.5:
+                        relevance = "moderately relevant"
+                    else:
+                        relevance = "somewhat relevant"
+                    
+                    # Format each result with clear source attribution
+                    content_preview = result['content'][:500]
+                    if len(result['content']) > 500:
+                        content_preview += "..."
+                    
+                    response_parts.append(
+                        f"**{i}. From '{result['document_name']}' (section {result['chunk_index'] + 1}) - {relevance}:**\n"
+                        f"{content_preview}\n"
+                    )
                 
-                # Format each result with clear source attribution
-                content_preview = result['content'][:500]
-                if len(result['content']) > 500:
-                    content_preview += "..."
-                
+                # Add summary footer
+                unique_documents = len(set(r['document_name'] for r in search_results))
                 response_parts.append(
-                    f"**{i}. From '{result['document_name']}' (section {result['chunk_index'] + 1}) - {relevance}:**\n"
-                    f"{content_preview}\n"
+                    f"\n*Found {len(search_results)} relevant passages from {unique_documents} document(s). "
+                    f"Results ranked by relevance to your query.*"
                 )
-            
-            # Add summary footer
-            unique_documents = len(set(r['document_name'] for r in search_results))
-            response_parts.append(
-                f"\n*Found {len(search_results)} relevant passages from {unique_documents} document(s). "
-                f"Results ranked by relevance to your query.*"
-            )
-            
-            logger.info(f"Document Q&A tool found {len(search_results)} results for query: {query}")
-            return "\n".join(response_parts)
-            
+                
+                response = "\n".join(response_parts)
+            # Append all available document summaries (sync call is fine for metadata)
+            all_docs = doc_processor.get_documents(self._user_id)
+            response += self._format_document_summaries(all_docs)
+            logger.info(f"Document Q&A tool found {len(search_results) if search_results else 0} results for query: {query}")
+            return response
         except Exception as e:
             logger.error(f"Error in search documents tool: {str(e)}")
             return f"I encountered an error while searching your documents: {str(e)}\n\nPlease try again or contact support if the issue persists."
