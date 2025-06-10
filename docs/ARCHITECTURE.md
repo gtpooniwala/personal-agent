@@ -2,21 +2,21 @@
 
 ## System Overview
 
-The Personal Agent MVP is built on a **hybrid intelligence routing architecture** that combines the power of LangChain agents with intelligent tool selection, providing both fast direct responses and enhanced tool-powered capabilities.
+The Personal Agent MVP is built on a **modern LangGraph orchestration architecture** that combines the power of graph-based agent execution with intelligent tool selection, providing both fast direct responses and enhanced tool-powered capabilities.
 
 ## Core Architecture Principles
 
-### 1. Hybrid Intelligence Routing
+### 1. LangGraph-Based Intelligence Routing
 
 ```text
-User Query → LangChain Agent Intelligence → Dynamic Route Decision
-                                                    ↓
+User Query → LangGraph Agent → Dynamic Route Decision (Graph-Based)
+                                              ↓
         General Knowledge → Direct LLM → Natural Response (Fast)
-                                                    ↓  
-        Computational Task → Agent + Tools → Tool-Enhanced Response
+                                              ↓  
+        Computational Task → Tool Execution → Tool-Enhanced Response
 ```
 
-**Key Innovation**: Agent-driven tool selection rather than hardcoded rules, allowing natural conversation flow and context-aware tool usage.
+**Key Innovation**: Graph-based agent execution with automatic tool binding, enabling natural conversation flow and persistent memory management.
 
 ### 2. Component Architecture
 
@@ -67,26 +67,33 @@ User Query → LangChain Agent Intelligence → Dynamic Route Decision
 - **Features**: CORS middleware, lifespan management, static file serving
 - **Configuration**: Environment-based settings with Pydantic
 
-#### 2. LangChain Agent System (`backend/agent/`)
+#### 2. LangGraph Orchestrator System (`backend/orchestrator/`)
 
-**Core Agent (`backend/agent/core.py`)**
-- Main `PersonalAgent` class implementing ReAct pattern
-- Smart routing logic (agent-driven, not hardcoded)
-- Conversation management and persistent memory
-- Token tracking and cost monitoring
-- Graceful fallback from agent to direct LLM
+**Core Orchestrator (`backend/orchestrator/core.py`)**
+- Main `CoreOrchestrator` class implementing LangGraph ReAct pattern
+- Modern graph-based agent execution with `create_react_agent()`
+- Automatic tool binding and description generation
+- Built-in memory management with `MemorySaver()`
+- Enhanced conversation persistence and state management
 
-**Memory System (`backend/agent/memory.py`)**
-- Custom SQLite-backed LangChain memory
-- Extends `ConversationBufferMemory`
-- Persistent conversation context across sessions
-- Integrates with database operations
+**Tool Registry (`backend/orchestrator/tool_registry.py`)**
+- Dynamic tool management with context-aware availability
+- Automatic tool discovery and binding
+- Pydantic-based tool validation and type safety
+- Support for document-dependent tool activation
 
-**Tool Registry (`backend/agent/tools.py`)**
-- `CalculatorTool`: Mathematical expressions with exponentiation
-- `CurrentTimeTool`: Date/time queries with natural language processing
-- `ToolRegistry`: Manages available tools dynamically
-- Placeholder frameworks for Gmail, Calendar, Todoist
+**Memory System (`backend/orchestrator/memory.py`)**
+- LangGraph-compatible memory integration
+- Conversation checkpointing and state persistence
+- Thread-based conversation management
+- Seamless integration with database operations
+
+**Tool Modules (`backend/orchestrator/tools/`)**
+- `calculator.py`: Mathematical expressions with Pydantic validation
+- `time.py`: Date/time queries with structured input handling
+- `search_documents.py`: RAG-based document search with context
+- `scratchpad.py`: Persistent note-taking across conversations
+- `integrations.py`: Framework for Gmail, Calendar, Todoist tools
 
 #### 3. API Layer (`backend/api/`)
 

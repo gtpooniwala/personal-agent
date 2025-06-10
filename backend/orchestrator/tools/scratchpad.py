@@ -1,6 +1,6 @@
 from langchain.tools import BaseTool
-from pydantic import BaseModel, Field, validator
-from typing import Dict, Any, Optional, Literal
+from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import Dict, Any, Optional, Literal, Type
 import json
 import os
 from pathlib import Path
@@ -27,25 +27,16 @@ class ScratchpadInput(BaseModel):
         description="Note number for delete/update operations. Required for delete and update actions."
     )
     
-    @validator('content')
-    def validate_content_for_action(cls, v, values):
-        """Validate that content is provided when required for specific actions."""
-        action = values.get('action')
-        
-        if action in ['save', 'search', 'update'] and not v:
-            raise ValueError(f"Content is required for '{action}' action")
+    @model_validator(mode='after')
+    def validate_action_requirements(self):
+        """Validate that required fields are provided for specific actions."""
+        if self.action in ['save', 'search', 'update'] and not self.content:
+            raise ValueError(f"Content is required for '{self.action}' action")
             
-        return v
-    
-    @validator('note_number')
-    def validate_note_number_for_action(cls, v, values):
-        """Validate that note_number is provided when required for specific actions."""
-        action = values.get('action')
-        
-        if action in ['delete', 'update'] and v is None:
-            raise ValueError(f"Note number is required for '{action}' action")
+        if self.action in ['delete', 'update'] and self.note_number is None:
+            raise ValueError(f"Note number is required for '{self.action}' action")
             
-        return v
+        return self
 
 
 class ScratchpadTool(BaseTool):
@@ -68,27 +59,16 @@ class ScratchpadTool(BaseTool):
     the conversation's complexity and context management needs.
     """
     
-    name = "scratchpad"
-    description = """Agent's temporary memory and context management tool.
-
-Use this tool to manage your working memory with structured commands:
-
-Required parameters:
-- action: The action to perform (save/read/search/delete/clear/update/help)
-- content: Text content (required for save, search, update actions)  
-- note_number: Integer ID (required for delete, update actions)
-
-Examples:
-- To save: action="save", content="User prefers morning meetings"
-- To read all: action="read"
-- To search: action="search", content="meetings" 
-- To update: action="update", note_number=2, content="Updated content"
-- To delete: action="delete", note_number=3
-- To clear all: action="clear"
-
-Use this proactively for context management during complex conversations."""
+    name: str = "scratchpad"
+    description: str = (
+        "Agent's temporary memory for plans, todos, and critical instructions. "
+        "Use to store, retrieve, search, update, or clear important context, intermediate results, action plans, or notes needed for multi-step reasoning. "
+        "Proactively remove outdated or irrelevant notes to keep memory clean. "
+        "Actions: save, read, search, update, delete, clear, help. "
+        "Examples: 'Save project plan', 'Read my notes', 'Search for deadline', 'Update note 2', 'Clear all notes'."
+    )
     
-    args_schema = ScratchpadInput
+    args_schema: Type[BaseModel] = ScratchpadInput
     
     def __init__(self, user_id: str = "default"):
         super().__init__()

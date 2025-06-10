@@ -1,7 +1,7 @@
 from typing import Dict, List, Type, Any, Optional
 from orchestrator.tools.calculator import CalculatorTool
 from orchestrator.tools.time import CurrentTimeTool
-from orchestrator.tools.search_documents import DocumentQATool
+from orchestrator.tools.search_documents import SearchDocumentsTool
 from orchestrator.tools.scratchpad import ScratchpadTool
 from orchestrator.tools.integrations import GmailTool, CalendarTool, TodoistTool
 import logging
@@ -44,7 +44,7 @@ class ToolRegistry:
         self._tools["scratchpad"] = ScratchpadTool(self.user_id)
         
         # Context-dependent tools (available based on user state)
-        self._tools["search_documents"] = DocumentQATool(self.user_id, self.selected_documents)
+        self._tools["search_documents"] = SearchDocumentsTool(self.user_id, self.selected_documents)
         
         # Future integration tools (placeholders for now)
         self._tools["gmail"] = GmailTool()
@@ -60,7 +60,7 @@ class ToolRegistry:
         """
         self.selected_documents = selected_documents
         # Reinitialize document search tool with new context
-        self._tools["search_documents"] = DocumentQATool(self.user_id, self.selected_documents)
+        self._tools["search_documents"] = SearchDocumentsTool(self.user_id, self.selected_documents)
         logger.info(f"Updated tool registry with {len(selected_documents)} selected documents")
     
     def get_available_tools(self) -> List[Any]:

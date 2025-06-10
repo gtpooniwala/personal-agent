@@ -1,13 +1,13 @@
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Type
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-class DocumentQAInput(BaseModel):
-    """Input model for document Q&A tool - expects structured query from LLM."""
+class SearchDocumentsInput(BaseModel):
+    """Structured input for searching user-uploaded documents. This tool will search through ALL selected documents to find relevant information. Use whenever you think the answer may be in the user's uploaded or selected documents. File summaries are available to help you decide if a search is worthwhile."""
     
     query: str = Field(
         description="The question or search query about the uploaded documents. Should be clear and specific."
@@ -19,39 +19,40 @@ class DocumentQAInput(BaseModel):
     )
 
 
-class DocumentQATool(BaseTool):
+class SearchDocumentsTool(BaseTool):
     """
-    Document Q&A tool/agent using RAG (Retrieval Augmented Generation).
-    
-    This is a sophisticated tool that enables users to query their uploaded documents.
-    It uses vector search and semantic matching to find relevant content.
-    
-    Features:
-    - Semantic search across uploaded documents
-    - Context-aware responses based on document content
-    - Multi-document search capabilities
-    - Relevance scoring and filtering
-    - Transparent source attribution
+    Tool: search_documents
+    Purpose: Answer questions or retrieve information from ALL user-selected documents using semantic search (RAG).
+
+    When to use:
+    - Use this tool whenever you think relevant information may be found in the user's uploaded or selected documents, even if the user does not explicitly mention them.
+    - The tool will search through ALL selected documents to find the answer.
+    - File summaries are available to help you decide if a search is worthwhile.
+    - Do not use for general knowledge, math, time, or conversation unless you believe the answer may be in the documents.
+
+    Example triggers:
+    - "What does my contract say about termination?"
+    - "Search my uploaded files for pricing information."
+    - "Summarize my selected documents."
+    - "Find AI references in my PDFs."
+    - "What is the project deadline?" (if you think it may be in the docs)
+
+    Example non-triggers:
+    - "Hi", "Hello", "How are you?", "What can you do?", "What's the weather?"
+    - Any question where you are confident the answer is not in the user's documents.
     """
     
-    name = "search_documents"
-    description = """Search through uploaded documents to find relevant information and answer questions.
-
-Use this tool when users:
-- Ask questions about their uploaded documents
-- Want to search for specific information in documents
-- Need summaries or explanations from document content
-- Reference "my documents", "uploaded files", etc.
-
-Examples:
-- "What does my contract say about termination?"
-- "Search my documents for information about pricing"
-- "Find information about AI in my documents"
-- "Summarize the key points from my uploaded report"
-
-The tool searches through selected documents and provides relevant excerpts with source attribution."""
+    name: str = "search_documents"
+    description: str = (
+        "Answer questions or retrieve information from user-uploaded documents. "
+        "Use this tool whenever you think relevant information may be found in the user's uploaded or selected documents. "
+        "Explicitly use this tool if you think relevant information may be in one of the included files, or if the user asks about the uploaded file(s). "
+        "File summaries are available to help you decide if a search is worthwhile. "
+        "Do not use for general knowledge, math, time, or conversation unless you believe the answer may be in the documents. "
+        "Examples: 'What does my contract say?', 'Find pricing info in my files', 'Summarize my uploaded documents', 'What is the project deadline?'"
+    )
     
-    args_schema = DocumentQAInput
+    args_schema: Type[BaseModel] = SearchDocumentsInput
     
     def __init__(self, user_id: str = "default", selected_documents: Optional[List[str]] = None):
         super().__init__()
@@ -61,7 +62,7 @@ The tool searches through selected documents and provides relevant excerpts with
     
     def _run(self, query: str, max_results: int = 3) -> str:
         """
-        Search documents and provide answers based on content.
+        Search ALL selected documents and provide answers based on content.
         
         Args:
             query: The search query or question
@@ -80,14 +81,7 @@ The tool searches through selected documents and provides relevant excerpts with
             
             # Check if any documents are selected for search
             if len(self._selected_documents) == 0:
-                return """No documents are currently selected for search. 
-
-To use document Q&A:
-1. Upload documents using the upload feature
-2. Select documents in the sidebar
-3. Ask questions about the document content
-
-The document Q&A tool will then search through your selected documents to find relevant information."""
+                return "No documents are currently selected. Please select one or more documents to enable document search."
             
             # Import here to avoid circular imports
             from services.document_service import doc_processor
@@ -146,12 +140,12 @@ You can try asking about different topics or selecting different documents."""
             return "\n".join(response_parts)
             
         except Exception as e:
-            logger.error(f"Error in document Q&A tool: {str(e)}")
+            logger.error(f"Error in search documents tool: {str(e)}")
             return f"I encountered an error while searching your documents: {str(e)}\n\nPlease try again or contact support if the issue persists."
     
     async def _arun(self, query: str) -> str:
         """
-        Async version of the document search tool.
+        Async version of the document search tool. Searches ALL selected documents for relevant information.
         
         This version uses the async document service for better performance
         in async contexts.
@@ -159,14 +153,7 @@ You can try asking about different topics or selecting different documents."""
         try:
             # Check if any documents are selected
             if len(self._selected_documents) == 0:
-                return """No documents are currently selected for search. 
-
-To use document Q&A:
-1. Upload documents using the upload feature
-2. Select documents in the sidebar  
-3. Ask questions about the document content
-
-The document Q&A tool will then search through your selected documents to find relevant information."""
+                return "No documents are currently selected. Please select one or more documents to enable document search."
             
             from services.document_service import doc_processor
             
@@ -224,5 +211,5 @@ You can try asking about different topics or selecting different documents."""
             return "\n".join(response_parts)
             
         except Exception as e:
-            logger.error(f"Error in document Q&A tool: {str(e)}")
+            logger.error(f"Error in search documents tool: {str(e)}")
             return f"I encountered an error while searching your documents: {str(e)}\n\nPlease try again or contact support if the issue persists."

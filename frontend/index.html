@@ -375,6 +375,12 @@
             font-size: 11px;
         }
 
+        .document-summary {
+            color: #b2d7ff;
+            font-size: 11px;
+            margin-top: 2px;
+        }
+
         .document-actions {
             display: flex;
             gap: 8px;
@@ -885,6 +891,9 @@
                                 </div>
                                 <div class="document-meta">
                                     ${formatFileSize(doc.file_size)} • ${formatDate(doc.uploaded_at)}
+                                </div>
+                                <div class="document-summary" style="color:#b2d7ff; font-size:11px; margin-top:2px;">
+                                    ${doc.summary ? doc.summary : 'No summary available.'}
                                 </div>
                             </div>
                         </div>

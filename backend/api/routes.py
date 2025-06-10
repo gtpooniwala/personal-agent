@@ -226,7 +226,8 @@ async def get_documents():
                 file_size=doc["file_size"],
                 uploaded_at=doc["upload_date"],
                 processed=doc["processed"],
-                total_chunks=doc["total_chunks"]
+                total_chunks=doc["total_chunks"],
+                summary=doc["summary"]
             )
             for doc in documents
         ]

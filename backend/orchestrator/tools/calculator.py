@@ -1,5 +1,6 @@
 from langchain.tools import BaseTool
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
+from typing import Type
 import logging
 import re
 
@@ -14,7 +15,8 @@ class CalculatorInput(BaseModel):
         min_length=1
     )
     
-    @validator('expression')
+    @field_validator('expression')
+    @classmethod
     def validate_expression(cls, v: str) -> str:
         """Validate that the expression contains only safe mathematical characters."""
         if not isinstance(v, str):
@@ -45,22 +47,14 @@ class CalculatorTool(BaseTool):
     The LLM should provide clean mathematical expressions ready for evaluation.
     """
     
-    name = "calculator"
-    description = """Mathematical calculation tool. Provide a clean mathematical expression for evaluation.
+    name: str = "calculator"
+    description: str = """Perform mathematical calculations with precision.
 
-IMPORTANT: 
-- Use ** for exponentiation, not ^
-- Provide expressions ready for evaluation: '2**4', '15+27', '100/25'
-- Do not include natural language - only mathematical expressions
-
-Examples:
-- For "2 to the power of 4": use expression="2**4"
-- For "15 plus 27": use expression="15+27"  
-- For "100 divided by 25": use expression="100/25"
-
-The LLM should parse natural language and convert to proper mathematical notation."""
+Use for any mathematical expressions, calculations, or computations.
+Accepts standard math notation: +, -, *, /, ** (for exponents).
+Examples: "2**8", "15*7", "200*0.25", "(15+5)/4" """
     
-    args_schema = CalculatorInput
+    args_schema: Type[BaseModel] = CalculatorInput
     
     def _run(self, expression: str) -> str:
         """

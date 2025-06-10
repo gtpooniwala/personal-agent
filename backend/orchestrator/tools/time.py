@@ -1,7 +1,7 @@
 from langchain.tools import BaseTool
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
-from typing import Optional, Literal
+from typing import Optional, Literal, Type
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,24 +20,22 @@ class TimeInput(BaseModel):
         description="Output format preference"
     )
     
-    @validator('query', pre=True)
+    @field_validator('query', mode='before')
+    @classmethod
     def validate_query(cls, v):
         """Validate and normalize the query."""
         if not isinstance(v, str):
             return "now"
         return v.strip().lower()
     
-    @validator('format_type', pre=True, always=True)
-    def parse_format(cls, v, values):
+    @field_validator('format_type', mode='before')
+    @classmethod
+    def parse_format(cls, v):
         """Parse format preference from query."""
-        query = values.get('query', '').lower()
-        
-        if any(word in query for word in ['detailed', 'verbose', 'full']):
-            return "verbose"
-        elif any(word in query for word in ['iso', 'standard', 'formatted']):
-            return "iso"
-        else:
+        # Since we can't access other fields in V2, use a simple default
+        if v is None:
             return "standard"
+        return v
 
 
 class CurrentTimeTool(BaseTool):
@@ -54,24 +52,14 @@ class CurrentTimeTool(BaseTool):
     - Pydantic input validation
     """
     
-    name = "current_time"
-    description = """Date and time information tool. Use ONLY when explicitly asked about current time, date, or timestamps.
+    name: str = "current_time"
+    description: str = """Get current date and time information.
 
-Examples of when to use:
-- "What time is it?"
-- "What's the date?"
-- "Current time"
-- "Tell me the time"
-- "What day is it?"
-
-Do NOT use for:
-- General greetings or conversation
-- Scheduling or calendar operations (use calendar tool instead)
-- Time calculations (use calculator tool instead)
-
-Input: use 'now' or any time-related query."""
+Use when users ask for current time, date, or temporal information.
+Provides real-time data the LLM cannot access.
+Examples: "What time is it?", "What's today's date?", "current time" """
     
-    args_schema = TimeInput
+    args_schema: Type[BaseModel] = TimeInput
     
     def _run(self, query: str = "now") -> str:
         """

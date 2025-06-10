@@ -22,7 +22,7 @@ def test_imports():
         from orchestrator.tools.calculator import CalculatorTool
         from orchestrator.tools.time import CurrentTimeTool
         from orchestrator.tools.scratchpad import ScratchpadTool
-        from orchestrator.tools.document_qa import DocumentQATool
+        from orchestrator.tools.search_documents import SearchDocumentsTool
         print("  ✅ Orchestrator tools imported successfully")
         
         # Test core components
@@ -125,8 +125,8 @@ def test_pydantic_tools():
     # Test Document QA Tool
     print("  Testing Document QA Tool...")
     try:
-        from orchestrator.tools.document_qa import DocumentQATool
-        doc_qa = DocumentQATool()
+        from orchestrator.tools.search_documents import SearchDocumentsTool
+        doc_qa = SearchDocumentsTool()
         
         result = doc_qa._run(query="What is machine learning?")
         if len(str(result)) > 10:

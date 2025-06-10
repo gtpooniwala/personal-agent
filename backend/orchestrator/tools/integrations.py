@@ -41,8 +41,8 @@ class GmailTool(BaseIntegrationTool):
     with its own reasoning capabilities about email management.
     """
     
-    name = "gmail_search"
-    description = """Gmail integration tool for email management.
+    name: str = "gmail_search"
+    description: str = """Gmail integration tool for email management.
 
 Currently not implemented - this is a placeholder for future development.
 
@@ -85,8 +85,8 @@ class CalendarTool(BaseIntegrationTool):
     understands natural language requests and makes intelligent scheduling decisions.
     """
     
-    name = "calendar_events"
-    description = """Google Calendar integration tool for schedule management.
+    name: str = "calendar_events"
+    description: str = """Google Calendar integration tool for schedule management.
 
 Currently not implemented - this is a placeholder for future development.
 
@@ -129,8 +129,8 @@ class TodoistTool(BaseIntegrationTool):
     helps users organize their work and life efficiently.
     """
     
-    name = "todoist_tasks"
-    description = """Todoist integration tool for task and project management.
+    name: str = "todoist_tasks"
+    description: str = """Todoist integration tool for task and project management.
 
 Currently not implemented - this is a placeholder for future development.
 

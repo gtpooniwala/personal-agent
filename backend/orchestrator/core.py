@@ -1,7 +1,8 @@
-from langchain.agents import initialize_agent, AgentType
+from langgraph.prebuilt import create_react_agent
+from langgraph.checkpoint.memory import MemorySaver
 from langchain_openai import ChatOpenAI
 from langchain_community.callbacks.manager import get_openai_callback
-from orchestrator.memory import SQLiteConversationMemory
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from orchestrator.tool_registry import ToolRegistry
 from database.operations import db_ops
 from config import settings
@@ -37,111 +38,71 @@ class CoreOrchestrator:
     def _setup_llm(self) -> ChatOpenAI:
         """Setup the language model for the orchestrator."""
         return ChatOpenAI(
-            model="gpt-3.5-turbo",
+            model="gpt-3.5-turbo",  # Revert back to GPT-3.5 Turbo
             temperature=0.3,  # Lower temperature for more focused decision-making
             openai_api_key=settings.openai_api_key,
             max_tokens=800   # Optimized for orchestration decisions
         )
     
-    def _generate_tools_description(self, available_tools) -> str:
-        """
-        Dynamically generate tool descriptions from actual tool objects.
-        This ensures the system prompt always reflects the current available tools.
-        """
-        tool_descriptions = []
-        
-        # Icons for different tool types
-        tool_icons = {
-            "calculator": "🧮",
-            "current_time": "⏰", 
-            "scratchpad": "🗂️",
-            "search_documents": "🔍"
-        }
-        
-        for i, tool in enumerate(available_tools, 1):
-            icon = tool_icons.get(tool.name, "🔧")
-            tool_name = tool.name.upper().replace("_", " ")
-            
-            # Use the tool's actual description
-            description = tool.description.strip()
-            
-            tool_descriptions.append(f"{i}. {icon} {tool_name} - {description}")
-        
-        return "\n\n".join(tool_descriptions)
-    
     def _setup_orchestrator_agent(self, conversation_id: str, force_refresh: bool = False):
         """
-        Setup the LangChain ReAct agent that serves as the orchestrator's decision-making brain.
+        Setup the LangGraph ReAct agent that serves as the orchestrator's decision-making brain.
         
         This agent is responsible for:
         - Understanding user intent
         - Deciding which tools/agents to use
         - Coordinating multi-tool workflows
         - Providing natural language responses
+        
+        Uses LangGraph's create_react_agent which automatically handles tool descriptions
+        and provides better state management than legacy AgentExecutor.
         """
         if self.current_conversation_id == conversation_id and self.orchestrator_agent and not force_refresh:
             return  # Already setup for this conversation
         
         self.current_conversation_id = conversation_id
-        self.current_memory = SQLiteConversationMemory(conversation_id)
         
-        # Get available tools from the registry
+        # Get available tools from the registry (no need for manual tool descriptions!)
         available_tools = self.tool_registry.get_available_tools()
         
         # Get document context to inform the agent about document availability
         document_context = self._get_document_context()
         
-        # Generate dynamic tool descriptions
-        tools_description = self._generate_tools_description(available_tools)
-        
-        # Setup the orchestrator agent with action-focused prompting
-        orchestrator_prompt = f"""You are the Core Orchestrator - the brain of a personal assistant system. Your job is to EXECUTE the right tools for user requests.
+        # Setup system prompt using best practices: no hard-coded tool descriptions or selection criteria
+        system_prompt = f"""# PERSONAL ASSISTANT CORE ORCHESTRATOR
 
-CORE DIRECTIVE: When you identify that a tool should be used, USE IT IMMEDIATELY. Do not explain what you will do - DO IT.
+## IDENTITY & ROLE
+You are an intelligent personal assistant orchestrator. Your purpose is to understand user needs and execute appropriate tools to fulfill them efficiently. You operate using a Reasoning-Acting (ReAct) framework.
 
-AVAILABLE TOOLS:
-{tools_description}
-
-DOCUMENT STATUS:
+## CONTEXT
+The following documents have been selected for this conversation:
 {self._format_document_status(document_context)}
 
-MANDATORY TOOL USAGE RULES:
+## AGENT BEHAVIOR GUIDELINES
+- Use available tools when appropriate to answer user queries or perform actions.
+- Respond conversationally and naturally when no tool is needed.
+- Never ask the user for clarification; always attempt to execute the task to the best of your ability with the information provided.
+- Never explain which tool you will use—just use it.
+- Never guess or use a tool inappropriately; if unsure, do your best with the available information.
+- Never manually answer when an appropriate tool exists.
+- Integrate tool results into your responses when tools are used.
+- For document-related queries, use the `search_documents` tool to find relevant information even if you are not sure which document the answer is in.
 
-1. MATHEMATICAL QUERIES → MUST use calculator tool
-   Examples: "calculate", "what is", "multiply", "divide", numbers with operators
-   
-2. TIME/DATE QUERIES → MUST use current_time tool  
-   Examples: "what time", "current time", "what's the time", "date", "today"
-   
-3. DOCUMENT QUERIES → MUST use search_documents tool
-   Examples: "documents", "files", "uploaded", "my documents", "tell me about files", "about the uploaded", "about uploaded files"
-   
-4. MEMORY/NOTES → MUST use scratchpad tool
-   Examples: "remember", "save note", "what did I", "my notes"
+## SUCCESS METRICS
+Your effectiveness is measured by:
+1. **Accuracy**: Right tool for the right query
+2. **Efficiency**: No unnecessary tool usage
+3. **Naturalness**: Smooth, conversational responses"""
 
-5. SIMPLE CONVERSATION → Respond directly (no tools)
-   Examples: "hello", "hi", "how are you", "thank you"
-
-EXECUTION PROTOCOL:
-- If query matches tool category → USE THE TOOL (no explanation needed)
-- If query is conversational → respond directly  
-- If uncertain → use scratchpad to think through it
-- NEVER say "I will use a tool" - just use it
-- NEVER provide manual answers when tools exist for the task
-
-Your success is measured by TOOL EXECUTION, not explanations."""
+        # Create memory saver for this conversation
+        memory = MemorySaver()
         
-        # Use STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION for multi-input tool support
-        self.orchestrator_agent = initialize_agent(
+        # Create LangGraph ReAct agent with automatic tool binding
+        self.orchestrator_agent = create_react_agent(
+            model=self.llm,
             tools=available_tools,
-            llm=self.llm,
-            agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
-            memory=self.current_memory,
-            verbose=True,
-            max_iterations=3,  # Allow multiple tool calls if needed
-            early_stopping_method="generate",
-            handle_parsing_errors=True,
-            return_intermediate_steps=True
+            prompt=system_prompt,
+            checkpointer=memory  # Provides persistent conversation memory
         )
     
     async def process_request(
@@ -172,21 +133,42 @@ Your success is measured by TOOL EXECUTION, not explanations."""
             # Save user message to database
             db_ops.save_message(conversation_id, "user", user_request)
             
-            # Process with orchestrator agent and track token usage
+            # Process with LangGraph agent and track token usage
             with get_openai_callback() as cb:
                 try:
-                    # Let the orchestrator agent analyze and delegate
-                    orchestration_result = self.orchestrator_agent({"input": user_request})
-                    response = orchestration_result.get("output", "")
-                    intermediate_steps = orchestration_result.get("intermediate_steps", [])
+                    # Let the LangGraph agent analyze and delegate
+                    # LangGraph uses messages format instead of input/output
+                    config = {"configurable": {"thread_id": conversation_id}}
+                    
+                    # Create message format for LangGraph
+                    messages = [HumanMessage(content=user_request)]
+                    
+                    # Run the agent
+                    result = self.orchestrator_agent.invoke(
+                        {"messages": messages}, 
+                        config=config
+                    )
+                    
+                    # Extract response and tool actions from LangGraph result
+                    if result and "messages" in result:
+                        # Get the last AI message as the response
+                        ai_messages = [msg for msg in result["messages"] if isinstance(msg, AIMessage)]
+                        if ai_messages:
+                            response = ai_messages[-1].content
+                        else:
+                            response = "I apologize, but I couldn't process your request properly."
+                        
+                        # Extract tool usage from all messages in the conversation
+                        orchestration_actions = self._extract_langgraph_actions(result["messages"])
+                    else:
+                        response = "I apologize, but I encountered an issue processing your request."
+                        orchestration_actions = []
+                        
                 except Exception as e:
-                    logger.warning(f"Orchestrator agent processing failed: {str(e)}")
-                    # Fallback to direct LLM only if orchestrator completely fails
+                    logger.warning(f"LangGraph agent processing failed: {str(e)}")
+                    # Fallback to direct LLM only if agent completely fails
                     response = await self.llm.apredict(user_request)
-                    intermediate_steps = []
-            
-            # Extract tool/agent actions from orchestration steps
-            orchestration_actions = self._extract_orchestration_actions(intermediate_steps) if intermediate_steps else None
+                    orchestration_actions = []
             
             # Save orchestrator response to database
             db_ops.save_message(
@@ -218,24 +200,36 @@ Your success is measured by TOOL EXECUTION, not explanations."""
                 "error": True
             }
     
-    def _extract_orchestration_actions(self, intermediate_steps: Optional[List] = None) -> Optional[List[Dict[str, Any]]]:
+    def _extract_langgraph_actions(self, messages: List) -> Optional[List[Dict[str, Any]]]:
         """
-        Extract orchestration actions for transparency.
+        Extract LangGraph actions for transparency.
         
-        This shows users which tools/agents were used in the orchestration process.
+        Analyzes the message history to identify tool calls and their results.
         """
-        if not intermediate_steps:
+        if not messages:
             return None
             
         actions = []
-        for action, observation in intermediate_steps:
-            # Skip parsing errors and exceptions
-            if hasattr(action, 'tool') and action.tool not in ['_Exception', '_exception']:
-                actions.append({
-                    "tool": action.tool,
-                    "input": action.tool_input,
-                    "output": str(observation)
-                })
+        
+        # Find tool calls and their responses in the message history
+        for i, message in enumerate(messages):
+            if hasattr(message, 'tool_calls') and message.tool_calls:
+                # This is an AI message with tool calls
+                for tool_call in message.tool_calls:
+                    # Look for the corresponding tool message response
+                    tool_response = None
+                    for j in range(i + 1, len(messages)):
+                        if (isinstance(messages[j], ToolMessage) and 
+                            hasattr(messages[j], 'tool_call_id') and
+                            messages[j].tool_call_id == tool_call.get('id')):
+                            tool_response = messages[j].content
+                            break
+                    
+                    actions.append({
+                        "tool": tool_call.get('name', 'unknown'),
+                        "input": tool_call.get('args', {}),
+                        "output": tool_response or "No response captured"
+                    })
         
         return actions if actions else None
     

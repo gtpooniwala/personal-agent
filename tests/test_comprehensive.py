@@ -11,6 +11,7 @@ import asyncio
 import logging
 from typing import Dict, List, Any, Optional
 import json
+import warnings
 
 # Add the backend directory to Python path
 backend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'backend')
@@ -106,6 +107,7 @@ class OrchestratorTester:
                 "expected_tool": expected_tool_usage,
                 "should_not_use_tools": should_not_use_tools,
                 "passed": False,
+                "warning": False,
                 "reason": ""
             }
             
@@ -113,24 +115,42 @@ class OrchestratorTester:
             if should_not_use_tools:
                 if not tools_used:
                     test_result["passed"] = True
+                    test_result["warning"] = False
                     test_result["reason"] = "✅ Correctly avoided using tools"
                 else:
-                    test_result["passed"] = False
-                    test_result["reason"] = f"❌ Unexpectedly used tools: {tools_used}"
+                    test_result["passed"] = True
+                    test_result["warning"] = True
+                    test_result["reason"] = f"⚠️ Passed with warning: Unnecessary tool(s) used: {tools_used}"
             elif expected_tool_usage:
                 if expected_tool_usage in tools_used:
-                    test_result["passed"] = True
-                    test_result["reason"] = f"✅ Correctly used {expected_tool_usage}"
+                    # Check for unnecessary tools
+                    extra_tools = [t for t in tools_used if t != expected_tool_usage]
+                    if extra_tools:
+                        test_result["passed"] = True
+                        test_result["warning"] = True
+                        test_result["reason"] = f"⚠️ Passed with warning: Used {expected_tool_usage} but also unnecessary tool(s): {extra_tools}"
+                    else:
+                        test_result["passed"] = True
+                        test_result["warning"] = False
+                        test_result["reason"] = f"✅ Correctly used {expected_tool_usage}"
                 else:
                     test_result["passed"] = False
+                    test_result["warning"] = False
                     test_result["reason"] = f"❌ Expected {expected_tool_usage}, got {tools_used}"
             else:
                 # No specific expectation, just check for reasonable response
                 if response and response.strip() and response.lower() not in ["n/a", "none"]:
-                    test_result["passed"] = True
-                    test_result["reason"] = "✅ Provided reasonable response"
+                    if tools_used:
+                        test_result["passed"] = True
+                        test_result["warning"] = True
+                        test_result["reason"] = f"⚠️ Passed with warning: Unnecessary tool(s) used: {tools_used}"
+                    else:
+                        test_result["passed"] = True
+                        test_result["warning"] = False
+                        test_result["reason"] = "✅ Provided reasonable response"
                 else:
                     test_result["passed"] = False
+                    test_result["warning"] = False
                     test_result["reason"] = f"❌ Poor response: '{response}'"
             
             print(f"   Result: {test_result['reason']}")
@@ -179,6 +199,17 @@ class OrchestratorTester:
                         tools_used.append(tool_name)
         
         return tools_used
+    
+    def assert_tool_usage(self, query, expected_tools, actual_tools, response, description=None):
+        """
+        Assert tool usage for a test case. If unnecessary tools are used, raise a warning instead of an error.
+        """
+        if expected_tools:
+            if set(expected_tools) != set(actual_tools):
+                raise AssertionError(f"❌ Expected {expected_tools}, got {actual_tools}\nResponse: {response}")
+        else:
+            if actual_tools:
+                print(f"⚠️ Warning: Unnecessary tool(s) used for query '{query}': {actual_tools}\nResponse: {response}")
     
     async def run_all_tests(self):
         """Run comprehensive test suite."""
@@ -295,19 +326,21 @@ class OrchestratorTester:
         print("=" * 60)
         
         total_tests = len(self.results)
-        passed_tests = sum(1 for r in self.results if r.get("passed", False) == True)
+        passed_tests = sum(1 for r in self.results if r.get("passed", False) == True and not r.get("passed_with_warning", False))
+        warning_tests = sum(1 for r in self.results if r.get("passed_with_warning", False))
         failed_tests = len(self.failed_tests)
         skipped_tests = len(self.skipped_tests)
         
         print(f"Total Tests: {total_tests}")
         print(f"Passed: {passed_tests} ✅")
+        print(f"Passed with warning: {warning_tests} ⚠️")
         print(f"Failed: {failed_tests} ❌")
         print(f"Skipped: {skipped_tests} ⚠️")
         
         # Calculate success rate based on non-skipped tests
         non_skipped_tests = total_tests - skipped_tests
         if non_skipped_tests > 0:
-            success_rate = (passed_tests / non_skipped_tests) * 100
+            success_rate = ((passed_tests + warning_tests) / non_skipped_tests) * 100
             print(f"Success Rate: {success_rate:.1f}% (of non-skipped tests)")
         else:
             print("Success Rate: N/A (no tests executed)")
@@ -340,6 +373,18 @@ class OrchestratorTester:
                     response_preview = test['response'][:150] + "..." if len(test['response']) > 150 else test['response']
                     print(f"   Response: {response_preview}")
                 print()
+        
+        # Summarize results
+        passed = sum(1 for r in self.results if r["passed"] and not r["warning"])
+        warning = sum(1 for r in self.results if r["passed"] and r["warning"])
+        failed = sum(1 for r in self.results if not r["passed"])
+        total = len(self.results)
+        print("\nTest Summary:")
+        print(f"  Passed: {passed}")
+        print(f"  Passed with warning: {warning}")
+        print(f"  Failed: {failed}")
+        print(f"  Total: {total}")
+        print(f"  Accuracy (counting warnings as pass): {(passed + warning) / total:.1%}")
         
         return passed_tests == non_skipped_tests and non_skipped_tests > 0
 

@@ -75,6 +75,7 @@ class DocumentInfo(BaseModel):
     uploaded_at: str = Field(..., description="Upload timestamp")
     processed: str = Field(..., description="Processing status")
     total_chunks: int = Field(..., description="Number of text chunks")
+    summary: str = Field(..., description="AI-generated summary of the document")
 
 
 class DocumentListResponse(BaseModel):

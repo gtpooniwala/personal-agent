@@ -394,7 +394,8 @@ Summary:"""
                 "file_size": doc.file_size,
                 "upload_date": doc.upload_date.isoformat(),
                 "processed": doc.processed,
-                "total_chunks": doc.total_chunks
+                "total_chunks": doc.total_chunks,
+                "summary": doc.summary or "Document content available for search"
             } for doc in documents]
             
         finally:

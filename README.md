@@ -1,6 +1,6 @@
 # Personal Agent MVP
 
-A sophisticated AI-powered personal assistant built with FastAPI, LangChain, and an intelligent orchestrator architecture. The system features modular tool delegation, automatic conversation management, document Q&A capabilities, and a clean web interface.
+A sophisticated AI-powered personal assistant built with FastAPI, LangGraph, and an intelligent orchestrator architecture. The system features modular tool delegation, automatic conversation management, document Q&A capabilities, and a clean web interface.
 
 ## ✨ Key Features
 
@@ -11,8 +11,16 @@ A sophisticated AI-powered personal assistant built with FastAPI, LangChain, and
 - **🌐 Web Interface**: Clean, responsive chat interface with document management
 - **🔄 Passive Maintenance**: Backend-driven conversation organization
 - **⚙️ Scalable Design**: Adding new tools only requires implementing the tool and updating orchestrator prompts
+- **🧠 LangGraph Architecture**: Modern graph-based orchestration with persistent memory and automatic tool binding
 
 ## 🆕 Recent Major Improvements
+
+### **LangGraph Architecture Upgrade (Latest)**
+- ✅ **Modern Agent Framework**: Migrated from legacy LangChain agents to LangGraph's `create_react_agent()`
+- ✅ **Automatic Tool Binding**: Eliminated manual tool description compilation (28 lines removed)
+- ✅ **Enhanced Memory Management**: Built-in conversation memory with `MemorySaver()`
+- ✅ **Improved Reliability**: Graph-based execution with better error handling and state management
+- ✅ **Pydantic V2 Compatibility**: All tools updated with proper type annotations for seamless integration
 
 ### **Pydantic Tool Conversion (Complete)**
 - ✅ **Structured Input Validation**: All tools now use Pydantic models for input validation
@@ -89,13 +97,15 @@ A sophisticated AI-powered personal assistant built with FastAPI, LangChain, and
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                            CORE ORCHESTRATOR                                    │
-│                         (Decision Making Hub)                                  │
+│                          LANGGRAPH ORCHESTRATOR                                │
+│                         (Modern Graph-Based Hub)                               │
 │                                                                                 │
 │  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐            │
-│  │  Tool Registry  │    │   LLM Agent     │    │ Context Manager │            │
-│  │  (Dynamic)      │◄──►│ (GPT-3.5-turbo) │◄──►│   (Documents)   │            │
-│  └─────────────────┘    └─────────────────┘    └─────────────────┘            │
+│  │  Tool Registry  │    │  LangGraph      │    │ Memory Manager  │            │
+│  │  (Dynamic)      │◄──►│  Agent          │◄──►│  (MemorySaver)  │            │
+│  └─────────────────┘    │ (ReAct Pattern) │    └─────────────────┘            │
+│                          │ Auto Tool Bind  │                                   │
+│                          └─────────────────┘                                   │
 └─────────────────────────────────┬───────────────────────────────────────────────┘
                                   │
                 ┌─────────────────┴─────────────────┐
