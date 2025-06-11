@@ -323,6 +323,19 @@ class OrchestratorTester:
         
         for query, desc in problematic_tests:
             await self.test_query(query, should_not_use_tools=True, description=desc)
+        
+        # 7. INTERNET SEARCH TOOL TESTS
+        print("\n📋 Category 7: Internet Search Tool")
+        internet_search_tests = [
+            ("Who is the president of the United States?", "Current US president (internet search)", "internet_search"),
+            ("What is the capital of France?", "Capital city of France (internet search)", "internet_search"),
+        ]
+        for query, desc, expected_tool in internet_search_tests:
+            await self.test_query(
+                query,
+                expected_tool_usage=expected_tool,
+                description=desc
+            )
     
     def print_summary(self):
         """Print test results summary."""

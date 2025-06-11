@@ -6,6 +6,7 @@ from .tools.scratchpad import ScratchpadTool
 from .tools.integrations import GmailTool, CalendarTool, TodoistTool
 from .tools.response_agent import ResponseAgentTool
 from backend.database.operations import db_ops
+from backend.orchestrator.tools.internet_search import InternetSearchTool
 import logging
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,9 @@ class ToolRegistry:
         # Response agent tool (for handling responses)
         self._tools["response_agent"] = ResponseAgentTool()
 
+        # Internet search tool (for web searching)
+        self._tools["internet_search"] = InternetSearchTool()
+
     def update_selected_documents(self, selected_documents: List[str]):
         """
         Update the context for document-dependent tools.
@@ -69,7 +73,7 @@ class ToolRegistry:
         Get list of tools that should be available to the orchestrator.
         """
         # Always include all core tools
-        available_tools = ["calculator", "current_time", "scratchpad"]
+        available_tools = ["calculator", "current_time", "scratchpad", "internet_search"]
         # Only include search_documents if documents are selected
         if self.selected_documents and len(self.selected_documents) > 0:
             available_tools.append("search_documents")

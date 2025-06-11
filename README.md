@@ -390,7 +390,7 @@ For detailed development information, see:
 
 #### Core Productivity Tools
 - [x] **Scratchpad Tool**: Persistent note-taking and information storage across conversations ✅ **COMPLETED**
-- [ ] **Internet Search Tool**: Web search capabilities with result summarization
+- [x] **Internet Search Tool**: Web search capabilities with result summarization ✅ **COMPLETED**
 - [ ] **Gmail Tool**: Complete email management (reading, sending, organizing)
 - [ ] **Calendar Tool**: Full calendar integration with scheduling intelligence
 - [ ] **Todoist Tool**: Advanced task and project management
@@ -429,7 +429,6 @@ For detailed development information, see:
 
 #### User Experience Improvements
 - [ ] **Tool Usage Hints**: Dynamic suggestions for when to use specific tools
-- [ ] **Conversation Export**: Export chat history in multiple formats (PDF, JSON, etc.)
 - [ ] **Dark Mode**: Toggle between light and dark themes
 - [ ] **Keyboard Shortcuts**: Quick actions for power users
 - [ ] **Mobile Responsive Design**: Better mobile interface optimization
