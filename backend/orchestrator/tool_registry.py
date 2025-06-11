@@ -5,6 +5,7 @@ from .tools.search_documents import SearchDocumentsTool
 from .tools.scratchpad import ScratchpadTool
 from .tools.integrations import GmailTool, CalendarTool, TodoistTool
 from .tools.response_agent import ResponseAgentTool
+from .tools.gmail import GmailReadTool
 from backend.database.operations import db_ops
 from backend.orchestrator.tools.internet_search import InternetSearchTool
 import logging
@@ -45,10 +46,8 @@ class ToolRegistry:
         if self.selected_documents and len(self.selected_documents) > 0:
             self._tools["search_documents"] = SearchDocumentsTool(self.user_id, self.selected_documents)
 
-        # Future integration tools (placeholders for now)
-        self._tools["gmail"] = GmailTool()
-        self._tools["calendar"] = CalendarTool()
-        self._tools["todoist"] = TodoistTool()
+        # Integration tools
+        self._tools["gmail_read"] = GmailReadTool()
 
         # Response agent tool (for handling responses)
         self._tools["response_agent"] = ResponseAgentTool()
@@ -73,7 +72,7 @@ class ToolRegistry:
         Get list of tools that should be available to the orchestrator.
         """
         # Always include all core tools
-        available_tools = ["calculator", "current_time", "scratchpad", "internet_search"]
+        available_tools = ["calculator", "current_time", "scratchpad", "internet_search", "gmail_read"]
         # Only include search_documents if documents are selected
         if self.selected_documents and len(self.selected_documents) > 0:
             available_tools.append("search_documents")

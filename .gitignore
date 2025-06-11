@@ -136,3 +136,4 @@ logs/
 
 test_results.json
 backend/test_results.json
+.DS_Store
