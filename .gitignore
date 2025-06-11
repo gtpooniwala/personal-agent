@@ -133,3 +133,6 @@ data/
 logs/
 *.sqlite
 *.db
+
+test_results.json
+backend/test_results.json
