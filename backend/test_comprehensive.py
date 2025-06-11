@@ -38,9 +38,11 @@ class OrchestratorTester:
     def _get_test_documents(self) -> List[str]:
         """Get available test document IDs."""
         try:
+            # Try test_user first, then fallback to default if empty
             documents = self.doc_processor.get_documents(user_id="test_user")
+            if not documents:
+                documents = self.doc_processor.get_documents(user_id="default")
             if documents:
-                # Return the first few document IDs for testing
                 return [doc["id"] for doc in documents[:2]]  # Use first 2 documents
             else:
                 return []
@@ -394,29 +396,37 @@ class OrchestratorTester:
                 print()
         
         # Summarize results
-        passed = sum(1 for r in self.results if r["passed"] and not r["warning"])
-        warning = sum(1 for r in self.results if r["passed"] and r["warning"])
-        failed = sum(1 for r in self.results if not r["passed"])
-        total = len(self.results)
-        print("\nTest Summary:")
-        print(f"  Passed: {passed}")
-        print(f"  Passed with warning: {warning}")
-        print(f"  Failed: {failed}")
-        print(f"  Total: {total}")
-        print(f"  Accuracy (counting warnings as pass): {(passed + warning) / total:.1%}")
+        print(f"Total Tests: {total_tests}")
+        print(f"Skipped: {skipped_tests} ⚠️")
+        print(f"Passed: {passed_tests} ✅")
+        print(f"Passed with warning: {warning_tests} ⚠️")
+        print(f"Failed: {failed_tests} ❌")
         
-        # When summarizing test results, ensure skipped tests are not counted as failed
-        # For example, in the summary logic:
-        total_failed = sum(1 for r in self.results if r['outcome'] == 'failed')
-        total_skipped = sum(1 for r in self.results if r['outcome'] == 'skipped')
-        total_passed = sum(1 for r in self.results if r['outcome'] == 'passed')
+
+        # passed = sum(1 for r in self.results if r["passed"] and not r["warning"])
+        # warning = sum(1 for r in self.results if r["passed"] and r["warning"])
+        # failed = sum(1 for r in self.results if not r["passed"] or r["warning"])
+        # skipped = len(self.skipped_tests)
+        # total = len(self.results)
+        # print("\nTest Summary:")
+        # print(f"  Passed: {passed}")
+        # print(f"  Passed with warning: {warning}")
+        # print(f"  Failed: {failed}")
+        # print(f"  Total: {total}")
+        # print(f"  Accuracy (counting warnings as pass): {(passed + warning) / total:.1%}")
         
-        summary = {
-            'total': len(self.results),
-            'passed': total_passed,
-            'failed': total_failed,  # Only count 'failed', not 'skipped'
-            'skipped': total_skipped
-        }
+        # # When summarizing test results, ensure skipped tests are not counted as failed
+        # # For example, in the summary logic:
+        # total_failed = sum(1 for r in self.results if r['outcome'] == 'failed')
+        # total_skipped = sum(1 for r in self.results if r['outcome'] == 'skipped')
+        # total_passed = sum(1 for r in self.results if r['outcome'] == 'passed')
+        
+        # summary = {
+        #     'total': len(self.results),
+        #     'passed': total_passed,
+        #     'failed': total_failed,  # Only count 'failed', not 'skipped'
+        #     'skipped': total_skipped
+        # }
         
         return passed_tests == non_skipped_tests and non_skipped_tests > 0
 
@@ -427,7 +437,7 @@ async def main():
     try:
         await tester.run_all_tests()
         success = tester.print_summary()
-        
+        print("Tests done")
         # Save detailed results to file
         with open("test_results.json", "w") as f:
             json.dump(tester.results, f, indent=2)
