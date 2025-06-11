@@ -6,6 +6,8 @@ Database migration to add summary column to documents table.
 import sqlite3
 import os
 from pathlib import Path
+from backend.database.operations import db_ops
+from backend.database.models import Document
 
 def add_summary_column():
     """Add summary column to documents table."""

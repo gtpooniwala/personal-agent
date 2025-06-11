@@ -66,10 +66,10 @@ class OrchestratorTester:
         """
         print(f"\n🧪 Testing: {query}")
         print(f"   Expected: {description}")
-        
-        # Reset/delete the test conversation before each test to avoid token bloat
-        db_ops.delete_conversation("test-conversation")
-        
+
+        # Always create a new conversation for each test
+        conversation_id = self.orchestrator.create_conversation()
+
         # Check if we should skip this test due to missing documents
         if skip_if_no_docs and not self.available_documents:
             skip_result = {
@@ -83,25 +83,24 @@ class OrchestratorTester:
             self.results.append(skip_result)
             self.skipped_tests.append(skip_result)
             return skip_result
-        
+
         try:
-            # Select documents if needed for this test
             selected_documents = None
             if use_documents and self.available_documents:
                 selected_documents = self.available_documents
                 print(f"   📄 Using documents: {len(selected_documents)} documents selected")
-            
-            # Process the query
+
+            # Process the query with a fresh conversation_id
             result = await self.orchestrator.process_request(
                 query, 
-                "test-conversation",
+                conversation_id,
                 selected_documents=selected_documents
             )
             response = result.get("response", "")
-            
+
             # Extract tool usage information from response and agent actions
             tools_used = self._extract_tools_used(response, result)
-            
+
             # Validate tool usage
             test_result = {
                 "query": query,
@@ -405,6 +404,19 @@ class OrchestratorTester:
         print(f"  Failed: {failed}")
         print(f"  Total: {total}")
         print(f"  Accuracy (counting warnings as pass): {(passed + warning) / total:.1%}")
+        
+        # When summarizing test results, ensure skipped tests are not counted as failed
+        # For example, in the summary logic:
+        total_failed = sum(1 for r in self.results if r['outcome'] == 'failed')
+        total_skipped = sum(1 for r in self.results if r['outcome'] == 'skipped')
+        total_passed = sum(1 for r in self.results if r['outcome'] == 'passed')
+        
+        summary = {
+            'total': len(self.results),
+            'passed': total_passed,
+            'failed': total_failed,  # Only count 'failed', not 'skipped'
+            'skipped': total_skipped
+        }
         
         return passed_tests == non_skipped_tests and non_skipped_tests > 0
 

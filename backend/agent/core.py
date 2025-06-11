@@ -1,10 +1,10 @@
 from langchain.agents import initialize_agent, AgentType
 from langchain_openai import ChatOpenAI
 from langchain_community.callbacks.manager import get_openai_callback
-from agent.memory import SQLiteConversationMemory
-from agent.tools import ToolRegistry
-from database.operations import db_ops
-from config import settings
+from backend.agent.memory import SQLiteConversationMemory
+from backend.agent.tools import ToolRegistry
+from backend.database.operations import db_ops
+from backend.config import settings
 from typing import Dict, Any, Optional, List
 import json
 import logging

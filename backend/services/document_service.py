@@ -12,9 +12,9 @@ import logging
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from database.models import Document, DocumentChunk
-from database.operations import db_ops
-from config import settings
+from backend.database.models import Document, DocumentChunk
+from backend.database.operations import db_ops
+from backend.config import settings
 
 logger = logging.getLogger(__name__)
 

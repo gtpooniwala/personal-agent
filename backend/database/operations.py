@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from database.models import Base, Conversation, Message, MemoryStore
-from config import settings
+from backend.database.models import Base, Conversation, Message, MemoryStore
+from backend.config import settings
 from typing import List, Optional, Dict, Any
 import json
 from datetime import datetime

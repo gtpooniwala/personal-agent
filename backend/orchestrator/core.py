@@ -3,9 +3,9 @@ from langgraph.checkpoint.memory import MemorySaver
 from langchain_openai import ChatOpenAI
 from langchain_community.callbacks.manager import get_openai_callback
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
-from orchestrator.tool_registry import ToolRegistry
-from database.operations import db_ops
-from config import settings
+from backend.config import settings
+from backend.orchestrator.tool_registry import ToolRegistry
+from ..database.operations import db_ops
 from typing import Dict, Any, Optional, List
 import json
 import logging

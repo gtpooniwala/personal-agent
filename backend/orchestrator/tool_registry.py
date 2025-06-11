@@ -1,10 +1,11 @@
 from typing import Dict, List, Type, Any, Optional
-from orchestrator.tools.calculator import CalculatorTool
-from orchestrator.tools.time import CurrentTimeTool
-from orchestrator.tools.search_documents import SearchDocumentsTool
-from orchestrator.tools.scratchpad import ScratchpadTool
-from orchestrator.tools.integrations import GmailTool, CalendarTool, TodoistTool
-from orchestrator.tools.response_agent import ResponseAgentTool
+from .tools.calculator import CalculatorTool
+from .tools.time import CurrentTimeTool
+from .tools.search_documents import SearchDocumentsTool
+from .tools.scratchpad import ScratchpadTool
+from .tools.integrations import GmailTool, CalendarTool, TodoistTool
+from .tools.response_agent import ResponseAgentTool
+from backend.database.operations import db_ops
 import logging
 
 logger = logging.getLogger(__name__)

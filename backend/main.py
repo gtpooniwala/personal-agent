@@ -2,8 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
-from api import router
-from config import settings
+from backend.api import router
+from backend.config import settings
 import logging
 import uvicorn
 

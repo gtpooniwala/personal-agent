@@ -1,16 +1,17 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from orchestrator import CoreOrchestrator
-from api.models import (
+from backend.orchestrator import CoreOrchestrator
+from backend.api.models import (
     ChatRequest, ChatResponse, ConversationCreate, ConversationResponse,
     MessageResponse, ToolInfo, HealthResponse, DocumentUploadResponse,
     DocumentListResponse, DocumentDeleteResponse, DocumentInfo,
     TitleGenerationResponse  # Add new model import
 )
-from services.document_service import doc_processor
+from backend.services.document_service import doc_processor
 from typing import List
 from datetime import datetime, timedelta
 import asyncio
 import logging
+from backend.database.operations import db_ops
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +37,6 @@ async def async_delete_empty_conversation(conversation_id: str):
     """Asynchronously delete an empty old conversation."""
     try:
         logger.info(f"Starting async deletion of empty conversation: {conversation_id}")
-        from database.operations import DatabaseOperations
-        db_ops = DatabaseOperations()
         db_ops.delete_conversation(conversation_id)
         logger.info(f"Successfully deleted empty conversation: {conversation_id}")
     except Exception as e:

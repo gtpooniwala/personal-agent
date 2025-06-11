@@ -7,7 +7,7 @@ import os
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from orchestrator.core import CoreOrchestrator
+from backend.orchestrator.core import CoreOrchestrator
 
 def debug_orchestrator():
     """Debug the orchestrator setup and show the prompt."""

@@ -1,6 +1,6 @@
 from langchain.memory.chat_memory import BaseChatMemory
 from langchain.schema import BaseMessage, HumanMessage, AIMessage
-from database.operations import db_ops
+from backend.database.operations import db_ops
 from typing import Dict, Any, List
 import json
 

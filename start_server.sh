@@ -38,14 +38,11 @@ fi
 
 echo "✅ Environment activated: $CONDA_DEFAULT_ENV"
 
-# Change to backend directory
-cd backend
-
 # Check if requirements are installed
 echo "🔍 Checking dependencies..."
 if ! python -c "import uvicorn, fastapi" &> /dev/null; then
     echo "⚠️  Some dependencies might be missing. Installing requirements..."
-    pip install -r requirements.txt
+    pip install -r backend/requirements.txt
 fi
 
 # Start the server
@@ -54,5 +51,5 @@ echo "Backend will be available at: http://localhost:8000"
 echo "Frontend should be served separately (e.g., Live Server in VS Code)"
 echo "========================================"
 
-# Run the server
-python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+# Run the server from project root with correct app path
+uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
