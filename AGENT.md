@@ -1099,3 +1099,15 @@ The orchestrator currently supports the following tools/agents:
 - **GmailTool**: Placeholder for full Gmail integration (search, send, organize)
 - **CalendarTool**: Placeholder for Google Calendar integration
 - **TodoistTool**: Placeholder for Todoist integration
+
+## 🤖 Iterative Orchestration Logic (2025)
+
+The orchestrator operates in an iterative, cyclical fashion:
+- For each user query, the agent may call multiple tools, in any order, as many times as needed.
+- The agent decides after each tool call whether it has enough information/context to answer the user.
+- If not, it can call additional tools, re-query tools, or gather more context.
+- When the agent determines it has sufficient information, it calls the Response Agent to synthesize the final answer.
+- This process may involve zero, one, or many tool calls, and is not strictly linear.
+- The agent is expected to reason about what information is missing and proactively use tools to fill gaps before responding.
+
+This enables more natural, context-rich, and accurate responses, especially for complex or multi-step queries.

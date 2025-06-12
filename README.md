@@ -106,7 +106,7 @@ A sophisticated AI-powered personal assistant built with FastAPI, LangGraph, and
 │  └─────────────────┘    │ (ReAct Pattern) │    └─────────────────┘            │
 │                          │ Auto Tool Bind  │                                   │
 │                          └─────────────────┘                                   │
-└─────────────────────────────────┬───────────────────────────────────────────────┘
+└─────────────────────────────────────────────────────────────────────────────────┘
                                   │
                 ┌─────────────────┴─────────────────┐
                 │           TOOL EXECUTION          │
@@ -216,64 +216,57 @@ A sophisticated AI-powered personal assistant built with FastAPI, LangGraph, and
 
 ### Information Flow Architecture
 
+The orchestrator operates as an **iterative, cyclical state machine**—not a simple linear pipeline. Each user request triggers a loop where the system repeatedly analyzes state, decides on actions, executes tools, and updates context until a final response is ready.
+
+#### **State Flow Diagram**
+
 ```text
-User Request
-    │
-    ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    CORE ORCHESTRATOR                        │
-│                                                             │
-│  1. Receive Request → 2. Analyze Intent → 3. Context Check  │
-│           │                    │                    │       │
-│           ▼                    ▼                    ▼       │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐ │
-│  │   User Input    │  │  LLM Analysis   │  │ Tool Registry│ │
-│  │   Processing    │  │ (GPT-3.5-turbo) │  │   Query     │ │
-│  └─────────────────┘  └─────────────────┘  └─────────────┘ │
-│           │                    │                    │       │
-│           └────────────────────┼────────────────────┘       │
-│                                ▼                            │
-│                    4. Tool Selection Decision               │
-│                                │                            │
-└────────────────────────────────┼────────────────────────────┘
-                                 │
-                    ┌────────────┴────────────┐
-                    │                         │
-                    ▼                         ▼
-        ┌─────────────────────┐    ┌─────────────────────┐
-        │   Direct Response   │    │   Tool Execution    │
-        │   (No tools needed) │    │                     │
-        └─────────────────────┘    └─────────────────────┘
-                    │                         │
-                    │              ┌─────────┴─────────┐
-                    │              │                   │
-                    │              ▼                   ▼
-                    │    ┌─────────────────┐  ┌─────────────────┐
-                    │    │ Implemented     │  │   Placeholder   │
-                    │    │ Tools Execute   │  │ Tools Return    │
-                    │    │                 │  │ "Not Available" │
-                    │    └─────────────────┘  └─────────────────┘
-                    │              │                   │
-                    │              └─────────┬─────────┘
-                    │                        │
-                    ▼                        ▼
-        ┌─────────────────────────────────────────────────────┐
-        │             RESPONSE GENERATION                     │
-        │                                                     │
-        │  • Orchestrator compiles final response             │
-        │  • Includes tool results (if any)                   │
-        │  • Maintains conversation context                   │
-        │  • Returns structured response to user              │
-        └─────────────────────────────────────────────────────┘
-                                 │
-                                 ▼
-                            User Response
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                              USER REQUEST                                   │
+└──────────────────────────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                           ORCHESTRATOR STATE                                │
+│ ┌──────────────────────────────────────────────────────────────────────────┐ │
+│ │ 1. Analyze user input, context, and memory                               │ │
+│ │ 2. Decide: Is a tool/action needed?                                      │ │
+│ │ 3. If yes, select tool(s) and prepare input                              │ │
+│ │ 4. Execute tool(s) and collect result(s)                                 │ │
+│ │ 5. Update state with new info, tool outputs, and conversation context     │ │
+│ │ 6. Decide: Is another tool/action needed?                                │ │
+│ │    └─► If yes, repeat from step 3 (loop)                                 │ │
+│ │    └─► If no, proceed to response synthesis                              │ │
+│ └──────────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                        RESPONSE SYNTHESIS (AGENT)                           │
+│   - Integrate tool results, memory, and conversation context                │
+│   - Generate final user-facing response                                     │
+└──────────────────────────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                              USER RESPONSE                                  │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Tool Availability Logic**: The orchestrator dynamically determines which tools to expose based on context:
-- **Always Available**: Calculator, Time tools
-- **Context-Dependent**: Document Q&A (only when documents are selected)
-- **Future Integration**: Gmail, Calendar, Todoist (when implemented and authenticated)
+**Key Points:**
+
+- The orchestrator **loops** through state analysis and tool execution as many times as needed, not just once.
+- Each cycle can update memory, context, and available tools.
+- The process ends only when the orchestrator determines that no further tool actions are needed and a final response can be synthesized.
+- This enables complex, multi-step reasoning and tool chaining within a single user request.
+
+**Example Flow:**
+
+1. User asks: "Summarize my latest email and add a note about it."
+2. Orchestrator fetches latest email (Gmail tool), then loops to invoke the Scratchpad tool to save a note, then loops again to synthesize a final response.
+3. Each step updates the state, and the loop continues until all actions are complete.
+
+This cyclical, state-driven approach is what enables advanced, multi-tool workflows and dynamic reasoning in the agent.
 
 ## 🏗️ Architecture
 
@@ -407,6 +400,7 @@ For detailed development information, see:
 - [ ] **Notion Tool**: Search through notion docs
 
 #### Additional Tool Ideas  
+
 - [ ] **Response Agent**: Dedicated agent for improving response quality, style, and tone
 - [ ] **Weather Tool**: Current conditions and forecasts
 - [ ] **News Tool**: Curated news summaries and updates
@@ -422,16 +416,19 @@ For detailed development information, see:
 ### 🏗️ **Architecture Improvements (Medium Priority)**
 
 #### Memory & Personalization
+
 - [ ] **User-Specific Memory**: Persistent user preferences and context across sessions
 - [ ] **Long-term Context Storage**: Advanced memory system beyond conversation history
 - [ ] **User Profile Management**: Individual user settings and customization
 
 #### Integration & Protocols
+
 - [ ] **MCP Integration**: Model Context Protocol support for tool standardization
 - [ ] **Alternative Agent Framework**: Evaluate replacing LangChain with Strand or similar
 - [ ] **Plugin Architecture**: Standardized plugin system for third-party tools
 
 #### Scalability & Performance
+
 - [ ] **Async Tool Execution**: Parallel tool processing for complex workflows
 - [ ] **Tool Result Caching**: Cache expensive operations for better performance
 - [ ] **Distributed Orchestrator**: Multi-instance orchestrator deployment
@@ -439,12 +436,14 @@ For detailed development information, see:
 ### 🚀 **Low-Hanging Fruit / High Impact Tasks**
 
 #### User Experience Improvements
+
 - [ ] **Tool Usage Hints**: Dynamic suggestions for when to use specific tools
 - [ ] **Dark Mode**: Toggle between light and dark themes
 - [ ] **Keyboard Shortcuts**: Quick actions for power users
 - [ ] **Mobile Responsive Design**: Better mobile interface optimization
 
 #### Developer Experience
+
 - [ ] **Tool Development CLI**: Command-line tool for scaffolding new tools
 - [ ] **Hot Reload Tools**: Live tool updates without server restart
 - [ ] **Tool Testing Framework**: Automated testing for individual tools
@@ -452,6 +451,7 @@ For detailed development information, see:
 - [ ] **Tool Performance Metrics**: Monitor tool usage and performance
 
 #### Integration & Deployment
+
 - [ ] **Docker Containerization**: Complete Docker setup for easy deployment
 - [ ] **Environment Variables UI**: Web interface for configuration management
 - [ ] **Health Monitoring**: System health dashboard and alerts
@@ -459,6 +459,7 @@ For detailed development information, see:
 - [ ] **SSL/HTTPS Support**: Production-ready security configuration
 
 #### Advanced Features
+
 - [ ] **Voice Interface**: Speech-to-text and text-to-speech integration
 - [ ] **Workflow Automation**: Chain multiple tools into automated workflows
 - [ ] **Tool Marketplace**: Community-contributed tool sharing
@@ -468,18 +469,21 @@ For detailed development information, see:
 ### 🎯 **Quick Wins (Immediate Impact)**
 
 #### Documentation & Polish
+
 - [ ] **Tool Usage Examples**: Interactive examples for each tool in documentation
 - [ ] **Video Tutorials**: Screen recordings showing key features
 - [ ] **Error Message Improvements**: More helpful error messages with suggested actions
 - [ ] **Loading States**: Better visual feedback during tool execution
 
 #### Quality of Life
+
 - [ ] **Conversation Search**: Search through conversation history
 - [ ] **Auto-save Conversations**: Prevent data loss during network issues
 - [ ] **Tool Favorites**: Quick access to frequently used tools
 - [ ] **Response Formatting**: Better markdown rendering in responses
 
 #### Orchestrator Improvements (Code-Level)
+
 - [ ] **Dynamic Tool Discovery**: Auto-update orchestrator prompt when new tools are added
 - [ ] **Tool Usage Analytics**: Track which tools are used most frequently
 - [ ] **Smart Tool Suggestions**: Proactive tool recommendations based on context
@@ -494,6 +498,7 @@ For detailed development information, see:
 ### 🎖️ **Recommended Next Steps (Prioritized by Impact/Effort Ratio)**
 
 #### **🥇 Immediate Wins (< 1 hour each)**
+
 - [ ] **Add Conversation Timestamps**: Show when messages were sent
 - [ ] **Improve Error Messages**: More helpful error descriptions with suggested actions
 - [ ] **Add Loading Indicators**: Visual feedback during tool execution
@@ -504,6 +509,7 @@ For detailed development information, see:
 - [ ] **Better Mobile Layout**: Responsive design improvements for mobile devices
 
 #### **🥈 Quick Implementation (< 4 hours each)**
+
 - [ ] **Export Conversations**: Download chat history as PDF, JSON, or TXT
 - [ ] **Search Conversations**: Find previous conversations by content
 - [ ] **Conversation Bookmarks**: Mark important conversations for easy access
@@ -514,6 +520,7 @@ For detailed development information, see:
 - [ ] **Message Reactions**: Like/dislike responses for feedback
 
 #### **🥉 Medium Effort, High Value (< 8 hours each)**
+
 - [ ] **Voice Input/Output**: Speech-to-text and text-to-speech integration
 - [ ] **Workflow Builder**: Chain multiple tools into automated sequences
 - [ ] **Template Messages**: Save and reuse common message patterns
@@ -525,30 +532,4 @@ For detailed development information, see:
 
 ---
 
-**Priority Legend:**
-- 🔧 **New Tools**: Expand system capabilities
-- 🏗️ **Architecture**: Foundation improvements  
-- 🚀 **Low-Hanging Fruit**: Easy wins with high user impact
-- 🎯 **Quick Wins**: Immediate improvements requiring minimal effort
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License.
-
-## 🆘 Support
-
-- **Documentation**: See [`docs/`](docs/) for detailed guides
-- **Issues**: Create GitHub issues for bugs or feature requests
-- **Development**: Check [`AGENT.md`](AGENT.md) for technical details
-
----
-
-**Built with ❤️ using FastAPI, LangChain, and OpenAI**
+### Built with ❤️ using FastAPI, LangChain, and OpenAI
