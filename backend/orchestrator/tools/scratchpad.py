@@ -51,9 +51,11 @@ class ScratchpadTool(BaseTool):
     - Store intermediate results when breaking down complex problems
     - Keep reference notes when switching between subtasks
     - Maintain context when conversations span multiple topics
-    - Store user preferences or important details mentioned in conversation
+    - Store user preferences or important details mentioned in conversation (but NOT for long-term memory)
     - Create action plans and refer back to them as work progresses
-    - Remember key facts or decisions that might be relevant later
+    - Remember key facts or decisions that might be relevant later in the current conversation
+    
+    The scratchpad is for temporary, conversation-specific memory. For long-term, user-specific memory (such as persistent facts, preferences, or background), always use the user_profile tool instead.
     
     The agent has full autonomy to decide when and how to use the scratchpad based on
     the conversation's complexity and context management needs.
@@ -61,8 +63,9 @@ class ScratchpadTool(BaseTool):
     
     name: str = "scratchpad"
     description: str = (
-        "Agent's temporary memory for plans, todos, and critical instructions. "
-        "Use to store, retrieve, search, update, or clear important context, intermediate results, action plans, or notes needed for multi-step reasoning. "
+        "Agent's temporary, conversation-specific memory for plans, todos, and critical instructions. "
+        "Use for working memory, intermediate results, and context needed only for the current conversation. "
+        "Do NOT use for long-term or user-specific facts—use the user_profile tool for that. "
         "Proactively remove outdated or irrelevant notes to keep memory clean. "
         "Actions: save, read, search, update, delete, clear, help. "
         "Examples: 'Save project plan', 'Read my notes', 'Search for deadline', 'Update note 2', 'Clear all notes'."

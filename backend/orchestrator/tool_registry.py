@@ -6,6 +6,7 @@ from .tools.scratchpad import ScratchpadTool
 from .tools.integrations import GmailTool, CalendarTool, TodoistTool
 from .tools.response_agent import ResponseAgentTool
 from .tools.gmail import GmailReadTool
+from .tools.user_profile import UserProfileTool
 from backend.database.operations import db_ops
 from backend.orchestrator.tools.internet_search import InternetSearchTool
 import logging
@@ -55,6 +56,9 @@ class ToolRegistry:
         # Internet search tool (for web searching)
         self._tools["internet_search"] = InternetSearchTool()
 
+        # User profile tool (always available)
+        self._tools["user_profile"] = UserProfileTool(self.user_id)
+
     def update_selected_documents(self, selected_documents: List[str]):
         """
         Update the context for document-dependent tools.
@@ -72,7 +76,7 @@ class ToolRegistry:
         Get list of tools that should be available to the orchestrator.
         """
         # Always include all core tools
-        available_tools = ["calculator", "current_time", "scratchpad", "internet_search", "gmail_read"]
+        available_tools = ["calculator", "current_time", "scratchpad", "internet_search", "gmail_read", "user_profile"]
         # Only include search_documents if documents are selected
         if self.selected_documents and len(self.selected_documents) > 0:
             available_tools.append("search_documents")
