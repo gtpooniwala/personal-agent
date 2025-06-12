@@ -42,21 +42,45 @@ class GmailReadTool(BaseTool):
                 pickle.dump(creds, token)
         # Build Gmail API service
         service = build("gmail", "v1", credentials=creds)
-        # Get the latest message
-        results = service.users().messages().list(userId="me", maxResults=1, labelIds=["INBOX"]).execute()
+
+        # Support search query, max_results, and label_ids
+        query = kwargs.get("query", None)  # Gmail search string
+        max_results = int(kwargs.get("max_results", 5))  # Default to 5 emails
+        label_ids = kwargs.get("label_ids", ["INBOX"])  # Default to INBOX
+
+        results = service.users().messages().list(
+            userId="me",
+            maxResults=max_results,
+            labelIds=label_ids,
+            q=query
+        ).execute()
         messages = results.get("messages", [])
         if not messages:
-            return "No emails found in your inbox."
-        msg_id = messages[0]["id"]
-        msg = service.users().messages().get(userId="me", id=msg_id, format="metadata", metadataHeaders=["From", "Subject", "Date"]).execute()
-        headers = {h["name"]: h["value"] for h in msg["payload"].get("headers", [])}
-        snippet = msg.get("snippet", "")
-        return (
-            f"From: {headers.get('From', 'Unknown')}\n"
-            f"Subject: {headers.get('Subject', 'No Subject')}\n"
-            f"Date: {headers.get('Date', 'Unknown')}\n"
-            f"Snippet: {snippet}"
-        )
+            return "No emails found matching your search."
+        emails = []
+        for msg_meta in messages:
+            msg_id = msg_meta["id"]
+            msg = service.users().messages().get(
+                userId="me",
+                id=msg_id,
+                format="metadata",
+                metadataHeaders=["From", "Subject", "Date"]
+            ).execute()
+            headers = {h["name"]: h["value"] for h in msg["payload"].get("headers", [])}
+            snippet = msg.get("snippet", "")
+            emails.append({
+                "from": headers.get("From", "Unknown"),
+                "subject": headers.get("Subject", "No Subject"),
+                "date": headers.get("Date", "Unknown"),
+                "snippet": snippet
+            })
+        # Format output for readability
+        output = []
+        for i, email in enumerate(emails, 1):
+            output.append(
+                f"Email {i}:\nFrom: {email['from']}\nSubject: {email['subject']}\nDate: {email['date']}\nSnippet: {email['snippet']}\n"
+            )
+        return "\n".join(output)
 
     async def _arun(self, **kwargs):
         return self._run(**kwargs)
