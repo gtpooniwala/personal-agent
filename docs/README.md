@@ -13,6 +13,9 @@ Detailed documentation for specific features and implementations:
 - **[Title Generation System](features/TITLE_GENERATION_SYSTEM.md)** - Intelligent conversation title generation with multiple triggers
 - **[Selective RAG Validation](features/SELECTIVE_RAG_VALIDATION.md)** - Document-based Q&A system validation
 - **[Document Q&A Context](features/DOCUMENT_QA_CONTEXT.txt)** - Context and examples for document question answering
+- **[User Profile System](features/USER_PROFILE_SYSTEM.md)** - Persistent, user-specific memory for personalization
+- **[Internet Search Tool](features/INTERNET_SEARCH_TOOL.md)** - Web search with multiple providers
+- **[Response Agent System](features/RESPONSE_AGENT_SYSTEM.md)** - Synthesizes final user-facing responses from tool outputs
 
 ### Main Project Files
 - **[AGENT.md](../AGENT.md)** - Core agent technical documentation and status

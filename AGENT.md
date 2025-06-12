@@ -1080,3 +1080,22 @@ personal-agent/
 5. **Documentation**: Keep API documentation current via FastAPI auto-docs
 
 This Personal Agent MVP provides a solid foundation for building sophisticated AI assistants with natural conversation capabilities and extensible tool integration.
+
+## 🛠️ Tool & Agent Inventory (2025)
+
+The orchestrator currently supports the following tools/agents:
+
+### ✅ Production-Ready Tools
+- **CalculatorTool**: Mathematical calculations
+- **CurrentTimeTool**: Date/time queries
+- **SearchDocumentsTool**: RAG-based document Q&A
+- **ScratchpadTool**: Temporary, conversation-specific memory
+- **InternetSearchTool**: Web search (DuckDuckGo, Bing, Google, SerpAPI)
+- **UserProfileTool**: Persistent, user-specific memory (facts, preferences, background)
+- **ResponseAgentTool**: Synthesizes final user-facing response from tool results
+
+### 🚧 In Progress / Placeholder Tools
+- **GmailReadTool**: Fetches most recent email (basic read-only)
+- **GmailTool**: Placeholder for full Gmail integration (search, send, organize)
+- **CalendarTool**: Placeholder for Google Calendar integration
+- **TodoistTool**: Placeholder for Todoist integration

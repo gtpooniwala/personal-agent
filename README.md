@@ -169,40 +169,50 @@ A sophisticated AI-powered personal assistant built with FastAPI, LangGraph, and
 - **Usage**: "Save a note that I need to call the dentist", "Show my notes", "Search for dentist"
 - **Availability**: Always available
 
+**5. Internet Search Tool**
+- **Status**: ✅ Fully Implemented
+- **Purpose**: Search the internet for up-to-date information using DuckDuckGo, Bing, Google, or SerpAPI
+- **Features**:
+  - Multiple provider support
+  - API key integration for Bing, Google, SerpAPI
+  - Used for general knowledge, research, news
+- **Usage**: "Search the web for latest AI news"
+- **Availability**: Always available
+
+**6. User Profile Tool**
+- **Status**: ✅ Fully Implemented
+- **Purpose**: Persistent, user-specific memory (facts, preferences, background)
+- **Features**:
+  - Read/update user profile with natural language instructions
+  - LLM-powered profile extraction and merging
+  - Used for personalization and long-term memory
+- **Usage**: "Remember my favorite color is blue", "What do you know about me?"
+- **Availability**: Always available
+
+**7. Response Agent Tool**
+- **Status**: ✅ Fully Implemented
+- **Purpose**: Synthesizes the final user-facing response from tool results and conversation history
+- **Features**:
+  - Integrates tool outputs into a single, natural response
+  - Avoids technical jargon/tool names in user answers
+- **Usage**: Internal orchestration step
+- **Availability**: Always available
+
 #### 🚧 **Placeholder Tools** (Framework Ready)
 
-**5. Gmail Tool**
-- **Status**: 🚧 Placeholder Implementation
-- **Purpose**: Email management and automation
-- **Planned Features**:
-  - Search and read emails
-  - Compose and send messages
-  - Email organization (labels, folders)
-  - Automation workflows
-- **Implementation Requirements**: Gmail API integration, OAuth authentication
-- **Availability**: Not yet available
+**8. Gmail Read Tool**
+- **Status**: 🚧 Basic Implementation (Read only)
+- **Purpose**: Fetches the most recent email from the user's Gmail inbox
+- **Features**:
+  - OAuth authentication
+  - Returns sender, subject, snippet, and date
+- **Usage**: "Show my latest email"
+- **Availability**: Requires Gmail setup
 
-**6. Calendar Tool**  
-- **Status**: 🚧 Placeholder Implementation
-- **Purpose**: Schedule and event management
-- **Planned Features**:
-  - Read upcoming events
-  - Create calendar events
-  - Meeting scheduling
-  - Reminder management
-- **Implementation Requirements**: Google Calendar API, OAuth authentication
-- **Availability**: Not yet available
-
-**7. Todoist Tool**
-- **Status**: 🚧 Placeholder Implementation  
-- **Purpose**: Task and project management
-- **Planned Features**:
-  - Create and manage tasks
-  - Project organization
-  - Priority and due date management
-  - Completion tracking
-- **Implementation Requirements**: Todoist API integration
-- **Availability**: Not yet available
+**9. Gmail, Calendar, Todoist (Full Integrations)**
+- **Status**: 🚧 Placeholder
+- **Purpose**: Email, calendar, and task management
+- **Planned Features**: See AGENT.md and docs/features for details
 
 ### Information Flow Architecture
 
