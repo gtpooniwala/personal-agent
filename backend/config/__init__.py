@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     api_host: str = "127.0.0.1"
     api_port: int = 8000
     
+    # API keys for web search providers (optional)
+    bing_api_key: Optional[str] = None
+    google_api_key: Optional[str] = None
+    google_cx: Optional[str] = None
+    serpapi_key: Optional[str] = None
+    
     class Config:
         env_file = ".env"
         case_sensitive = False
