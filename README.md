@@ -15,32 +15,11 @@ A sophisticated AI-powered personal assistant built with FastAPI, LangGraph, and
 
 ## 🆕 Recent Major Improvements
 
-### **LangGraph Architecture Upgrade (Latest)**
-- ✅ **Modern Agent Framework**: Migrated from legacy LangChain agents to LangGraph's `create_react_agent()`
-- ✅ **Automatic Tool Binding**: Eliminated manual tool description compilation (28 lines removed)
-- ✅ **Enhanced Memory Management**: Built-in conversation memory with `MemorySaver()`
-- ✅ **Improved Reliability**: Graph-based execution with better error handling and state management
-- ✅ **Pydantic V2 Compatibility**: All tools updated with proper type annotations for seamless integration
-
-### **Pydantic Tool Conversion (Complete)**
-- ✅ **Structured Input Validation**: All tools now use Pydantic models for input validation
-- ✅ **Multi-Input Tool Support**: Fixed LangChain agent compatibility for complex tool parameters
-- ✅ **95.5% Test Success Rate**: Comprehensive test suite with 21/22 tests passing
-- ✅ **Enhanced Calculator**: Now accepts clean expressions like `expression="2**4"`
-- ✅ **Improved Time Tool**: Structured input with format preferences
-- ✅ **Smart Scratchpad**: Action-based input with better organization
-- ✅ **Document QA Enhancement**: Dynamic chunk selection (1-5 results based on complexity)
-
-### **Document Upload System Enhancement**
-- ✅ **AI-Generated Summaries**: Automatic one-sentence summaries for all uploaded documents
-- ✅ **Context-Aware AI**: System informs AI about available documents and their content
-- ✅ **Smart Document Handling**: AI behavior adapts based on document availability
-- ✅ **Database Migration**: Seamless upgrade for existing installations
-
-### **Test Suite Organization**
-- ✅ **Comprehensive Testing**: Main test suite covers 22 scenarios across all tool categories
-- ✅ **Clean Test Structure**: Organized test files with clear separation of concerns
-- ✅ **Behavioral Validation**: Tests verify tool usage patterns and response quality
+- **Gmail Tool Expanded**: Gmail integration now supports advanced search, filtering, and multi-email results using Gmail's full search syntax.
+- **Frontend Refactor**: Modular JavaScript, improved sidebar, and real-time conversation highlighting for a modern UI/UX.
+- **Long-Term Memory/Profile**: Robust user profile memory tool with LLM-powered merging and persistent storage.
+- **Internet Search Tool**: Modular search with provider selection (DuckDuckGo, Bing, Google, SerpAPI).
+- **LangGraph Upgrade**: Modern agent orchestration, automatic tool binding, and enhanced memory management.
 
 ## 🚀 Quick Start
 
@@ -119,7 +98,7 @@ A sophisticated AI-powered personal assistant built with FastAPI, LangGraph, and
 │Calculator│ │  Time   │ │ Document Q&A │ │ Scratchpad  │ │    Gmail    │ │  Calendar   │ │  Todoist    │
 │  Tool    │ │  Tool   │ │    Tool      │ │    Tool     │ │    Tool     │ │    Tool     │ │    Tool     │
 │    ✅    │ │    ✅    │ │      ✅       │ │     ✅      │ │     🚧      │ │     🚧      │ │     🚧      │
-│IMPLEMENTED│ │IMPLEMENTED│ │ IMPLEMENTED  │ │IMPLEMENTED  │ │ PLACEHOLDER │ │ PLACEHOLDER │ │ PLACEHOLDER │
+│IMPLEMENTED│ │IMPLEMENTED│ │ IMPLEMENTED  │ │IMPLEMENTED  │ │ IMPLEMENTED │ │ PLACEHOLDER │ │ PLACEHOLDER │
 └─────────┘ └─────────┘ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
 ```
 
@@ -169,15 +148,15 @@ A sophisticated AI-powered personal assistant built with FastAPI, LangGraph, and
 - **Usage**: "Save a note that I need to call the dentist", "Show my notes", "Search for dentist"
 - **Availability**: Always available
 
-**5. Internet Search Tool**
-- **Status**: ✅ Fully Implemented
-- **Purpose**: Search the internet for up-to-date information using DuckDuckGo, Bing, Google, or SerpAPI
+**5. Gmail Tool**
+- **Status**: ✅ Expanded Implementation
+- **Purpose**: Search, filter, and read emails from Gmail inbox
 - **Features**:
-  - Multiple provider support
-  - API key integration for Bing, Google, SerpAPI
-  - Used for general knowledge, research, news
-- **Usage**: "Search the web for latest AI news"
-- **Availability**: Always available
+  - OAuth authentication
+  - Full Gmail search syntax support (by sender, subject, date, label, etc.)
+  - Fetch multiple emails with sender, subject, date, and snippet
+- **Usage**: "Show emails from Alice last week", "Find unread messages with 'invoice' in the subject"
+- **Availability**: Requires Gmail setup
 
 **6. User Profile Tool**
 - **Status**: ✅ Fully Implemented
