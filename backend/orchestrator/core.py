@@ -207,6 +207,7 @@ Your effectiveness is measured by:
         Extract LangGraph actions for transparency.
         
         Analyzes the message history to identify tool calls and their results.
+        Ensures tool input is always JSON-serializable (dict or pretty string), never a raw Pydantic object.
         """
         if not messages:
             return None
@@ -226,10 +227,27 @@ Your effectiveness is measured by:
                             messages[j].tool_call_id == tool_call.get('id')):
                             tool_response = messages[j].content
                             break
-                    
+                    # --- SERIALIZATION FIX START ---
+                    tool_input = tool_call.get('args', {})
+                    # If input is a Pydantic model, convert to dict
+                    try:
+                        # Pydantic v2: model_dump; v1: dict
+                        if hasattr(tool_input, 'model_dump'):
+                            tool_input = tool_input.model_dump()
+                        elif hasattr(tool_input, 'dict'):
+                            tool_input = tool_input.dict()
+                    except Exception:
+                        pass
+                    # Optionally, pretty-print dict for frontend readability
+                    if isinstance(tool_input, dict):
+                        import json
+                        tool_input_pretty = json.dumps(tool_input, ensure_ascii=False, indent=2)
+                    else:
+                        tool_input_pretty = str(tool_input)
+                    # --- SERIALIZATION FIX END ---
                     actions.append({
                         "tool": tool_call.get('name', 'unknown'),
-                        "input": tool_call.get('args', {}),
+                        "input": tool_input_pretty,
                         "output": tool_response or "No response captured"
                     })
         

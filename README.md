@@ -394,6 +394,7 @@ For detailed development information, see:
 - [ ] **Gmail Tool**: Complete email management (reading, sending, organizing)
 - [ ] **Calendar Tool**: Full calendar integration with scheduling intelligence
 - [ ] **Todoist Tool**: Advanced task and project management
+- [ ] **Notion Tool**: Search through notion docs
 
 #### Additional Tool Ideas  
 - [ ] **Response Agent**: Dedicated agent for improving response quality, style, and tone
