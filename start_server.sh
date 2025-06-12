@@ -1,10 +1,7 @@
 #!/bin/bash
 
-# Personal Agent Backend Startup Script
-# This script activates the conda environment and starts the backend server
-
-echo "🚀 Starting Personal Agent Backend Server..."
-echo "========================================"
+# Personal Agent Backend Startup Script (macOS version)
+# This script opens two new Terminal windows and runs the backend and frontend servers separately
 
 # Check if conda is available
 if ! command -v conda &> /dev/null; then
@@ -12,9 +9,6 @@ if ! command -v conda &> /dev/null; then
     echo "Please install Anaconda/Miniconda first"
     exit 1
 fi
-
-# Initialize conda for shell script
-eval "$(conda shell.bash hook)"
 
 # Check if personalagent environment exists
 if ! conda env list | grep -q "personalagent"; then
@@ -26,30 +20,30 @@ if ! conda env list | grep -q "personalagent"; then
     exit 1
 fi
 
-# Activate the conda environment
-echo "🔧 Activating conda environment 'personalagent'..."
-conda activate personalagent
+# Get absolute path to project root
+PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 
-# Check if activation was successful
-if [ "$CONDA_DEFAULT_ENV" != "personalagent" ]; then
-    echo "❌ Error: Failed to activate conda environment 'personalagent'"
-    exit 1
-fi
+# Open backend server in new Terminal window
+osascript <<END
+  tell application "Terminal"
+    do script "cd $PROJECT_ROOT; source ~/.zshrc; conda activate personalagent; uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
+    activate
+  end tell
+END
 
-echo "✅ Environment activated: $CONDA_DEFAULT_ENV"
+echo "✅ Backend server started in a new Terminal window."
 
-# Check if requirements are installed
-echo "🔍 Checking dependencies..."
-if ! python -c "import uvicorn, fastapi" &> /dev/null; then
-    echo "⚠️  Some dependencies might be missing. Installing requirements..."
-    pip install -r backend/requirements.txt
-fi
+# Open frontend static server in new Terminal window
+osascript <<END
+  tell application "Terminal"
+    do script "cd $PROJECT_ROOT/frontend; python3 -m http.server 8081"
+    activate
+  end tell
+END
 
-# Start the server
-echo "🌟 Starting FastAPI server..."
-echo "Backend will be available at: http://localhost:8000"
-echo "Frontend should be served separately (e.g., Live Server in VS Code)"
+echo "✅ Frontend static server started in a new Terminal window."
+
 echo "========================================"
-
-# Run the server from project root with correct app path
-uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+echo "Backend running at: http://localhost:8000"
+echo "Frontend running at: http://localhost:8081"
+echo "Press Ctrl+C in the respective Terminal windows to stop the servers."
