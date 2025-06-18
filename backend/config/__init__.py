@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
 import os
+import yaml
 
 
 class Settings(BaseSettings):
@@ -34,6 +35,17 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
+
+# Load LLM config as a separate global variable (not as a field on settings)
+LLM_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "llm_config.yaml")
+
+def load_llm_config():
+    if os.path.exists(LLM_CONFIG_PATH):
+        with open(LLM_CONFIG_PATH, "r") as f:
+            return yaml.safe_load(f)
+    return {}
+
+llm_config = load_llm_config()
 
 # Ensure data directory exists
 os.makedirs(os.path.dirname(settings.database_path), exist_ok=True)

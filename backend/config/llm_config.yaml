@@ -1,0 +1,37 @@
+# LLM configuration for each tool that uses an LLM
+#
+# === OpenAI Model Options (June 2025) ===
+#
+# GPT-4.1           | $2.00/1M input, $8.00/1M output | Smartest, best for complex reasoning, planning, analysis, agentic workflows
+# GPT-4.1 mini      | $0.40/1M input, $1.60/1M output | Balances speed, intelligence, and cost. Excellent for most agentic and reasoning tasks
+# GPT-4.1 nano      | $0.10/1M input, $0.40/1M output | Fastest, most cost-effective. Good for high-volume, low-latency, or simple tasks
+# o3 (thinking)     | (see OpenAI docs)               | Specialized for planning/reasoning/agentic tasks, top-tier agentic performance
+# o4 (thinking)     | (see OpenAI docs)               | Specialized for planning/reasoning/agentic tasks, top-tier agentic performance
+# gpt-4o            | $5.00/1M input, $15.00/1M output| SOTA reasoning, vision, audio, text. Fast, good for most tasks
+# gpt-4-turbo       | $10.00/1M input, $30.00/1M output| Large context, fallback if 4.1/4o unavailable
+# gpt-3.5-turbo     | $0.50/1M input, $1.50/1M output | Legacy, basic chat/search, lowest cost (but 4.1 nano is now cheaper)
+#
+# === Model Selection Guidance ===
+# - Use GPT-4.1 mini for most agentic, reasoning, and user-facing tasks (best price/performance)
+# - Use GPT-4.1 nano for high-volume, low-latency, or simple tasks (cheapest)
+# - Use o3/o4 (thinking) for advanced planning/reasoning/agentic workflows if available and cost is justified
+# - Use GPT-4.1 for the most complex tasks where cost is less of a concern
+# - Use gpt-4o/gpt-4-turbo for vision/multimodal or as fallback
+#
+# === Best Model for Each Tool (as of June 2025) ===
+#   orchestrator: gpt-4.1 mini      # best price/performance for agentic reasoning
+#   response_agent: gpt-4.1 mini    # natural language synthesis, cost-effective
+#   document_qa: gpt-4.1 mini       # handles complex queries, good context window
+#   user_profile: gpt-4.1 mini      # profile extraction, memory, cost-effective
+#   planning_tool: gpt-4.1 mini     # multi-step, chain-of-thought, agentic workflows
+#   internet_search: gpt-4.1 nano   # cheap, fast, good for summarizing search results and high-volume tasks
+
+llms:
+  orchestrator: gpt-4.1 mini
+  response_agent: gpt-4.1 mini
+  document_qa: gpt-4.1 mini
+  user_profile: gpt-4.1 mini
+  planning_tool: gpt-4.1 mini
+  internet_search: gpt-4.1 nano
+# To change the LLM for a tool, just edit the value for that tool.
+# Example: to use o3 for planning, set planning_tool: o3
