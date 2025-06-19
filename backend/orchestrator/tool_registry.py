@@ -7,6 +7,7 @@ from .tools.integrations import GmailTool, CalendarTool, TodoistTool
 from .tools.response_agent import ResponseAgentTool
 from .tools.gmail import GmailReadTool
 from .tools.user_profile import UserProfileTool
+from .tools.summarisation_agent import SummarisationAgent
 from backend.database.operations import db_ops
 from backend.orchestrator.tools.internet_search import InternetSearchTool
 import logging
@@ -58,6 +59,8 @@ class ToolRegistry:
 
         # User profile tool (always available)
         self._tools["user_profile"] = UserProfileTool(self.user_id)
+        # Summarisation agent (always available)
+        self._tools["summarisation_agent"] = SummarisationAgent()
 
     def update_selected_documents(self, selected_documents: List[str]):
         """

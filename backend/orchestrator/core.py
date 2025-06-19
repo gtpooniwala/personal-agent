@@ -2,7 +2,7 @@ from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_openai import ChatOpenAI
 from langchain_community.callbacks.manager import get_openai_callback
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
 from backend.config import settings
 from backend.orchestrator.tool_registry import ToolRegistry
 from ..database.operations import db_ops
@@ -111,6 +111,33 @@ Your effectiveness is measured by:
             checkpointer=memory  # Provides persistent conversation memory
         )
     
+    def get_condensed_conversation_history(self, conversation_id: str) -> list:
+        """
+        Returns the most recent summary (if any), the 4 non-summary messages before it (if they exist), and all messages after it.
+        If no summary, returns the full conversation history.
+        """
+        history = db_ops.get_conversation_history(conversation_id)
+        summary_idx = None
+        for i in reversed(range(len(history))):
+            msg = history[i]
+            if msg['role'] == 'system' and msg['content'].startswith('[CONVERSATION SUMMARY]'):
+                summary_idx = i
+                break
+        if summary_idx is not None:
+            # Find the 4 non-summary messages before the summary
+            pre_summary = []
+            count = 0
+            j = summary_idx - 1
+            while j >= 0 and count < 4:
+                if not (history[j]['role'] == 'system' and history[j]['content'].startswith('[CONVERSATION SUMMARY]')):
+                    pre_summary.append(history[j])
+                    count += 1
+                j -= 1
+            pre_summary = list(reversed(pre_summary))
+            return [history[summary_idx]] + pre_summary + history[summary_idx+1:]
+        else:
+            return history
+    
     async def process_request(
         self, 
         user_request: str, 
@@ -138,32 +165,34 @@ Your effectiveness is measured by:
             
             # Save user message to database
             db_ops.save_message(conversation_id, "user", user_request)
-            
-            # Process with LangGraph agent and track token usage
+
+            # Use condensed conversation history for agent context
+            condensed_history = self.get_condensed_conversation_history(conversation_id)
+            messages = []
+            for msg in condensed_history:
+                if msg['role'] == 'user':
+                    messages.append(HumanMessage(content=msg['content']))
+                elif msg['role'] == 'assistant':
+                    messages.append(AIMessage(content=msg['content']))
+                elif msg['role'] == 'system' and msg['content'].startswith('[CONVERSATION SUMMARY]'):
+                    messages.append(SystemMessage(content=msg['content']))
+                # Optionally, handle other system/tool messages here if needed
             with get_openai_callback() as cb:
                 try:
-                    # Let the LangGraph agent analyze and delegate
                     config = {"configurable": {"thread_id": conversation_id}}
-                    messages = [HumanMessage(content=user_request)]
                     result = self.orchestrator_agent.invoke({"messages": messages}, config=config)
-
-                    # Extract tool usage from all messages in the conversation
                     orchestration_actions = self._extract_langgraph_actions(result["messages"]) if result and "messages" in result else []
-
-                    # Prepare tool results for response agent
                     tool_results = orchestration_actions if orchestration_actions else []
-
-                    # Call the response agent tool to synthesize the final response
                     response_agent_tool = self.tool_registry._tools.get("response_agent")
                     if response_agent_tool:
-                        conversation_history = db_ops.get_conversation_history(conversation_id)
+                        # Use condensed history for response agent as well
+                        conversation_history = self.get_condensed_conversation_history(conversation_id)
                         response = response_agent_tool._run(
                             user_query=user_request,
                             tool_results=tool_results,
                             conversation_history=conversation_history
                         )
                     else:
-                        # Fallback: Use last AI message as response if response agent is missing
                         ai_messages = [msg for msg in result["messages"] if isinstance(msg, AIMessage)]
                         if ai_messages:
                             response = ai_messages[-1].content
@@ -171,7 +200,6 @@ Your effectiveness is measured by:
                             response = "I apologize, but I couldn't process your request properly."
                 except Exception as e:
                     logger.warning(f"LangGraph agent processing failed: {str(e)}")
-                    # Fallback to direct LLM only if agent completely fails
                     response = await self.llm.apredict(user_request)
                     orchestration_actions = []
             
@@ -183,7 +211,12 @@ Your effectiveness is measured by:
                 agent_actions=json.dumps(orchestration_actions) if orchestration_actions else None,
                 token_usage=cb.total_tokens
             )
-            
+
+            # Trigger summarisation in the background (do not await)
+            import asyncio
+            asyncio.create_task(self.maybe_summarise_conversation(conversation_id))
+
+            # Return response immediately
             return {
                 "response": response,
                 "conversation_id": conversation_id,
@@ -205,55 +238,74 @@ Your effectiveness is measured by:
                 "error": True
             }
     
+    async def maybe_summarise_conversation(self, conversation_id: str, context_window_tokens: int = 4096, threshold: float = 0.01):
+        """
+        If conversation history exceeds a very small threshold of the context window, summarise it and save the summary.
+        """
+        conversation_history = db_ops.get_conversation_history(conversation_id)
+        # Concatenate all messages for token estimation
+        history_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in conversation_history])
+        # Estimate tokens (very rough: 1 token ≈ 4 chars)
+        token_count = len(history_text) // 4
+        if token_count > int(context_window_tokens * threshold):
+            # Summarise
+            summarisation_agent = self.tool_registry._tools.get("summarisation_agent")
+            if summarisation_agent:
+                summary = await summarisation_agent._arun(history_text)
+                # Save summary as a special message
+                db_ops.save_message(conversation_id, "system", f"[CONVERSATION SUMMARY]\n{summary}")
+                return True
+        return False
+
     def _extract_langgraph_actions(self, messages: List) -> Optional[List[Dict[str, Any]]]:
         """
         Extract LangGraph actions for transparency.
-        
-        Analyzes the message history to identify tool calls and their results.
-        Ensures tool input is always JSON-serializable (dict or pretty string), never a raw Pydantic object.
+        Skips messages that do not have tool call structure (e.g., system messages like summaries).
+        Handles both dict and object tool_call/tool_message formats.
+        Never fails on missing tool_call_id.
         """
         if not messages:
             return None
-            
         actions = []
-        
-        # Find tool calls and their responses in the message history
         for i, message in enumerate(messages):
             if hasattr(message, 'tool_calls') and message.tool_calls:
-                # This is an AI message with tool calls
                 for tool_call in message.tool_calls:
-                    # Look for the corresponding tool message response
+                    # Get tool_call id safely
+                    if isinstance(tool_call, dict):
+                        tool_call_id = tool_call.get('id')
+                        tool_name = tool_call.get('name', 'unknown')
+                        tool_input = tool_call.get('args', {})
+                    else:
+                        tool_call_id = getattr(tool_call, 'id', None)
+                        tool_name = getattr(tool_call, 'name', 'unknown')
+                        tool_input = getattr(tool_call, 'args', {})
+                    # Find corresponding tool response
                     tool_response = None
                     for j in range(i + 1, len(messages)):
-                        if (isinstance(messages[j], ToolMessage) and 
-                            hasattr(messages[j], 'tool_call_id') and
-                            messages[j].tool_call_id == tool_call.get('id')):
-                            tool_response = messages[j].content
+                        msg_j = messages[j]
+                        msg_tool_call_id = getattr(msg_j, 'tool_call_id', None) if hasattr(msg_j, 'tool_call_id') else None
+                        if msg_tool_call_id and tool_call_id and msg_tool_call_id == tool_call_id:
+                            tool_response = getattr(msg_j, 'content', None)
                             break
-                    # --- SERIALIZATION FIX START ---
-                    tool_input = tool_call.get('args', {})
-                    # If input is a Pydantic model, convert to dict
+                    # Safely convert tool_input to dict if possible
                     try:
-                        # Pydantic v2: model_dump; v1: dict
-                        if hasattr(tool_input, 'model_dump'):
-                            tool_input = tool_input.model_dump()
-                        elif hasattr(tool_input, 'dict'):
-                            tool_input = tool_input.dict()
+                        if not isinstance(tool_input, dict):
+                            if hasattr(tool_input, 'model_dump'):
+                                tool_input = tool_input.model_dump()
+                            elif hasattr(tool_input, 'dict'):
+                                tool_input = tool_input.dict()
                     except Exception:
                         pass
-                    # Optionally, pretty-print dict for frontend readability
                     if isinstance(tool_input, dict):
                         import json
                         tool_input_pretty = json.dumps(tool_input, ensure_ascii=False, indent=2)
                     else:
                         tool_input_pretty = str(tool_input)
-                    # --- SERIALIZATION FIX END ---
                     actions.append({
-                        "tool": tool_call.get('name', 'unknown'),
+                        "tool": tool_name,
                         "input": tool_input_pretty,
                         "output": tool_response or "No response captured"
                     })
-        
         return actions if actions else None
     
     def create_conversation(self, title: Optional[str] = None) -> str:

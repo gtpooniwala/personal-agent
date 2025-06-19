@@ -188,7 +188,7 @@ A sophisticated AI-powered personal assistant built with FastAPI, LangGraph, and
 - **Usage**: "Show my latest email"
 - **Availability**: Requires Gmail setup
 
-**9. Gmail, Calendar, Todoist (Full Integrations)**
+**9. Calendar, Todoist (Full Integrations)**
 - **Status**: 🚧 Placeholder
 - **Purpose**: Email, calendar, and task management
 - **Planned Features**: See AGENT.md and docs/features for details

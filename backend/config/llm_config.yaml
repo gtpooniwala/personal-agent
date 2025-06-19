@@ -25,13 +25,15 @@
 #   user_profile: gpt-4.1 mini      # profile extraction, memory, cost-effective
 #   planning_tool: gpt-4.1 mini     # multi-step, chain-of-thought, agentic workflows
 #   internet_search: gpt-4.1 nano   # cheap, fast, good for summarizing search results and high-volume tasks
+#   summarisation_agent: gpt-4.1 mini # effective for generating concise summaries
 
 llms:
-  orchestrator: gpt-4.1 mini
-  response_agent: gpt-4.1 mini
-  document_qa: gpt-4.1 mini
-  user_profile: gpt-4.1 mini
-  planning_tool: gpt-4.1 mini
-  internet_search: gpt-4.1 nano
+  orchestrator: gpt-3.5-turbo
+  response_agent: gpt-3.5-turbo
+  document_qa: gpt-3.5-turbo
+  user_profile: gpt-3.5-turbo
+  planning_tool: gpt-3.5-turbo
+  internet_search: gpt-3.5-turbo
+  summarisation_agent: gpt-3.5-turbo
 # To change the LLM for a tool, just edit the value for that tool.
 # Example: to use o3 for planning, set planning_tool: o3
