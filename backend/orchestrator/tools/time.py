@@ -8,7 +8,12 @@ logger = logging.getLogger(__name__)
 
 
 class TimeInput(BaseModel):
-    """Input model for time tool with validation."""
+    """Input model for time tool with validation.
+    
+    Fields:
+        query (str): Time query (e.g., 'now', 'current time', 'today')
+        format_type (str): Output format preference (standard, verbose, iso)
+    """
     
     query: str = Field(
         default="now",
@@ -42,14 +47,12 @@ class CurrentTimeTool(BaseTool):
     """
     Date and time information tool with Pydantic input validation.
     
-    This specialized tool handles all time-related queries.
-    It provides accurate, formatted time information for users.
-    
     Features:
     - Current date and time
-    - Multiple output formats
-    - Timezone awareness (currently local time)
-    - Pydantic input validation
+    - Multiple output formats (standard, verbose, iso)
+    - Timezone awareness (local time)
+    - Input validation
+    - Used for all time/date queries
     """
     
     name: str = "current_time"

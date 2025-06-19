@@ -3,6 +3,16 @@ from langchain_openai import ChatOpenAI
 from backend.config import llm_config
 
 class SummarisationAgent(BaseTool):
+    """
+    Tool: summarisation_agent
+    Description: Summarises a conversation history to fit within the context window.
+    
+    Features:
+    - Summarises long conversations to preserve key context, facts, and user intent
+    - Used to keep agent context efficient and within model limits
+    - Runs asynchronously in the background after assistant response if conversation is long
+    """
+
     name: str = "summarisation_agent"
     description: str = "Summarises a conversation history to fit within the context window."
 

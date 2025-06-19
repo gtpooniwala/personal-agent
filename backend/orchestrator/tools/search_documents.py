@@ -7,7 +7,12 @@ logger = logging.getLogger(__name__)
 
 
 class SearchDocumentsInput(BaseModel):
-    """Structured input for searching user-uploaded documents. This tool will search through ALL selected documents to find relevant information. Use whenever you think the answer may be in the user's uploaded or selected documents. File summaries are available to help you decide if a search is worthwhile."""
+    """Structured input for searching user-uploaded documents.
+    
+    Fields:
+        query (str): The question or search query about the uploaded documents.
+        max_results (int): Maximum number of document chunks to retrieve (1-5).
+    """
     
     query: str = Field(
         description="The question or search query about the uploaded documents. Should be clear and specific."
@@ -23,6 +28,12 @@ class SearchDocumentsTool(BaseTool):
     """
     Tool: search_documents
     Purpose: Answer questions or retrieve information from ALL user-selected documents using semantic search (RAG).
+    
+    Features:
+    - Semantic search (RAG) over all selected documents
+    - File summaries to help decide if a search is worthwhile
+    - Used for any query that may be answered by uploaded documents
+    - Not used for general knowledge, math, or time queries
 
     When to use:
     - Use this tool whenever you think relevant information may be found in the user's uploaded or selected documents, even if the user does not explicitly mention them.

@@ -8,7 +8,11 @@ logger = logging.getLogger(__name__)
 
 
 class CalculatorInput(BaseModel):
-    """Input model for calculator tool - expects structured mathematical expression from LLM."""
+    """Input model for calculator tool - expects structured mathematical expression from LLM.
+    
+    Fields:
+        expression (str): Clean mathematical expression to evaluate (e.g., '2**4', '15+27', '100/25').
+    """
     
     expression: str = Field(
         description="Clean mathematical expression to evaluate (e.g., '2**4', '15+27', '100/25'). Use ** for exponentiation, not ^.",
@@ -45,6 +49,12 @@ class CalculatorTool(BaseTool):
     Mathematical calculation tool expecting structured input from LLM.
     
     The LLM should provide clean mathematical expressions ready for evaluation.
+    
+    Features:
+    - Secure evaluation of mathematical expressions
+    - Supports +, -, *, /, ** (exponentiation)
+    - Input validation for safety
+    - Used for all math/calculation queries
     """
     
     name: str = "calculator"

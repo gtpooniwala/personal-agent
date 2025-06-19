@@ -5,7 +5,13 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional, Type
 
 class ResponseAgentInput(BaseModel):
-    """Input for the Response Agent. Contains all information and tool results needed to craft the final user response."""
+    """Input for the Response Agent. Contains all information and tool results needed to craft the final user response.
+    
+    Fields:
+        user_query (str): The original user query.
+        tool_results (list): Results from all tools used for this user query.
+        conversation_history (list): Recent conversation history for context (optional).
+    """
     user_query: str = Field(..., description="The original user query.")
     tool_results: List[Dict[str, Any]] = Field(
         ..., description="A list of results from all tools used for this user query. Each result should include the tool name, input, and output.")
@@ -15,7 +21,12 @@ class ResponseAgentInput(BaseModel):
 class ResponseAgentTool(BaseTool):
     """
     Tool: response_agent
-    Description: Synthesizes a final, user-facing response from the user query, tool results, and conversation history using a modern LangChain Runnable (prompt | llm). This tool does not select or invoke other tools; it only generates the final answer for the user based on provided context and tool outputs.
+    Description: Synthesizes a final, user-facing response from the user query, tool results, and conversation history using a modern LangChain Runnable (prompt | llm).
+    
+    Features:
+    - Synthesizes tool results and conversation history into a single, natural response
+    - Avoids technical jargon/tool names in user answers
+    - Used as the final step in every agent workflow
     """
     name: str = "response_agent"
     description: str = (

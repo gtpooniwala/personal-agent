@@ -11,7 +11,13 @@ logger = logging.getLogger(__name__)
 
 
 class ScratchpadInput(BaseModel):
-    """Input model for scratchpad tool - expects structured commands from LLM."""
+    """Input model for scratchpad tool - expects structured commands from LLM.
+    
+    Fields:
+        action (str): The action to perform (save, read, search, delete, clear, update, help)
+        content (str): Content for save/search/update operations
+        note_number (int): Note number for delete/update operations
+    """
     
     action: Literal["save", "read", "search", "delete", "clear", "update", "help"] = Field(
         description="The action to perform: save, read, search, delete, clear, update, or help"
@@ -42,6 +48,12 @@ class ScratchpadInput(BaseModel):
 class ScratchpadTool(BaseTool):
     """
     Agent's temporary memory and context management tool with Pydantic input validation.
+    
+    Features:
+    - Temporary, conversation-specific memory
+    - Save, read, search, delete, clear, update notes
+    - Used for tracking context, intermediate results, and plans
+    - NOT for long-term memory (use user_profile tool for that)
     
     This tool serves as the agent's working memory for managing context, tasks, and information
     across complex conversations and multi-step operations. The agent should use this tool to:

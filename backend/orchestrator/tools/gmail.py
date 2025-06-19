@@ -15,7 +15,21 @@ TOKEN_PATH = os.path.join(BASE_DIR, "backend/data/gmail/token.pickle")
 class GmailReadTool(BaseTool):
     """
     Tool: gmail_read
-    Description: Use this tool to fetch the most recent email from the user's Gmail inbox. Returns sender, subject, snippet, and date. Use for queries like 'show my latest email', 'read my newest message', or 'what is my last received email?'.
+    Description: Use this tool to search, filter, and read emails from the user's Gmail inbox.
+    
+    Features:
+    - OAuth authentication (secure, user-granted access)
+    - Full Gmail search syntax support (by sender, subject, date, label, etc.)
+    - Fetches multiple emails per query (not just the latest)
+    - Returns sender, subject, date, and snippet for each email
+    - Supports label-based filtering (e.g., INBOX, UNREAD)
+    - Handles both simple and advanced user queries
+    
+    Usage:
+    - "Show emails from Alice last week"
+    - "Find unread messages with 'invoice' in the subject"
+    - "Read my latest email"
+    - "Search for emails about project X from Bob"
     """
     name: str = "gmail_read"
     description: str = (

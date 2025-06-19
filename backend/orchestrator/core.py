@@ -238,9 +238,9 @@ Your effectiveness is measured by:
                 "error": True
             }
     
-    async def maybe_summarise_conversation(self, conversation_id: str, context_window_tokens: int = 4096, threshold: float = 0.01):
+    async def maybe_summarise_conversation(self, conversation_id: str, context_window_tokens: int = 4096, threshold: float = 0.8) -> bool:
         """
-        If conversation history exceeds a very small threshold of the context window, summarise it and save the summary.
+        If conversation history exceeds a threshold ratio of the context window, summarise it and save the summary.
         """
         conversation_history = db_ops.get_conversation_history(conversation_id)
         # Concatenate all messages for token estimation

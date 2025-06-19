@@ -12,6 +12,7 @@ A sophisticated AI-powered personal assistant built with FastAPI, LangGraph, and
 - **🔄 Passive Maintenance**: Backend-driven conversation organization
 - **⚙️ Scalable Design**: Adding new tools only requires implementing the tool and updating orchestrator prompts
 - **🧠 LangGraph Architecture**: Modern graph-based orchestration with persistent memory and automatic tool binding
+- **📝 Automatic Conversation Summarisation**: Keeps long conversations efficient by summarising history and using only the most relevant context for the agent.
 
 ## 🆕 Recent Major Improvements
 
@@ -20,6 +21,7 @@ A sophisticated AI-powered personal assistant built with FastAPI, LangGraph, and
 - **Long-Term Memory/Profile**: Robust user profile memory tool with LLM-powered merging and persistent storage.
 - **Internet Search Tool**: Modular search with provider selection (DuckDuckGo, Bing, Google, SerpAPI).
 - **LangGraph Upgrade**: Modern agent orchestration, automatic tool binding, and enhanced memory management.
+- **Async Conversation Summarisation**: The system now automatically summarises conversations in the background when the context window is exceeded, saving the summary as a system message and keeping the agent context efficient for long chats.
 
 ## 🚀 Quick Start
 
@@ -97,7 +99,7 @@ A sophisticated AI-powered personal assistant built with FastAPI, LangGraph, and
 ┌─────────┐ ┌─────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
 │Calculator│ │  Time   │ │ Document Q&A │ │ Scratchpad  │ │    Gmail    │ │  Calendar   │ │  Todoist    │
 │  Tool    │ │  Tool   │ │    Tool      │ │    Tool     │ │    Tool     │ │    Tool     │ │    Tool     │
-│    ✅    │ │    ✅    │ │      ✅       │ │     ✅      │ │     🚧      │ │     🚧      │ │     🚧      │
+│    ✅    │ │    ✅    │ │      ✅       │ │     ✅      │ │     ✅      │ │     🚧      │ │     🚧      │
 │IMPLEMENTED│ │IMPLEMENTED│ │ IMPLEMENTED  │ │IMPLEMENTED  │ │ IMPLEMENTED │ │ PLACEHOLDER │ │ PLACEHOLDER │
 └─────────┘ └─────────┘ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
 ```
@@ -149,16 +151,21 @@ A sophisticated AI-powered personal assistant built with FastAPI, LangGraph, and
 - **Availability**: Always available
 
 **5. Gmail Tool**
-- **Status**: ✅ Expanded Implementation
+
+- **Status**: ✅ Fully Implemented
 - **Purpose**: Search, filter, and read emails from Gmail inbox
 - **Features**:
-  - OAuth authentication
+  - OAuth authentication (secure, user-granted access)
   - Full Gmail search syntax support (by sender, subject, date, label, etc.)
-  - Fetch multiple emails with sender, subject, date, and snippet
-- **Usage**: "Show emails from Alice last week", "Find unread messages with 'invoice' in the subject"
+  - Fetches multiple emails per query (not just the latest)
+  - Returns sender, subject, date, and snippet for each email
+  - Supports label-based filtering (e.g., INBOX, UNREAD)
+  - Handles both simple and advanced user queries
+- **Usage**: "Show emails from Alice last week", "Find unread messages with 'invoice' in the subject", "Read my latest email"
 - **Availability**: Requires Gmail setup
 
 **6. User Profile Tool**
+
 - **Status**: ✅ Fully Implemented
 - **Purpose**: Persistent, user-specific memory (facts, preferences, background)
 - **Features**:
@@ -169,6 +176,7 @@ A sophisticated AI-powered personal assistant built with FastAPI, LangGraph, and
 - **Availability**: Always available
 
 **7. Response Agent Tool**
+
 - **Status**: ✅ Fully Implemented
 - **Purpose**: Synthesizes the final user-facing response from tool results and conversation history
 - **Features**:
@@ -180,6 +188,7 @@ A sophisticated AI-powered personal assistant built with FastAPI, LangGraph, and
 #### 🚧 **Placeholder Tools** (Framework Ready)
 
 **8. Gmail Read Tool**
+
 - **Status**: 🚧 Basic Implementation (Read only)
 - **Purpose**: Fetches the most recent email from the user's Gmail inbox
 - **Features**:
@@ -189,6 +198,7 @@ A sophisticated AI-powered personal assistant built with FastAPI, LangGraph, and
 - **Availability**: Requires Gmail setup
 
 **9. Calendar, Todoist (Full Integrations)**
+
 - **Status**: 🚧 Placeholder
 - **Purpose**: Email, calendar, and task management
 - **Planned Features**: See AGENT.md and docs/features for details
