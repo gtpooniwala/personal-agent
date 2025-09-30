@@ -28,12 +28,13 @@
 #   summarisation_agent: gpt-4.1 mini # effective for generating concise summaries
 
 llms:
-  orchestrator: gpt-3.5-turbo
-  response_agent: gpt-3.5-turbo
-  document_qa: gpt-3.5-turbo
-  user_profile: gpt-3.5-turbo
-  planning_tool: gpt-3.5-turbo
-  internet_search: gpt-3.5-turbo
-  summarisation_agent: gpt-3.5-turbo
+  default: gpt-5-mini
+  orchestrator: default
+  response_agent: default
+  document_qa: default
+  user_profile: default
+  planning_tool: default
+  internet_search: default
+  summarisation_agent: default
 # To change the LLM for a tool, just edit the value for that tool.
 # Example: to use o3 for planning, set planning_tool: o3

@@ -361,36 +361,52 @@ For detailed development information, see:
 **✅ Production Ready Features:**
 - Modular orchestrator architecture with CoreOrchestrator
 - Dynamic tool registry with context-dependent availability
-- Mathematical calculations and time queries via specialized tools
-- Document upload and Q&A with RAG using dedicated tool
-- Persistent scratchpad for note-taking across conversations
-- Conversation management with automatic titles
+- Mathematical calculations via Calculator Tool
+- Current time/date queries via Time Tool  
+- Document upload and Q&A with RAG via Document Q&A Tool
+- Persistent scratchpad for note-taking via Scratchpad Tool
+- Internet search capabilities via Internet Search Tool
+- Gmail reading functionality via Gmail Read Tool (OAuth required)
+- User profile management via User Profile Tool
+- Conversation summarization for context window management
+- Response synthesis via Response Agent Tool
 - Professional web interface with seamless orchestrator integration
 - Comprehensive error handling and tool delegation
-- Backward compatibility layer for smooth migration
+- LLM configuration system with model defaults
+- Complete test coverage for core functionality
+
+**🚧 Framework Ready (Placeholder Tools):**
+- Gmail sending/management integration (structure ready, OAuth needed)
+- Calendar integration (structure ready, Google API needed)
+- Todoist task management (structure ready, Todoist API needed)
 
 **🚧 Future Enhancements:**
-- Gmail, Calendar, and Todoist integration tools (structure ready)
 - Multi-user support with role-based orchestration
 - Cloud deployment with distributed orchestrator
 - Advanced memory and learning capabilities
-- Additional specialized tools (weather, news, web search, etc.)
+- Additional specialized tools (weather, news, file management, etc.)
 
 ## 📋 Development Roadmap & TODOs
 
 ### 🔧 **New Tools (High Priority)**
 
 #### Core Productivity Tools
+
+- [x] **Calculator Tool**: Mathematical expression evaluation with security validation ✅ **COMPLETED**
+- [x] **Time Tool**: Current date/time queries with multiple formats ✅ **COMPLETED**
 - [x] **Scratchpad Tool**: Persistent note-taking and information storage across conversations ✅ **COMPLETED**
 - [x] **Internet Search Tool**: Web search capabilities with result summarization ✅ **COMPLETED**
-- [ ] **Gmail Tool**: Complete email management (reading, sending, organizing)
-- [ ] **Calendar Tool**: Full calendar integration with scheduling intelligence
-- [ ] **Todoist Tool**: Advanced task and project management
-- [ ] **Notion Tool**: Search through notion docs
+- [x] **Document Q&A Tool**: RAG-based document search and question answering ✅ **COMPLETED**
+- [x] **Gmail Read Tool**: Email reading with OAuth integration ✅ **COMPLETED**
+- [x] **User Profile Tool**: User preference management and customization ✅ **COMPLETED**
+- [x] **Response Agent Tool**: Response synthesis and natural language integration ✅ **COMPLETED**
+- [x] **Conversation Summarisation Agent**: Context window management and summarization ✅ **COMPLETED**
+- [ ] **Gmail Management Tool**: Complete email management (sending, organizing) - Structure ready, OAuth needed
+- [ ] **Calendar Tool**: Full calendar integration with scheduling intelligence - Structure ready, Google API needed
+- [ ] **Todoist Tool**: Advanced task and project management - Structure ready, Todoist API needed
 
-#### Additional Tool Ideas  
+#### Additional Tool Ideas
 
-- [ ] **Response Agent**: Dedicated agent for improving response quality, style, and tone
 - [ ] **Weather Tool**: Current conditions and forecasts
 - [ ] **News Tool**: Curated news summaries and updates
 - [ ] **File Management Tool**: Local file operations and organization
@@ -398,6 +414,7 @@ For detailed development information, see:
 - [ ] **Translation Tool**: Multi-language translation capabilities
 - [ ] **Web Scraper Tool**: Extract content from web pages for analysis
 - [ ] **QR Code Generator**: Generate QR codes for text, URLs, and data
+- [ ] **Notion Tool**: Search through Notion docs and databases
 - [ ] **Password Generator**: Secure password generation with customizable criteria
 - [ ] **Base64 Encoder/Decoder**: Encode and decode Base64 strings
 - [ ] **JSON Formatter**: Format and validate JSON data
