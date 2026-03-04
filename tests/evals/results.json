@@ -1,0 +1,82 @@
+{
+  "generated_at": "2026-03-04T16:34:14.651223+00:00",
+  "summary": {
+    "passed": 12,
+    "failed": 0,
+    "total": 12
+  },
+  "results": [
+    {
+      "id": "legacy_agent_removed",
+      "passed": true,
+      "description": "Legacy backend/agent module has been removed",
+      "detail": "path does not exist: backend/agent"
+    },
+    {
+      "id": "legacy_memory_removed",
+      "passed": true,
+      "description": "Legacy orchestrator memory module has been removed",
+      "detail": "path does not exist: backend/orchestrator/memory.py"
+    },
+    {
+      "id": "stray_config_removed",
+      "passed": true,
+      "description": "Stray config shim has been removed",
+      "detail": "path does not exist: backend/config/settings.py"
+    },
+    {
+      "id": "core_import_hygiene",
+      "passed": true,
+      "description": "Core orchestrator uses fully-qualified backend service imports",
+      "detail": "pattern absent"
+    },
+    {
+      "id": "search_docs_import_hygiene",
+      "passed": true,
+      "description": "Document search tool uses fully-qualified backend service imports",
+      "detail": "pattern absent"
+    },
+    {
+      "id": "docker_health_endpoint",
+      "passed": true,
+      "description": "Docker healthcheck points to versioned API health endpoint",
+      "detail": "pattern found"
+    },
+    {
+      "id": "compose_health_endpoint",
+      "passed": true,
+      "description": "Compose healthcheck points to versioned API health endpoint",
+      "detail": "pattern found"
+    },
+    {
+      "id": "setup_env_path",
+      "passed": true,
+      "description": "Setup script configures root-level .env",
+      "detail": "pattern found"
+    },
+    {
+      "id": "requirements_numpy",
+      "passed": true,
+      "description": "Core search dependency numpy is pinned",
+      "detail": "pattern found"
+    },
+    {
+      "id": "requirements_requests",
+      "passed": true,
+      "description": "Web search dependency requests is pinned",
+      "detail": "pattern found"
+    },
+    {
+      "id": "requirements_openai",
+      "passed": true,
+      "description": "Direct OpenAI client dependency is pinned",
+      "detail": "pattern found"
+    },
+    {
+      "id": "tests_readme_present",
+      "passed": true,
+      "description": "Tests README documents the scenario eval workflow",
+      "detail": "pattern found"
+    }
+  ]
+}

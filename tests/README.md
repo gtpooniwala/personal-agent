@@ -22,6 +22,16 @@ pytest tests -q
 python tests/test_comprehensive.py
 ```
 
+## Run Repository Cleanup Eval
+
+`tests/run_eval.py` is a deterministic static eval that checks core production-readiness cleanup invariants.
+
+```bash
+python tests/run_eval.py
+```
+
+It writes a machine-readable report to `tests/evals/results.json`.
+
 ## Notes
 
 - Some tests require project dependencies from `backend/requirements.txt`.

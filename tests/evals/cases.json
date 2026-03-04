@@ -1,0 +1,83 @@
+[
+  {
+    "id": "legacy_agent_removed",
+    "type": "path_absent",
+    "path": "backend/agent",
+    "description": "Legacy backend/agent module has been removed"
+  },
+  {
+    "id": "legacy_memory_removed",
+    "type": "path_absent",
+    "path": "backend/orchestrator/memory.py",
+    "description": "Legacy orchestrator memory module has been removed"
+  },
+  {
+    "id": "stray_config_removed",
+    "type": "path_absent",
+    "path": "backend/config/settings.py",
+    "description": "Stray config shim has been removed"
+  },
+  {
+    "id": "core_import_hygiene",
+    "type": "not_contains",
+    "path": "backend/orchestrator/core.py",
+    "pattern": "from services.document_service import doc_processor",
+    "description": "Core orchestrator uses fully-qualified backend service imports"
+  },
+  {
+    "id": "search_docs_import_hygiene",
+    "type": "not_contains",
+    "path": "backend/orchestrator/tools/search_documents.py",
+    "pattern": "from services.document_service import doc_processor",
+    "description": "Document search tool uses fully-qualified backend service imports"
+  },
+  {
+    "id": "docker_health_endpoint",
+    "type": "contains",
+    "path": "Dockerfile",
+    "pattern": "http://localhost:8000/api/v1/health",
+    "description": "Docker healthcheck points to versioned API health endpoint"
+  },
+  {
+    "id": "compose_health_endpoint",
+    "type": "contains",
+    "path": "docker-compose.yml",
+    "pattern": "http://localhost:8000/api/v1/health",
+    "description": "Compose healthcheck points to versioned API health endpoint"
+  },
+  {
+    "id": "setup_env_path",
+    "type": "contains",
+    "path": "setup.sh",
+    "pattern": "cp .env.example .env",
+    "description": "Setup script configures root-level .env"
+  },
+  {
+    "id": "requirements_numpy",
+    "type": "contains",
+    "path": "backend/requirements.txt",
+    "pattern": "numpy==",
+    "description": "Core search dependency numpy is pinned"
+  },
+  {
+    "id": "requirements_requests",
+    "type": "contains",
+    "path": "backend/requirements.txt",
+    "pattern": "requests==",
+    "description": "Web search dependency requests is pinned"
+  },
+  {
+    "id": "requirements_openai",
+    "type": "contains",
+    "path": "backend/requirements.txt",
+    "pattern": "openai==",
+    "description": "Direct OpenAI client dependency is pinned"
+  },
+  {
+    "id": "tests_readme_present",
+    "type": "contains",
+    "path": "tests/README.md",
+    "pattern": "Run Scenario Eval",
+    "description": "Tests README documents the scenario eval workflow"
+  }
+]

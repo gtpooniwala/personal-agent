@@ -116,10 +116,30 @@ Use these if your environment matches their assumptions.
 ## Running Tests
 
 ```bash
-python -m pytest tests -q
+python -m unittest discover -s tests -p "test_*.py"
 ```
 
-Some tests rely on API/LLM behavior and are easier to run in an environment with valid configuration.
+Optional (if you use `pytest`):
+
+```bash
+pytest tests -q
+```
+
+Some tests rely on API/LLM behavior and are easier to run in an environment with full project dependencies.
+
+## Running Evals
+
+Run the deterministic repository cleanup eval:
+
+```bash
+python tests/run_eval.py
+```
+
+Latest baseline (run on **March 4, 2026**):
+- Cases: `12`
+- Passed: `12`
+- Failed: `0`
+- Report: `tests/evals/results.json`
 
 ## API Surface
 
@@ -177,7 +197,7 @@ Design choices reflected in this implementation:
 
 - Multi-user auth + tenant isolation
 - PostgreSQL + managed vector store option
-- Stronger eval harness for tool-selection accuracy and regression checks
+- Expand eval coverage for tool-selection accuracy and regression checks
 - Observability for latency/token/tool metrics
 - Production deployment profile (secrets, health checks, structured logging)
 
