@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from backend.api import router
 from backend.config import settings
@@ -37,10 +36,14 @@ app = FastAPI(
 )
 
 # Add CORS middleware for frontend
+raw_origins = [origin.strip() for origin in settings.allowed_origins.split(",") if origin.strip()]
+allow_origins = raw_origins or ["*"]
+allow_credentials = allow_origins != ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your frontend domain
-    allow_credentials=True,
+    allow_origins=allow_origins,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -53,7 +56,7 @@ app.include_router(router, prefix="/api/v1")
 
 if __name__ == "__main__":
     uvicorn.run(
-        "main:app",
+        "backend.main:app",
         host=settings.api_host,
         port=settings.api_port,
         reload=True if settings.environment == "local" else False,

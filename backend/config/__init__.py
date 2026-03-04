@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     # API settings
     api_host: str = "127.0.0.1"
     api_port: int = 8000
+    allowed_origins: str = "http://127.0.0.1:8081,http://localhost:8081"
     
     # API keys for web search providers (optional)
     bing_api_key: Optional[str] = None

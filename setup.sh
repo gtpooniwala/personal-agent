@@ -28,10 +28,10 @@ echo "📋 Installing dependencies..."
 pip install -r backend/requirements.txt
 
 # Check if .env file exists
-if [ ! -f "backend/.env" ]; then
+if [ ! -f ".env" ]; then
     echo "⚙️  Creating environment configuration..."
-    cp backend/.env.example backend/.env
-    echo "📝 Please edit backend/.env and add your OpenAI API key:"
+    cp .env.example .env
+    echo "📝 Please edit .env and add your OpenAI API key:"
     echo "   OPENAI_API_KEY=your_api_key_here"
     echo ""
 fi
@@ -43,9 +43,10 @@ mkdir -p backend/data
 echo "✅ Setup complete!"
 echo ""
 echo "📋 Next steps:"
-echo "1. Edit backend/.env and add your OpenAI API key"
+echo "1. Edit .env and add your OpenAI API key"
 echo "2. Activate the conda environment: conda activate personalagent"
-echo "3. Start the backend: cd backend && python main.py"
-echo "4. Open frontend/index.html in your browser"
+echo "3. Start the backend: uvicorn backend.main:app --reload"
+echo "4. Start the frontend: cd frontend && python3 -m http.server 8081"
+echo "5. Open http://127.0.0.1:8081 in your browser"
 echo ""
 echo "🚀 Your Personal Agent MVP is ready to use!"
