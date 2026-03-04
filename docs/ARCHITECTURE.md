@@ -82,11 +82,10 @@ User Query → LangGraph Agent → Dynamic Route Decision (Graph-Based)
 - Pydantic-based tool validation and type safety
 - Support for document-dependent tool activation
 
-**Memory System (`backend/orchestrator/memory.py`)**
-- LangGraph-compatible memory integration
-- Conversation checkpointing and state persistence
-- Thread-based conversation management
-- Seamless integration with database operations
+**Memory System (`backend/orchestrator/core.py` + `backend/database/operations.py`)**
+- LangGraph `MemorySaver()` checkpoints for thread-scoped state
+- Conversation persistence in SQLite via database operations
+- Background summarization to keep context windows manageable
 
 **Tool Modules (`backend/orchestrator/tools/`)**
 - `calculator.py`: Mathematical expressions with Pydantic validation

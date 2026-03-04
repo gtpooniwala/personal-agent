@@ -68,8 +68,8 @@ cd personal-agent
 chmod +x setup.sh && ./setup.sh
 
 # Add your OpenAI API key
-cp backend/.env.example backend/.env
-# Edit backend/.env with your API key
+cp .env.example .env
+# Edit .env with your API key
 
 # Start the application
 ./start_server.sh

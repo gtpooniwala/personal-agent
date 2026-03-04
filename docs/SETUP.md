@@ -93,7 +93,7 @@ chmod +x start_server.sh
 ./start_server.sh
 
 # In another terminal, test the API
-curl http://localhost:8000/health
+curl http://localhost:8000/api/v1/health
 ```
 
 Expected response:
@@ -136,15 +136,7 @@ python test_basic_agent.py
 ### Advanced Configuration
 
 #### Custom AI Models
-To use custom AI models, modify `backend/config/settings.py`:
-```python
-AI_MODEL_CONFIG = {
-    "primary_model": "gpt-4",
-    "fallback_model": "gpt-3.5-turbo",
-    "max_tokens": 4000,
-    "temperature": 0.7
-}
-```
+To use custom AI model mappings, modify `backend/config/llm_config.yaml`.
 
 #### Database Configuration
 For production environments, consider using PostgreSQL:
