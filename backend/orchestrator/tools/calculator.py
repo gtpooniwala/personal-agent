@@ -2,7 +2,6 @@ from langchain.tools import BaseTool
 from pydantic import BaseModel, Field, field_validator
 from typing import Type
 import logging
-import re
 
 logger = logging.getLogger(__name__)
 

@@ -2,12 +2,10 @@
 Document processing service for PDF text extraction and chunking.
 """
 
-import os
 import uuid
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from pathlib import Path
 import PyPDF2
-from io import BytesIO
 import logging
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
