@@ -5,27 +5,36 @@ Tests that tools are only called when needed and responses are appropriate.
 Updated for CoreOrchestrator and Pydantic tool structure.
 """
 
-import sys
-import os
 import asyncio
-import logging
-from typing import Dict, List, Any, Optional
 import json
-import warnings
+import logging
+import os
+import sys
+from typing import Dict, List, Any, Optional
 
 # Add the project root to Python path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from backend.database.operations import db_ops
-from backend.orchestrator.core import CoreOrchestrator
-from backend.services.document_service import DocumentProcessor
+try:
+    from backend.database.operations import db_ops
+    from backend.orchestrator.core import CoreOrchestrator
+    from backend.services.document_service import DocumentProcessor
+except Exception:
+    db_ops = None
+    CoreOrchestrator = None
+    DocumentProcessor = None
 
 # Set up logging
 logging.basicConfig(level=logging.WARNING)  # Reduce noise
 
 class OrchestratorTester:
     def __init__(self):
+        if not all([db_ops, CoreOrchestrator, DocumentProcessor]):
+            raise RuntimeError(
+                "Required backend dependencies are unavailable. "
+                "Install project dependencies before running tests/test_comprehensive.py."
+            )
         self.orchestrator = CoreOrchestrator(user_id="test_user")
         self.doc_processor = DocumentProcessor()
         self.results = []

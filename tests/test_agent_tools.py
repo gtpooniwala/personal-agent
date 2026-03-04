@@ -1,8 +1,9 @@
-"""
-Comprehensive tests for Individual Agent Tools.
-"""
-import sys
+"""Behavioral tests for core tool modules."""
+import datetime
 import os
+import shutil
+import sys
+import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
@@ -10,286 +11,113 @@ from unittest.mock import Mock, patch
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
+AGENT_TOOL_TESTS_AVAILABLE = True
+AGENT_TOOL_IMPORT_ERROR = ""
 
-class TestAgentTools(unittest.TestCase):
-    """Test individual agent tools functionality."""
-    
+try:
+    from backend.orchestrator.tools.calculator import CalculatorInput, CalculatorTool
+    from backend.orchestrator.tools.scratchpad import ScratchpadTool
+    from backend.orchestrator.tools.time import CurrentTimeTool
+    from backend.orchestrator.tools import web_search_providers
+except Exception as exc:
+    AGENT_TOOL_TESTS_AVAILABLE = False
+    AGENT_TOOL_IMPORT_ERROR = str(exc)
+
+
+@unittest.skipUnless(
+    AGENT_TOOL_TESTS_AVAILABLE,
+    f"Agent tool test dependencies unavailable: {AGENT_TOOL_IMPORT_ERROR}"
+)
+class TestCalculatorTool(unittest.TestCase):
     def setUp(self):
-        """Set up test fixtures."""
-        self.mock_llm = Mock()
-        self.mock_llm.invoke = Mock(return_value=Mock(content="Mocked response"))
-    
-    def test_calculator_tool_structure(self):
-        """Test calculator tool has proper structure."""
-        # Expected calculator tool behavior
-        test_expressions = [
-            {"input": "2 + 2", "expected": 4},
-            {"input": "10 * 5", "expected": 50},
-            {"input": "100 / 4", "expected": 25.0}
-        ]
-        
-        for test_case in test_expressions:
-            # This simulates the calculator tool logic
-            try:
-                # Safe evaluation of mathematical expressions
-                result = eval(test_case["input"])
-                self.assertEqual(result, test_case["expected"])
-            except Exception as e:
-                self.fail(f"Calculator failed on {test_case['input']}: {e}")
-    
-    def test_search_internet_tool_structure(self):
-        """Test internet search tool structure."""
-        # Mock search results structure
-        expected_search_result = {
-            "query": "Python programming",
-            "results": [
-                {
-                    "title": "Python.org",
-                    "url": "https://python.org",
-                    "snippet": "Official Python website"
-                }
-            ]
-        }
-        
-        # Test structure validation
-        self.assertIn("query", expected_search_result)
-        self.assertIn("results", expected_search_result)
-        self.assertIsInstance(expected_search_result["results"], list)
-        
-        if expected_search_result["results"]:
-            result = expected_search_result["results"][0]
-            self.assertIn("title", result)
-            self.assertIn("url", result)
-            self.assertIn("snippet", result)
-    
-    def test_gmail_tool_structure(self):
-        """Test Gmail tool structure."""
-        # Expected Gmail tool responses
-        expected_gmail_responses = {
-            "send_email": {
-                "status": "sent",
-                "message_id": "msg_123",
-                "to": "recipient@example.com"
-            },
-            "read_emails": {
-                "emails": [
-                    {
-                        "id": "email_1",
-                        "subject": "Test Subject",
-                        "from": "sender@example.com",
-                        "date": "2025-01-01T00:00:00Z",
-                        "body": "Email content"
-                    }
-                ]
-            }
-        }
-        
-        # Test send email response structure
-        send_response = expected_gmail_responses["send_email"]
-        self.assertIn("status", send_response)
-        self.assertIn("message_id", send_response)
-        self.assertIn("to", send_response)
-        
-        # Test read emails response structure
-        read_response = expected_gmail_responses["read_emails"]
-        self.assertIn("emails", read_response)
-        self.assertIsInstance(read_response["emails"], list)
-        
-        if read_response["emails"]:
-            email = read_response["emails"][0]
-            required_fields = ["id", "subject", "from", "date", "body"]
-            for field in required_fields:
-                self.assertIn(field, email)
-    
-    def test_document_qa_tool_structure(self):
-        """Test document Q&A tool structure."""
-        # Expected document Q&A response
-        expected_qa_response = {
-            "question": "What is the main topic?",
-            "answer": "The document discusses Python programming concepts.",
-            "source_documents": [
-                {
-                    "filename": "python_guide.pdf",
-                    "page": 1,
-                    "relevance_score": 0.95
-                }
-            ]
-        }
-        
-        # Test response structure
-        self.assertIn("question", expected_qa_response)
-        self.assertIn("answer", expected_qa_response)
-        self.assertIn("source_documents", expected_qa_response)
-        
-        # Test source documents structure
-        if expected_qa_response["source_documents"]:
-            doc = expected_qa_response["source_documents"][0]
-            self.assertIn("filename", doc)
-            self.assertIn("relevance_score", doc)
-            self.assertIsInstance(doc["relevance_score"], (int, float))
-    
-    def test_current_time_tool_structure(self):
-        """Test current time tool structure."""
-        import datetime
-        
-        # Test time formatting
-        current_time = datetime.datetime.now()
-        formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
-        
-        # Should be valid datetime format
-        self.assertIsInstance(formatted_time, str)
-        self.assertGreater(len(formatted_time), 0)
-        
-        # Should be parseable back to datetime
-        try:
-            parsed_time = datetime.datetime.strptime(formatted_time, "%Y-%m-%d %H:%M:%S")
-            self.assertIsInstance(parsed_time, datetime.datetime)
-        except ValueError:
-            self.fail("Time formatting produced invalid format")
-    
-    def test_memory_tool_structure(self):
-        """Test memory tool structure."""
-        # Expected memory operations
-        memory_operations = {
-            "save": {
-                "operation": "save",
-                "key": "user_preference",
-                "value": "dark_mode",
-                "status": "saved"
-            },
-            "retrieve": {
-                "operation": "retrieve", 
-                "key": "user_preference",
-                "value": "dark_mode",
-                "found": True
-            },
-            "list": {
-                "operation": "list",
-                "keys": ["user_preference", "last_search", "settings"]
-            }
-        }
-        
-        # Test save operation structure
-        save_op = memory_operations["save"]
-        self.assertIn("operation", save_op)
-        self.assertIn("key", save_op)
-        self.assertIn("value", save_op)
-        self.assertIn("status", save_op)
-        
-        # Test retrieve operation structure
-        retrieve_op = memory_operations["retrieve"]
-        self.assertIn("operation", retrieve_op)
-        self.assertIn("key", retrieve_op)
-        self.assertIn("found", retrieve_op)
-        self.assertIsInstance(retrieve_op["found"], bool)
-        
-        # Test list operation structure
-        list_op = memory_operations["list"]
-        self.assertIn("operation", list_op)
-        self.assertIn("keys", list_op)
-        self.assertIsInstance(list_op["keys"], list)
-    
-    def test_conversation_summarisation_tool_structure(self):
-        """Test conversation summarisation tool structure."""
-        # Mock conversation history
-        conversation_history = [
-            {"role": "user", "content": "Hello, how are you?"},
-            {"role": "assistant", "content": "I'm doing well, thank you!"},
-            {"role": "user", "content": "Can you help me with Python?"},
-            {"role": "assistant", "content": "Of course! What do you need help with?"}
-        ]
-        
-        # Expected summarisation response
-        expected_summary = {
-            "original_length": len(conversation_history),
-            "summary": "User greeted and asked for Python help. Assistant responded positively.",
-            "summary_length": 65,
-            "compression_ratio": 0.8
-        }
-        
-        # Test summary structure
-        self.assertIn("original_length", expected_summary)
-        self.assertIn("summary", expected_summary)
-        self.assertIn("summary_length", expected_summary)
-        self.assertIsInstance(expected_summary["original_length"], int)
-        self.assertIsInstance(expected_summary["summary"], str)
-        self.assertGreater(len(expected_summary["summary"]), 0)
-    
-    def test_user_profile_tool_structure(self):
-        """Test user profile tool structure."""
-        # Expected user profile operations
-        profile_operations = {
-            "get_profile": {
-                "user_id": "test_user",
-                "profile": {
-                    "name": "Test User",
-                    "preferences": {
-                        "theme": "dark",
-                        "language": "en"
-                    },
-                    "created_at": "2025-01-01T00:00:00Z"
-                }
-            },
-            "update_profile": {
-                "user_id": "test_user",
-                "updated_fields": ["preferences.theme"],
-                "status": "updated"
-            }
-        }
-        
-        # Test get profile structure
-        get_profile = profile_operations["get_profile"]
-        self.assertIn("user_id", get_profile)
-        self.assertIn("profile", get_profile)
-        
-        profile = get_profile["profile"]
-        self.assertIn("name", profile)
-        self.assertIn("preferences", profile)
-        self.assertIsInstance(profile["preferences"], dict)
-        
-        # Test update profile structure
-        update_profile = profile_operations["update_profile"]
-        self.assertIn("user_id", update_profile)
-        self.assertIn("updated_fields", update_profile)
-        self.assertIn("status", update_profile)
-        self.assertIsInstance(update_profile["updated_fields"], list)
-    
-    def test_tool_error_handling_structure(self):
-        """Test that tools handle errors properly."""
-        # Expected error response structure
-        expected_error_response = {
-            "error": True,
-            "error_type": "ValidationError",
-            "message": "Invalid input provided",
-            "details": "The query parameter is required"
-        }
-        
-        # Test error structure
-        self.assertIn("error", expected_error_response)
-        self.assertIn("error_type", expected_error_response)
-        self.assertIn("message", expected_error_response)
-        self.assertTrue(expected_error_response["error"])
-        self.assertIsInstance(expected_error_response["message"], str)
-    
-    def test_tool_response_consistency(self):
-        """Test that all tools follow consistent response format."""
-        # All successful tool responses should be consistent
-        success_formats = [
-            {"status": "success", "data": {"result": "value"}},
-            {"status": "success", "result": "direct_value"},
-            {"success": True, "data": {"key": "value"}}
-        ]
-        
-        # Test that each format has some indication of success
-        for response in success_formats:
-            has_success_indicator = (
-                "status" in response and response["status"] == "success" or
-                "success" in response and response["success"] is True or
-                "error" not in response or 
-                ("error" in response and not response["error"])
-            )
-            self.assertTrue(has_success_indicator, f"Response lacks success indicator: {response}")
+        self.tool = CalculatorTool()
+
+    def test_calculator_returns_result(self):
+        result = self.tool._run("2 * (3 + 4)")
+        self.assertIn("14", result)
+
+    def test_calculator_handles_division_by_zero(self):
+        result = self.tool._run("10 / 0")
+        self.assertIn("Division by zero", result)
+
+    def test_calculator_input_validation_blocks_non_math(self):
+        with self.assertRaises(ValueError):
+            CalculatorInput(expression="2 + os.system('rm -rf /')")
 
 
-if __name__ == '__main__':
+@unittest.skipUnless(
+    AGENT_TOOL_TESTS_AVAILABLE,
+    f"Agent tool test dependencies unavailable: {AGENT_TOOL_IMPORT_ERROR}"
+)
+class TestTimeTool(unittest.TestCase):
+    def setUp(self):
+        self.tool = CurrentTimeTool()
+
+    def test_time_tool_standard_format(self):
+        result = self.tool._run(query="what time is it")
+        self.assertTrue(result.startswith("Current date and time: "))
+        timestamp = result.replace("Current date and time: ", "")
+        datetime.datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+
+    def test_time_tool_iso_format(self):
+        result = self.tool._run(query="now")
+        self.assertIn("Current date and time", result)
+
+
+@unittest.skipUnless(
+    AGENT_TOOL_TESTS_AVAILABLE,
+    f"Agent tool test dependencies unavailable: {AGENT_TOOL_IMPORT_ERROR}"
+)
+class TestScratchpadTool(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.tool = ScratchpadTool(user_id="test_user")
+        notes_dir = os.path.join(self.temp_dir, "scratchpad")
+        os.makedirs(notes_dir, exist_ok=True)
+        object.__setattr__(self.tool, "_notes_dir", self.tool._notes_dir.__class__(notes_dir))
+        object.__setattr__(self.tool, "_notes_file", self.tool._notes_file.__class__(os.path.join(notes_dir, "notes.json")))
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_scratchpad_save_and_read(self):
+        save_result = self.tool._run(action="save", content="remember this")
+        self.assertIn("Note saved", save_result)
+        read_result = self.tool._run(action="read")
+        self.assertIn("remember this", read_result)
+
+    def test_scratchpad_delete(self):
+        self.tool._run(action="save", content="temporary")
+        delete_result = self.tool._run(action="delete", note_number=1)
+        self.assertIn("Deleted note", delete_result)
+
+    def test_scratchpad_clear(self):
+        self.tool._run(action="save", content="a")
+        self.tool._run(action="save", content="b")
+        clear_result = self.tool._run(action="clear")
+        self.assertIn("Cleared all", clear_result)
+
+
+@unittest.skipUnless(
+    AGENT_TOOL_TESTS_AVAILABLE,
+    f"Agent tool test dependencies unavailable: {AGENT_TOOL_IMPORT_ERROR}"
+)
+class TestWebSearchProviders(unittest.TestCase):
+    @patch("backend.orchestrator.tools.web_search_providers.requests")
+    def test_duckduckgo_search_uses_abstract_text(self, mock_requests):
+        mock_response = Mock()
+        mock_response.json.return_value = {"AbstractText": "Result summary"}
+        mock_response.raise_for_status.return_value = None
+        mock_requests.get.return_value = mock_response
+        result = web_search_providers.duckduckgo_search("python")
+        self.assertEqual(result, "Result summary")
+
+    @patch("backend.orchestrator.tools.web_search_providers.requests")
+    def test_provider_returns_none_on_request_error(self, mock_requests):
+        mock_requests.get.side_effect = Exception("network down")
+        result = web_search_providers.bing_search("python", "test-key")
+        self.assertIsNone(result)
+
+
+if __name__ == "__main__":
     unittest.main()

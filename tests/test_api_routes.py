@@ -1,219 +1,105 @@
-"""
-Comprehensive tests for API Routes functionality.
-"""
-import sys
+"""API route tests against the FastAPI app with mocked dependencies."""
 import os
+import sys
 import unittest
-from unittest.mock import Mock, patch, AsyncMock
-import json
+from unittest.mock import AsyncMock, patch
+
+os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")
 
 # Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
+API_TESTS_AVAILABLE = True
+API_IMPORT_ERROR = ""
 
+try:
+    from fastapi.testclient import TestClient
+    from backend.api import routes
+    from backend.main import app
+except Exception as exc:
+    API_TESTS_AVAILABLE = False
+    API_IMPORT_ERROR = str(exc)
+
+
+@unittest.skipUnless(API_TESTS_AVAILABLE, f"API test dependencies unavailable: {API_IMPORT_ERROR}")
 class TestAPIRoutes(unittest.TestCase):
-    """Test the API routes functionality."""
-    
     def setUp(self):
-        """Set up test fixtures."""
-        # Mock FastAPI app and dependencies
-        self.mock_orchestrator = Mock()
-        self.mock_request_data = {
-            "message": "Hello, how are you?",
-            "conversation_id": "test_conv_123"
+        self.client = TestClient(app)
+
+    def test_health_endpoint(self):
+        response = self.client.get("/api/v1/health")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "healthy")
+        self.assertEqual(payload["version"], "1.0.0")
+        self.assertIn("timestamp", payload)
+
+    @patch("backend.api.routes.orchestrator.process_request", new_callable=AsyncMock)
+    def test_chat_endpoint(self, mock_process_request):
+        mock_process_request.return_value = {
+            "response": "hello",
+            "conversation_id": "conv-1",
+            "orchestration_actions": [{"tool": "calculator", "input": "2+2", "output": "4"}],
+            "token_usage": 42,
+            "cost": 0.001,
         }
-    
-    def test_chat_endpoint_structure(self):
-        """Test that chat endpoint has proper structure."""
-        # This tests the expected API structure without requiring FastAPI
-        expected_response = {
-            "response": "I'm doing well, thank you!",
-            "conversation_id": "test_conv_123",
-            "actions": None
-        }
-        
-        # Mock orchestrator response
-        self.mock_orchestrator.process_request.return_value = expected_response
-        
-        # Simulate endpoint logic
-        message = self.mock_request_data["message"]
-        conversation_id = self.mock_request_data.get("conversation_id")
-        
-        response = self.mock_orchestrator.process_request(message, conversation_id)
-        
-        self.assertIn("response", response)
-        self.assertIn("conversation_id", response)
-        self.assertEqual(response["conversation_id"], "test_conv_123")
-    
-    def test_conversations_endpoint_structure(self):
-        """Test conversations endpoint structure."""
-        expected_conversations = [
+        response = self.client.post(
+            "/api/v1/chat",
+            json={"message": "hi", "conversation_id": "conv-1", "selected_documents": []},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["response"], "hello")
+        self.assertEqual(payload["conversation_id"], "conv-1")
+        self.assertEqual(payload["token_usage"], 42)
+
+    @patch("backend.api.routes.orchestrator.get_conversations")
+    @patch("backend.api.routes.check_conversation_maintenance")
+    def test_get_conversations_endpoint(self, mock_maintenance, mock_get_conversations):
+        mock_get_conversations.return_value = [
             {
-                "id": "conv1",
-                "title": "Test Conversation",
-                "created_at": "2025-01-01T00:00:00Z",
-                "updated_at": "2025-01-01T00:01:00Z"
+                "id": "conv-1",
+                "title": "Test",
+                "created_at": "2025-01-01T00:00:00",
+                "updated_at": "2025-01-01T00:00:00",
+                "message_count": 2,
             }
         ]
-        
-        self.mock_orchestrator.get_conversations.return_value = expected_conversations
-        
-        conversations = self.mock_orchestrator.get_conversations()
-        
-        self.assertIsInstance(conversations, list)
-        if conversations:
-            self.assertIn("id", conversations[0])
-            self.assertIn("title", conversations[0])
-    
-    def test_create_conversation_endpoint_structure(self):
-        """Test create conversation endpoint structure."""
-        create_data = {"title": "New Conversation"}
-        expected_response = {"conversation_id": "new_conv_456"}
-        
-        self.mock_orchestrator.create_conversation.return_value = "new_conv_456"
-        
-        # Simulate endpoint logic
-        title = create_data["title"]
-        conv_id = self.mock_orchestrator.create_conversation(title)
-        response = {"conversation_id": conv_id}
-        
-        self.assertEqual(response, expected_response)
-    
-    def test_tools_endpoint_structure(self):
-        """Test tools endpoint structure."""
-        expected_tools = [
-            {
-                "name": "search_internet",
-                "description": "Search the internet for information",
-                "parameters": {"query": "string"}
-            },
-            {
-                "name": "calculator",
-                "description": "Perform mathematical calculations", 
-                "parameters": {"expression": "string"}
-            }
-        ]
-        
-        self.mock_orchestrator.get_available_tools.return_value = expected_tools
-        
-        tools = self.mock_orchestrator.get_available_tools()
-        
-        self.assertIsInstance(tools, list)
-        if tools:
-            self.assertIn("name", tools[0])
-            self.assertIn("description", tools[0])
-    
-    def test_upload_document_endpoint_structure(self):
-        """Test document upload endpoint structure."""
-        # Mock file upload
-        mock_file = Mock()
-        mock_file.filename = "test_document.pdf"
-        mock_file.content_type = "application/pdf"
-        
-        expected_response = {
-            "file_id": "file_123",
-            "filename": "test_document.pdf",
-            "status": "uploaded"
-        }
-        
-        # This would be the logic in the actual endpoint
-        file_id = "file_123"
-        response = {
-            "file_id": file_id,
-            "filename": mock_file.filename,
-            "status": "uploaded"
-        }
-        
-        self.assertEqual(response, expected_response)
-    
-    def test_error_handling_structure(self):
-        """Test error handling structure."""
-        # Test various error scenarios
-        error_cases = [
-            {
-                "error": "ValidationError",
-                "message": "Invalid request format",
-                "status_code": 400
-            },
-            {
-                "error": "NotFoundError", 
-                "message": "Conversation not found",
-                "status_code": 404
-            },
-            {
-                "error": "InternalServerError",
-                "message": "An internal error occurred",
-                "status_code": 500
-            }
-        ]
-        
-        for error_case in error_cases:
-            self.assertIn("error", error_case)
-            self.assertIn("message", error_case)
-            self.assertIn("status_code", error_case)
-            self.assertIsInstance(error_case["status_code"], int)
-    
-    def test_cors_headers_structure(self):
-        """Test CORS headers are properly structured."""
-        expected_cors_headers = {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization"
-        }
-        
-        # This would be applied by CORS middleware
-        for header, value in expected_cors_headers.items():
-            self.assertIsInstance(header, str)
-            self.assertIsInstance(value, str)
-            self.assertTrue(header.startswith("Access-Control-"))
-    
-    def test_request_validation_structure(self):
-        """Test request validation structure."""
-        # Test required fields validation
-        chat_request_schema = {
-            "required_fields": ["message"],
-            "optional_fields": ["conversation_id"],
-            "field_types": {
-                "message": str,
-                "conversation_id": str
-            }
-        }
-        
-        # Validate required fields exist
-        for field in chat_request_schema["required_fields"]:
-            self.assertIn(field, ["message"])
-        
-        # Validate field types are correct
-        for field, expected_type in chat_request_schema["field_types"].items():
-            self.assertIn(expected_type, [str, int, float, bool, list, dict])
-    
-    def test_response_format_consistency(self):
-        """Test that all responses follow consistent format."""
-        # All successful responses should have consistent structure
-        success_responses = [
-            {"status": "success", "data": {"response": "Hello"}},
-            {"status": "success", "data": {"conversations": []}},
-            {"status": "success", "data": {"tools": []}}
-        ]
-        
-        for response in success_responses:
-            self.assertIn("status", response)
-            self.assertEqual(response["status"], "success")
-            self.assertIn("data", response)
-        
-        # All error responses should have consistent structure
-        error_responses = [
-            {"status": "error", "error": "ValidationError", "message": "Invalid input"},
-            {"status": "error", "error": "NotFound", "message": "Resource not found"}
-        ]
-        
-        for response in error_responses:
-            self.assertIn("status", response)
-            self.assertEqual(response["status"], "error")
-            self.assertIn("error", response)
-            self.assertIn("message", response)
+        response = self.client.get("/api/v1/conversations")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload), 1)
+        self.assertEqual(payload[0]["id"], "conv-1")
+        mock_maintenance.assert_called_once()
+
+    def test_upload_document_rejects_non_pdf(self):
+        response = self.client.post(
+            "/api/v1/documents/upload",
+            files={"file": ("note.txt", b"hello", "text/plain")},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Only PDF files are supported", response.text)
+
+    @patch("backend.api.routes.doc_processor.process_pdf_upload", new_callable=AsyncMock)
+    def test_upload_document_success(self, mock_process_pdf_upload):
+        mock_process_pdf_upload.return_value = "doc-123"
+        response = self.client.post(
+            "/api/v1/documents/upload",
+            files={"file": ("sample.pdf", b"%PDF-1.4 mock", "application/pdf")},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["document_id"], "doc-123")
+        self.assertEqual(payload["filename"], "sample.pdf")
+        self.assertEqual(payload["status"], "processing")
+
+    @patch("backend.api.routes.doc_processor.delete_document")
+    def test_delete_document_not_found(self, mock_delete_document):
+        mock_delete_document.return_value = False
+        response = self.client.delete("/api/v1/documents/missing-doc")
+        self.assertEqual(response.status_code, 404)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

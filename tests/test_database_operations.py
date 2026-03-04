@@ -5,17 +5,25 @@ import sys
 import os
 import unittest
 from datetime import datetime
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 # Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from backend.database.models import Base
-from backend.database.operations import DatabaseOperations
+DB_TESTS_AVAILABLE = True
+DB_IMPORT_ERROR = ""
+
+try:
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from backend.database.models import Base
+    from backend.database.operations import DatabaseOperations
+except Exception as exc:
+    DB_TESTS_AVAILABLE = False
+    DB_IMPORT_ERROR = str(exc)
 
 
+@unittest.skipUnless(DB_TESTS_AVAILABLE, f"Database test dependencies unavailable: {DB_IMPORT_ERROR}")
 class TestDatabaseOperations(unittest.TestCase):
     """Test the database operations functionality."""
     
