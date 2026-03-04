@@ -104,7 +104,7 @@ class SearchDocumentsTool(BaseTool):
                 return "No documents are currently selected. Please select one or more documents to enable document search."
             
             # Import here to avoid circular imports
-            from services.document_service import doc_processor
+            from backend.services.document_service import doc_processor
             
             # Perform document search with dynamic chunk limit
             selected_docs = self._selected_documents if len(self._selected_documents) > 0 else None
@@ -172,7 +172,7 @@ class SearchDocumentsTool(BaseTool):
             if len(self._selected_documents) == 0:
                 return "No documents are currently selected. Please select one or more documents to enable document search."
             
-            from services.document_service import doc_processor
+            from backend.services.document_service import doc_processor
             
             # Perform async document search
             selected_docs = self._selected_documents if len(self._selected_documents) > 0 else None

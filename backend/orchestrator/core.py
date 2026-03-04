@@ -392,7 +392,7 @@ Title:"""
         """
         try:
             # Import here to avoid circular imports
-            from services.document_service import doc_processor
+            from backend.services.document_service import doc_processor
             
             # Get document context for the current user
             selected_docs = self.tool_registry.selected_documents if hasattr(self.tool_registry, 'selected_documents') else []

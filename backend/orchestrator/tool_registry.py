@@ -1,14 +1,12 @@
-from typing import Dict, List, Type, Any, Optional
+from typing import Dict, List, Any, Optional
 from .tools.calculator import CalculatorTool
 from .tools.time import CurrentTimeTool
 from .tools.search_documents import SearchDocumentsTool
 from .tools.scratchpad import ScratchpadTool
-from .tools.integrations import GmailTool, CalendarTool, TodoistTool
 from .tools.response_agent import ResponseAgentTool
 from .tools.gmail import GmailReadTool
 from .tools.user_profile import UserProfileTool
 from .tools.summarisation_agent import SummarisationAgent
-from backend.database.operations import db_ops
 from backend.orchestrator.tools.internet_search import InternetSearchTool
 import logging
 
