@@ -15,6 +15,7 @@ python-dotenv==1.0.1
 # Data validation and settings
 pydantic==2.7.2
 pydantic-settings==2.3.0
+PyYAML==6.0.2
 
 # Database
 sqlalchemy==2.0.30
@@ -23,6 +24,8 @@ sqlalchemy==2.0.30
 aiofiles==23.2.1
 python-multipart>=0.0.7
 
-# PDF processing and vector storage for document Q&A
+# PDF processing and document search
 PyPDF2==3.0.1
-faiss-cpu==1.7.4
+numpy==2.2.3
+openai==1.63.2
+requests==2.32.3

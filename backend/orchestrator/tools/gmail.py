@@ -1,16 +1,17 @@
 import os
 import pickle
-from typing import Optional
-from google.auth.transport.requests import Request
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
 from langchain.tools import BaseTool
 
 GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
-# Use the correct path for credentials and token
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
-CREDENTIALS_PATH = os.path.join(BASE_DIR, "backend/data/gmail/client_secret_978811794429-sjaaqdpeg0psga3k6afpm4gvl64tqlal.apps.googleusercontent.com.json")
-TOKEN_PATH = os.path.join(BASE_DIR, "backend/data/gmail/token.pickle")
+CREDENTIALS_PATH = os.environ.get(
+    "GMAIL_CREDENTIALS_PATH",
+    os.path.join(BASE_DIR, "backend/data/gmail/client_secret.json")
+)
+TOKEN_PATH = os.environ.get(
+    "GMAIL_TOKEN_PATH",
+    os.path.join(BASE_DIR, "backend/data/gmail/token.pickle")
+)
 
 class GmailReadTool(BaseTool):
     """
@@ -39,6 +40,22 @@ class GmailReadTool(BaseTool):
     )
 
     def _run(self, **kwargs):
+        try:
+            from google.auth.transport.requests import Request
+            from google_auth_oauthlib.flow import InstalledAppFlow
+            from googleapiclient.discovery import build
+        except ImportError:
+            return (
+                "Gmail integration dependencies are not installed. "
+                "Install `google-auth`, `google-auth-oauthlib`, and `google-api-python-client` to use this tool."
+            )
+
+        if not os.path.exists(CREDENTIALS_PATH):
+            return (
+                "Gmail credentials file not found. "
+                "Set GMAIL_CREDENTIALS_PATH or place a client secret file at backend/data/gmail/client_secret.json."
+            )
+
         creds = None
         # Load token if it exists
         if os.path.exists(TOKEN_PATH):
