@@ -7,6 +7,10 @@ on:
     branches-ignore:
       - main
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   test-and-eval:
     name: test-and-eval
