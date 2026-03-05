@@ -45,3 +45,7 @@ Status values: `todo`, `in_progress`, `done`, `blocked`.
 ## Notes
 - This file is now synced to live issue tracking.
 - If GitHub Project board access is added later, these issues can be batch-imported to that board.
+- Implementation process is enforced via:
+  - [`ENGINEERING_WORKFLOW.md`](ENGINEERING_WORKFLOW.md)
+  - CI checks in `.github/workflows/`
+  - PR template requiring issue-closing keywords

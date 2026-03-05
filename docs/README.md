@@ -13,6 +13,7 @@ Comprehensive documentation for the Personal Agent MVP - an intelligent AI assis
 ### 🚀 **Setup & Development**
 - [`SETUP.md`](SETUP.md) - Installation and setup instructions
 - [`DEVELOPMENT_GUIDE.md`](DEVELOPMENT_GUIDE.md) - Development workflow and guidelines
+- [`ENGINEERING_WORKFLOW.md`](ENGINEERING_WORKFLOW.md) - Branch/worktree/PR/merge policy for Codex + Claude
 - [`API.md`](API.md) - API reference and endpoint documentation
 - [`TESTING.md`](TESTING.md) - Testing framework and guidelines
 
