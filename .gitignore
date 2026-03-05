@@ -148,6 +148,13 @@ backend/test_results.json
 *.swo
 *.pid
 *.seed
+*.out
+*.err
+*~
+/=
+/.worktrees/
+.direnv/
+.envrc
 
 # Editor/IDE artifacts
 .idea/

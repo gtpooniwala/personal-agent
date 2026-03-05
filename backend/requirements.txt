@@ -1,10 +1,10 @@
 # LangGraph and LangChain dependencies (upgraded for LangGraph compatibility)
-langchain==0.3.13
+langchain==0.3.15
 langchain-openai==0.3.7
 langchain-community==0.3.15
 langchain-text-splitters==0.3.5
 langgraph==0.2.70
-langgraph-checkpoint==2.0.5
+langgraph-checkpoint==2.0.10
 langgraph-prebuilt==0.2.3
 
 # FastAPI and web server
@@ -13,8 +13,8 @@ uvicorn[standard]==0.30.0
 python-dotenv==1.0.1
 
 # Data validation and settings
-pydantic==2.7.2
-pydantic-settings==2.3.0
+pydantic==2.7.4
+pydantic-settings==2.4.0
 PyYAML==6.0.2
 
 # Database
@@ -26,6 +26,6 @@ python-multipart>=0.0.7
 
 # PDF processing and document search
 PyPDF2==3.0.1
-numpy==2.2.3
+numpy==1.26.4
 openai==1.63.2
 requests==2.32.3
