@@ -16,6 +16,12 @@ Comprehensive documentation for the Personal Agent MVP - an intelligent AI assis
 - [`API.md`](API.md) - API reference and endpoint documentation
 - [`TESTING.md`](TESTING.md) - Testing framework and guidelines
 
+### 🗂️ **Execution Tracking**
+- [`PROJECT_STATUS.md`](PROJECT_STATUS.md) - Current implementation status and confidence snapshot
+- [`WORKBOARD.md`](WORKBOARD.md) - AI execution board (`Now` / `Next` / `Later` / `Done`)
+- [`ROADMAP.md`](ROADMAP.md) - Sequenced improvement and feature roadmap
+- [`SUGGESTED_CHANGES.md`](SUGGESTED_CHANGES.md) - Pre-issue backlog of suggested fixes and feature ideas
+
 ### 🔧 **Features & Tools**
 - [`features/`](features/) - Detailed documentation for each system feature
   - [Conversation Summarization](features/conversation_summarisation.md)
