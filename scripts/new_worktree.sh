@@ -21,6 +21,18 @@ if ! [[ "$ISSUE" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
+# Restrict free-form path/branch components to safe characters only.
+# This prevents path traversal and unexpected branch structures.
+if ! [[ "$TYPE" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+  echo "Type must match: ^[a-z0-9][a-z0-9-]*$"
+  exit 1
+fi
+
+if ! [[ "$SLUG" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+  echo "Slug must match: ^[a-z0-9][a-z0-9-]*$"
+  exit 1
+fi
+
 git fetch origin
 git checkout main
 git pull --rebase origin main
