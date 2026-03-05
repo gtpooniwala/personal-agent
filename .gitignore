@@ -137,3 +137,21 @@ logs/
 test_results.json
 backend/test_results.json
 .DS_Store
+
+# Temporary files and local artifacts
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+*.swp
+*.swo
+*.pid
+*.seed
+
+# Editor/IDE artifacts
+.idea/
+.vscode/
+
+# OS-specific artifacts
+Thumbs.db
