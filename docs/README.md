@@ -21,6 +21,7 @@ Comprehensive documentation for the Personal Agent MVP - an intelligent AI assis
 - [`WORKBOARD.md`](WORKBOARD.md) - AI execution board (`Now` / `Next` / `Later` / `Done`)
 - [`ROADMAP.md`](ROADMAP.md) - Sequenced improvement and feature roadmap
 - [`SUGGESTED_CHANGES.md`](SUGGESTED_CHANGES.md) - Pre-issue backlog of suggested fixes and feature ideas
+- GitHub issue tracker: [Repository Issues](https://github.com/gtpooniwala/personal-agent/issues)
 
 ### 🔧 **Features & Tools**
 - [`features/`](features/) - Detailed documentation for each system feature

@@ -46,3 +46,10 @@ Success criteria:
 - Better long-term memory controls (review/edit/delete profile facts).
 - Citation-grade RAG responses with source snippet controls.
 - Voice input/output and multimodal document ingestion.
+
+## Execution Mapping (GitHub)
+- Foundation hardening milestone: [01 Foundation Hardening](https://github.com/gtpooniwala/personal-agent/milestone/1)
+- Runtime migration core milestone: [02 Runtime Migration Core](https://github.com/gtpooniwala/personal-agent/milestone/2)
+- Workflow automation milestone: [03 Workflow Automation](https://github.com/gtpooniwala/personal-agent/milestone/3)
+- Future backlog milestone: [Backlog / Future](https://github.com/gtpooniwala/personal-agent/milestone/4)
+- Core migration issue set: [#14](https://github.com/gtpooniwala/personal-agent/issues/14), [#15](https://github.com/gtpooniwala/personal-agent/issues/15), [#16](https://github.com/gtpooniwala/personal-agent/issues/16), [#17](https://github.com/gtpooniwala/personal-agent/issues/17), [#18](https://github.com/gtpooniwala/personal-agent/issues/18), [#19](https://github.com/gtpooniwala/personal-agent/issues/19)

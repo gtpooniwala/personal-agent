@@ -10,6 +10,7 @@ Single source of truth for current implementation status, known risks, and execu
 - Static eval: `tests/run_eval.py` passing (`12/12` on March 5, 2026)
 - Unit test suite: present, but local run currently dependency-gated in bare environments
 - Runtime profile: local-first FastAPI + LangGraph + SQLite + vanilla JS frontend
+- Tracking system: GitHub labels + milestones + prioritized issue backlog established (`#7`-`#19` plus existing `#1`-`#6`)
 
 ## Implemented Features
 | Area | Feature | Status | Confidence |
@@ -45,3 +46,4 @@ Confidence rubric:
 - Execution board: [`WORKBOARD.md`](WORKBOARD.md)
 - Sequenced roadmap: [`ROADMAP.md`](ROADMAP.md)
 - Atomic tasks: GitHub Issues
+- Suggested changes index: [`SUGGESTED_CHANGES.md`](SUGGESTED_CHANGES.md)

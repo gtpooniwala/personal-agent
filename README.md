@@ -211,6 +211,7 @@ Design choices reflected in this implementation:
 - [Workboard](docs/WORKBOARD.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Suggested Changes Tracker](docs/SUGGESTED_CHANGES.md)
+- [GitHub Issues](https://github.com/gtpooniwala/personal-agent/issues)
 
 ## License
 
