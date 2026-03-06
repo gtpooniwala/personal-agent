@@ -78,6 +78,11 @@ class TestLangchainMigrationSource(unittest.TestCase):
             "pydantic-settings": "2.13.1",
             "numpy": "2.4.2",
             "sqlalchemy": "2.0.48",
+            "fastapi": "0.135.1",
+            "uvicorn[standard]": "0.41.0",
+            "python-dotenv": "1.2.2",
+            "aiofiles": "25.1.0",
+            "pypdf": "6.7.5",
         }
         for package, version in expected_versions.items():
             self.assertIn(

@@ -1,7 +1,6 @@
 from sqlalchemy import Column, String, DateTime, Text, Integer, ForeignKey, LargeBinary
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
-from datetime import datetime
+from sqlalchemy.orm import relationship, declarative_base
+from datetime import datetime, timezone
 import uuid
 
 Base = declarative_base()
@@ -12,14 +11,19 @@ def generate_id():
     return str(uuid.uuid4())
 
 
+def utcnow():
+    """Timezone-aware UTC timestamp helper (avoids deprecated utcnow())."""
+    return datetime.now(timezone.utc)
+
+
 class Conversation(Base):
     """Conversation model for storing chat sessions."""
     __tablename__ = "conversations"
     
     id = Column(String, primary_key=True, default=generate_id)
     title = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
     user_id = Column(String, default="default")  # For future multi-user support
     
     # Relationship to messages
@@ -35,7 +39,7 @@ class Message(Base):
     conversation_id = Column(String, ForeignKey("conversations.id"), nullable=False)
     role = Column(String, nullable=False)  # 'user', 'assistant', 'system'
     content = Column(Text, nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime(timezone=True), default=utcnow)
     
     # Agent-specific fields for transparency
     agent_actions = Column(Text, nullable=True)  # JSON string of agent actions
@@ -53,7 +57,7 @@ class MemoryStore(Base):
     conversation_id = Column(String, ForeignKey("conversations.id"), nullable=False)
     key = Column(String, nullable=False)
     value = Column(Text, nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime(timezone=True), default=utcnow)
     
     # Relationship to conversation
     conversation = relationship("Conversation", back_populates="memory_entries")
@@ -68,7 +72,7 @@ class Document(Base):
     original_filename = Column(String, nullable=False)
     file_size = Column(Integer, nullable=False)
     content_type = Column(String, nullable=False, default="application/pdf")
-    upload_date = Column(DateTime, default=datetime.utcnow)
+    upload_date = Column(DateTime(timezone=True), default=utcnow)
     user_id = Column(String, default="default")  # For future multi-user support
     
     # Document processing status
@@ -96,7 +100,7 @@ class DocumentChunk(Base):
     embedding = Column(LargeBinary, nullable=True)
     embedding_model = Column(String, default="text-embedding-ada-002")
     
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
     
     # Relationship to document
     document = relationship("Document", back_populates="chunks")

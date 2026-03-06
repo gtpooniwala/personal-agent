@@ -5,7 +5,7 @@ Document processing service for PDF text extraction and chunking.
 import uuid
 from typing import List, Dict, Any, Optional
 from pathlib import Path
-import PyPDF2
+from pypdf import PdfReader
 import logging
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -191,7 +191,7 @@ class DocumentProcessor:
             text_content = []
             
             with open(file_path, 'rb') as file:
-                pdf_reader = PyPDF2.PdfReader(file)
+                pdf_reader = PdfReader(file)
                 
                 for page_num, page in enumerate(pdf_reader.pages):
                     try:
