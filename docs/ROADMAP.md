@@ -8,8 +8,8 @@ Move from strong prototype to production-ready personal AI agent with reliable b
 Current high-priority execution objective: implement and validate the async run model (`#15`-`#17`) now that migration design and prerequisite upgrades are complete (`#14`, `#22`, `#23`).
 
 ## Now (Stabilize Core)
-- Complete in-flight Foundation Hardening work (`#10`, `#11`, `#12`) and land Gmail reliability follow-up (`#40`).
-- Implement durable run lifecycle schema + async submission/status/event contracts (`#15`, `#17`).
+- Foundation hardening baseline is complete (`#10`, `#11`, `#12`, `#13`); land Gmail reliability follow-up (`#40`).
+- Active implementation lane is durable run lifecycle schema + async submission/status/event contracts (`#15`, `#17`).
 - Sequence worker execution and per-session serialization after data contract freeze (`#16`).
 - Address active frontend send correctness risk (`#31`) and IME Enter handling (`#30`).
 
@@ -23,7 +23,7 @@ Success criteria:
 - Add runtime eval coverage for lifecycle transitions, retries, and session isolation (`#19`).
 - Add scheduler/heartbeat primitives for autonomous workflows after core runtime stabilizes (`#18`).
 - Resolve async-path follow-up correctness/cleanup items (`#28`, `#29`).
-- Continue integration ergonomics and cleanup after foundation follow-ups settle (`#40`, then frontend polish).
+- Continue integration ergonomics and cleanup after migration core and Gmail follow-up settle (`#40`, then frontend polish).
 
 Success criteria:
 - Machine-readable runtime eval report with CI-friendly pass/fail signals.

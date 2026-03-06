@@ -19,11 +19,9 @@ Workflow:
 - `done`
 
 ## Now
-- [ ] `in_progress` Make local test workflow runnable and reduce skip-only passes ([#10](https://github.com/gtpooniwala/personal-agent/issues/10))
-- [ ] `in_progress` Add baseline observability and core runtime counters ([#11](https://github.com/gtpooniwala/personal-agent/issues/11))
-- [ ] `in_progress` Make Gmail tool optional in active tool list unless configured ([#12](https://github.com/gtpooniwala/personal-agent/issues/12))
 - [ ] `todo` Fix Gmail auth flow and dependency packaging ([#40](https://github.com/gtpooniwala/personal-agent/issues/40))
-- [ ] `todo` Start migration core implementation sequence from `Migration Track` (`#15` + `#17`, then `#16`)
+- [ ] `in_progress` Add run lifecycle schema (`runs`, `run_events`, `leases`) ([#15](https://github.com/gtpooniwala/personal-agent/issues/15))
+- [ ] `in_progress` Deliver async submission contracts for `/chat` and `/runs` plus status/events endpoints ([#17](https://github.com/gtpooniwala/personal-agent/issues/17))
 
 ## Next
 - [ ] `todo` Prevent cross-conversation message race on send ([#31](https://github.com/gtpooniwala/personal-agent/issues/31))
@@ -31,8 +29,8 @@ Workflow:
 
 ## Migration Track
 - [x] `done` Publish migration architecture contract + PR decomposition for long-running runtime ([#14](https://github.com/gtpooniwala/personal-agent/issues/14))
-- [ ] `todo` Add run lifecycle schema (`runs`, `run_events`, `leases`) ([#15](https://github.com/gtpooniwala/personal-agent/issues/15))
-- [ ] `todo` Deliver async submission contracts for `/chat` and `/runs` plus status/events endpoints ([#17](https://github.com/gtpooniwala/personal-agent/issues/17))
+- [ ] `in_progress` Add run lifecycle schema (`runs`, `run_events`, `leases`) ([#15](https://github.com/gtpooniwala/personal-agent/issues/15))
+- [ ] `in_progress` Deliver async submission contracts for `/chat` and `/runs` plus status/events endpoints ([#17](https://github.com/gtpooniwala/personal-agent/issues/17))
 - [ ] `todo` Implement runtime worker queue with per-session serialization ([#16](https://github.com/gtpooniwala/personal-agent/issues/16))
 - [ ] `todo` Add scheduler/heartbeat for autonomous workflows ([#18](https://github.com/gtpooniwala/personal-agent/issues/18))
 - [ ] `todo` Add runtime evals for lifecycle/retry/session isolation ([#19](https://github.com/gtpooniwala/personal-agent/issues/19))
@@ -57,6 +55,9 @@ Execution sequence after #14:
 - [x] `done` Replace calculator `eval` with safe parser/evaluator ([#7](https://github.com/gtpooniwala/personal-agent/issues/7))
 - [x] `done` Remove XSS-prone `innerHTML` rendering in chat/conversation/document UIs ([#8](https://github.com/gtpooniwala/personal-agent/issues/8))
 - [x] `done` Fix upload error path referencing uninitialized `document_id` ([#9](https://github.com/gtpooniwala/personal-agent/issues/9))
+- [x] `done` Make local test workflow runnable and reduce skip-only passes ([#10](https://github.com/gtpooniwala/personal-agent/issues/10))
+- [x] `done` Add baseline observability and core runtime counters ([#11](https://github.com/gtpooniwala/personal-agent/issues/11))
+- [x] `done` Make Gmail tool optional in active tool list unless configured ([#12](https://github.com/gtpooniwala/personal-agent/issues/12))
 - [x] `done` Cleanup frontend rough edges and duplicate utility logic ([#13](https://github.com/gtpooniwala/personal-agent/issues/13))
 - [x] `done` Publish migration architecture contract + PR decomposition ([#14](https://github.com/gtpooniwala/personal-agent/issues/14))
 - [x] `done` Enforce branch/worktree/PR policy checks ([#20](https://github.com/gtpooniwala/personal-agent/issues/20))
