@@ -115,6 +115,7 @@ uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 
 ```bash
 cd frontend
+cp .env.example .env.local
 npm install
 npm run dev
 ```
@@ -135,7 +136,7 @@ Run both services together:
 
 ```bash
 cp .env.example .env
-# Set OPENAI_API_KEY in .env
+# Set GEMINI_API_KEY and NEXT_PUBLIC_API_BASE_URL in .env
 docker compose up --build
 ```
 

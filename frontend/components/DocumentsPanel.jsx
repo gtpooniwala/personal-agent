@@ -1,25 +1,8 @@
 import { formatFileSize, formatRelativeTime, truncateText } from "@/lib/formatters";
 
-function RagStatus({ ragEnabled, selectedCount }) {
-  if (!ragEnabled) {
-    return <p className="rag-status rag-disabled">Document search disabled</p>;
-  }
-
-  if (selectedCount === 0) {
-    return <p className="rag-status rag-idle">Document search enabled • No files selected</p>;
-  }
-
-  return (
-    <p className="rag-status rag-active">
-      Document search enabled • {selectedCount} file{selectedCount > 1 ? "s" : ""} selected
-    </p>
-  );
-}
-
 export default function DocumentsPanel({
   documents,
   selectedDocuments,
-  ragEnabled,
   isLoading,
   error,
   isUploading,
@@ -27,7 +10,6 @@ export default function DocumentsPanel({
   isCollapsed,
   isDragActive,
   onToggleCollapse,
-  onToggleRag,
   onOpenFilePicker,
   onFileSelect,
   onDragEnter,
@@ -57,19 +39,11 @@ export default function DocumentsPanel({
             <p className="eyebrow">Knowledge</p>
             <h2>Documents</h2>
           </div>
-
-          <section className="rag-controls">
-            <div className="rag-toggle-row">
-              <label htmlFor="rag-enabled">Enable document search</label>
-              <input
-                id="rag-enabled"
-                type="checkbox"
-                checked={ragEnabled}
-                onChange={(event) => onToggleRag(event.target.checked)}
-              />
-            </div>
-            <RagStatus ragEnabled={ragEnabled} selectedCount={selectedCount} />
-          </section>
+          <p className="panel-note docs-selection-note">
+            {selectedCount > 0
+              ? `${selectedCount} selected file${selectedCount > 1 ? "s" : ""} will be used for document search.`
+              : "Select files below to use document search in chat."}
+          </p>
 
           <button
             type="button"

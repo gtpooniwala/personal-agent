@@ -14,8 +14,7 @@ Create `frontend/.env.local`:
 ```bash
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000/api/v1
 ```
-
-If omitted, the app defaults to `http://127.0.0.1:8000/api/v1`.
+This value is required.
 
 ## Run
 

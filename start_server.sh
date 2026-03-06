@@ -33,7 +33,7 @@ PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 # Open backend server in new Terminal window
 osascript <<END
   tell application "Terminal"
-    do script "cd $PROJECT_ROOT; source ~/.zshrc; conda activate personalagent; uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
+    do script "cd \"$PROJECT_ROOT\"; source ~/.zshrc; conda activate personalagent; uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
     activate
   end tell
 END
@@ -43,7 +43,7 @@ echo "✅ Backend server started in a new Terminal window."
 # Open frontend Next.js dev server in new Terminal window
 osascript <<END
   tell application "Terminal"
-    do script "cd $PROJECT_ROOT/frontend; if [ ! -d node_modules ]; then npm install; fi; npm run dev"
+    do script "cd \"$PROJECT_ROOT/frontend\"; if [ ! -d node_modules ]; then npm install; fi; npm run dev"
     activate
   end tell
 END

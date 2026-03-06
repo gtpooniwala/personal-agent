@@ -32,7 +32,6 @@ export default function HomePage() {
   const [documents, setDocuments] = useState([]);
 
   const [selectedDocuments, setSelectedDocuments] = useState(() => new Set());
-  const [ragEnabled, setRagEnabled] = useState(true);
 
   const [messageInput, setMessageInput] = useState("");
 
@@ -378,7 +377,6 @@ export default function HomePage() {
       <DocumentsPanel
         documents={documents}
         selectedDocuments={selectedDocumentsStable}
-        ragEnabled={ragEnabled}
         isLoading={loadingDocuments}
         error={documentError}
         isUploading={uploading}
@@ -386,7 +384,6 @@ export default function HomePage() {
         isCollapsed={rightCollapsed}
         isDragActive={dragActive}
         onToggleCollapse={() => setRightCollapsed((isCollapsed) => !isCollapsed)}
-        onToggleRag={setRagEnabled}
         onOpenFilePicker={() => fileInputRef.current?.click()}
         onFileSelect={onFileSelect}
         onDragEnter={(event) => {

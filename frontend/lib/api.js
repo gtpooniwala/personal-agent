@@ -1,7 +1,4 @@
-const DEFAULT_API_BASE = "http://127.0.0.1:8000/api/v1";
-
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || DEFAULT_API_BASE;
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
 
 async function parseResponse(response) {
   const contentType = response.headers.get("content-type") || "";
@@ -30,15 +27,22 @@ function extractErrorMessage(response, payload) {
 }
 
 export async function apiCall(endpoint, options = {}) {
+  if (!API_BASE) {
+    throw new Error("NEXT_PUBLIC_API_BASE_URL is not configured.");
+  }
+
   const url = `${API_BASE}${endpoint}`;
   const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+  const hasBody = options.body !== undefined && options.body !== null;
+  const headers = new Headers(options.headers || {});
+
+  if (!isFormData && hasBody && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
 
   const response = await fetch(url, {
     ...options,
-    headers: {
-      ...(isFormData ? {} : { "Content-Type": "application/json" }),
-      ...(options.headers || {}),
-    },
+    headers,
   });
 
   const payload = await parseResponse(response);

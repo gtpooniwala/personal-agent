@@ -5,13 +5,14 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-dummy}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-dummy}
-      - DATABASE_PATH=/app/data/personal_agent.db
-      - HOST=0.0.0.0
-      - PORT=8000
-      - ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - GEMINI_API_KEY=${GEMINI_API_KEY:?Set GEMINI_API_KEY in .env}
+      - DATABASE_PATH=${DATABASE_PATH:?Set DATABASE_PATH in .env}
+      - HOST=${HOST:?Set HOST in .env}
+      - PORT=${PORT:?Set PORT in .env}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:?Set ALLOWED_ORIGINS in .env}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -27,11 +28,11 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api/v1}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?Set NEXT_PUBLIC_API_BASE_URL in .env}
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api/v1}
+      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:?Set NEXT_PUBLIC_API_BASE_URL in .env}
       - PORT=3000
     depends_on:
       personal-agent:
