@@ -1,5 +1,5 @@
 from langchain_core.tools import BaseTool
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field, PrivateAttr
 from typing import List, Dict, Any, Optional, Type
 

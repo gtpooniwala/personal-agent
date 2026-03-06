@@ -8,7 +8,7 @@ from pathlib import Path
 import PyPDF2
 import logging
 
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from backend.database.models import Document, DocumentChunk
 from backend.database.operations import db_ops
 from backend.llm import (
@@ -207,7 +207,7 @@ class DocumentProcessor:
         except Exception as e:
             logger.error(f"Error extracting PDF text: {str(e)}")
             raise
-    
+
     async def _generate_document_summary(self, text_content: str) -> str:
         """
         Generate a concise one-sentence summary of the document content.

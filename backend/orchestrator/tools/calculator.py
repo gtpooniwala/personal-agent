@@ -1,4 +1,4 @@
-from langchain.tools import BaseTool
+from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field, field_validator
 from typing import Type
 import logging

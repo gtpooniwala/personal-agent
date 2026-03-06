@@ -1,6 +1,6 @@
 import os
 import pickle
-from langchain.tools import BaseTool
+from langchain_core.tools import BaseTool
 
 GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))

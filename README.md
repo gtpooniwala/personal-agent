@@ -66,6 +66,20 @@ flowchart LR
 - Frontend: HTML/CSS + modular ES6 JavaScript
 - Storage: SQLite + local filesystem (`data/`)
 
+### LangChain/LangGraph Migration Baseline
+
+Issue tracking: `#22` (`[Migration] Upgrade to latest LangChain/LangGraph stack`).
+
+- LangChain stack pinned to: `langchain==1.2.10`, `langgraph==1.0.10`
+- Related packages pinned: `langchain-openai==1.1.10`, `langchain-community==0.4.1`, `langchain-text-splitters==1.1.1`, `langgraph-checkpoint==4.0.1`, `langgraph-prebuilt==1.0.8`
+- Related dependency floors adopted in requirements:
+  `openai==2.26.0`, `requests==2.32.5`, `pydantic-settings==2.13.1`
+- Code migrated off removed APIs/import paths:
+  - `langchain.prompts` -> `langchain_core.prompts`
+  - `langchain.text_splitter` -> `langchain_text_splitters`
+  - `langchain.tools.BaseTool` -> `langchain_core.tools.BaseTool`
+  - `apredict()` -> `ainvoke()` patterns
+
 ## Quick Start (Manual, Recommended)
 
 ### 1) Prerequisites
