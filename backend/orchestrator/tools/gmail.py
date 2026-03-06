@@ -1,17 +1,57 @@
 import os
 import pickle
+from importlib.util import find_spec
+from typing import List, Tuple
+
 from langchain_core.tools import BaseTool
 
 GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
-CREDENTIALS_PATH = os.environ.get(
-    "GMAIL_CREDENTIALS_PATH",
-    os.path.join(BASE_DIR, "backend/data/gmail/client_secret.json")
-)
-TOKEN_PATH = os.environ.get(
-    "GMAIL_TOKEN_PATH",
-    os.path.join(BASE_DIR, "backend/data/gmail/token.pickle")
-)
+
+
+def _get_credentials_path() -> str:
+    return os.environ.get(
+        "GMAIL_CREDENTIALS_PATH",
+        os.path.join(BASE_DIR, "backend/data/gmail/client_secret.json")
+    )
+
+
+def _get_token_path() -> str:
+    return os.environ.get(
+        "GMAIL_TOKEN_PATH",
+        os.path.join(BASE_DIR, "backend/data/gmail/token.pickle")
+    )
+
+
+def _gmail_dependencies_installed() -> bool:
+    required_modules = (
+        "google.auth.transport.requests",
+        "google_auth_oauthlib.flow",
+        "googleapiclient.discovery",
+    )
+    for module_name in required_modules:
+        try:
+            if find_spec(module_name) is None:
+                return False
+        except ModuleNotFoundError:
+            return False
+    return True
+
+
+def get_gmail_readiness(enable_gmail_integration: bool) -> Tuple[bool, List[str]]:
+    """
+    Determine whether Gmail integration should be exposed to the orchestrator.
+    """
+    if not enable_gmail_integration:
+        return False, ["feature_flag_disabled"]
+
+    reasons = []
+    if not _gmail_dependencies_installed():
+        reasons.append("dependencies_missing")
+    if not os.path.exists(_get_credentials_path()):
+        reasons.append("credentials_missing")
+
+    return len(reasons) == 0, reasons
 
 class GmailReadTool(BaseTool):
     """
@@ -40,6 +80,9 @@ class GmailReadTool(BaseTool):
     )
 
     def _run(self, **kwargs):
+        credentials_path = _get_credentials_path()
+        token_path = _get_token_path()
+
         try:
             from google.auth.transport.requests import Request
             from google_auth_oauthlib.flow import InstalledAppFlow
@@ -50,7 +93,7 @@ class GmailReadTool(BaseTool):
                 "Install `google-auth`, `google-auth-oauthlib`, and `google-api-python-client` to use this tool."
             )
 
-        if not os.path.exists(CREDENTIALS_PATH):
+        if not os.path.exists(credentials_path):
             return (
                 "Gmail credentials file not found. "
                 "Set GMAIL_CREDENTIALS_PATH or place a client secret file at backend/data/gmail/client_secret.json."
@@ -58,19 +101,34 @@ class GmailReadTool(BaseTool):
 
         creds = None
         # Load token if it exists
-        if os.path.exists(TOKEN_PATH):
-            with open(TOKEN_PATH, "rb") as token:
+        if os.path.exists(token_path):
+            with open(token_path, "rb") as token:
                 creds = pickle.load(token)
         # If no valid creds, do OAuth flow
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
-                flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, GMAIL_SCOPES)
+                flow = InstalledAppFlow.from_client_secrets_file(credentials_path, GMAIL_SCOPES)
                 creds = flow.run_local_server(port=0)
             # Save the credentials for next run
-            with open(TOKEN_PATH, "wb") as token:
-                pickle.dump(creds, token)
+            token_dir = os.path.dirname(token_path)
+            if token_dir and not os.path.exists(token_dir):
+                try:
+                    os.makedirs(token_dir, exist_ok=True)
+                except OSError:
+                    return (
+                        f"Failed to create directory for Gmail token at '{token_dir}'. "
+                        "Check GMAIL_TOKEN_PATH and ensure the directory is writable."
+                    )
+            try:
+                with open(token_path, "wb") as token:
+                    pickle.dump(creds, token)
+            except OSError:
+                return (
+                    f"Failed to save Gmail OAuth token to '{token_path}'. "
+                    "Check GMAIL_TOKEN_PATH and ensure the path is writable."
+                )
         # Build Gmail API service
         service = build("gmail", "v1", credentials=creds)
 

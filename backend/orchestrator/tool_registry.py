@@ -1,10 +1,11 @@
 from typing import Dict, List, Any, Optional
+from backend.config import settings
 from .tools.calculator import CalculatorTool
 from .tools.time import CurrentTimeTool
 from .tools.search_documents import SearchDocumentsTool
 from .tools.scratchpad import ScratchpadTool
 from .tools.response_agent import ResponseAgentTool
-from .tools.gmail import GmailReadTool
+from .tools.gmail import GmailReadTool, get_gmail_readiness
 from .tools.user_profile import UserProfileTool
 from .tools.summarisation_agent import SummarisationAgent
 from backend.orchestrator.tools.internet_search import InternetSearchTool
@@ -46,8 +47,14 @@ class ToolRegistry:
         if self.selected_documents and len(self.selected_documents) > 0:
             self._tools["search_documents"] = SearchDocumentsTool(self.user_id, self.selected_documents)
 
-        # Integration tools
-        self._tools["gmail_read"] = GmailReadTool()
+        gmail_ready, gmail_reasons = get_gmail_readiness(settings.enable_gmail_integration)
+        if gmail_ready:
+            self._tools["gmail_read"] = GmailReadTool()
+        else:
+            logger.info(
+                "Skipping gmail_read tool registration: %s",
+                ", ".join(gmail_reasons)
+            )
 
         # Response agent tool (for handling responses)
         self._tools["response_agent"] = ResponseAgentTool()
@@ -77,7 +84,9 @@ class ToolRegistry:
         Get list of tools that should be available to the orchestrator.
         """
         # Always include all core tools
-        available_tools = ["calculator", "current_time", "scratchpad", "internet_search", "gmail_read", "user_profile"]
+        available_tools = ["calculator", "current_time", "scratchpad", "internet_search", "user_profile"]
+        if "gmail_read" in self._tools:
+            available_tools.append("gmail_read")
         # Only include search_documents if documents are selected
         if self.selected_documents and len(self.selected_documents) > 0:
             available_tools.append("search_documents")

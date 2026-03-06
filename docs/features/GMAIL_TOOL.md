@@ -25,14 +25,16 @@ The Gmail Tool provides robust integration with Gmail, enabling the agent to sea
 - Returns formatted results for agent and user
 
 ## Setup Requirements
+- `ENABLE_GMAIL_INTEGRATION=true`
+- Gmail dependencies installed: `google-auth`, `google-auth-oauthlib`, `google-api-python-client`
 - Google Cloud project with Gmail API enabled
-- OAuth client credentials JSON in `backend/data/gmail/`
+- OAuth client credentials JSON at `GMAIL_CREDENTIALS_PATH` (defaults to `backend/data/gmail/client_secret.json`)
 - Token file generated on first use (user login)
 
 ## Limitations
 - Only read/search is implemented (no send/compose yet)
 - Requires user to complete OAuth flow on first use
-- Only works if credentials and token are present
+- Tool is hidden from active tool list unless integration is configured and ready
 
 ## References
 - See [`README.md`](../../README.md) and [`AGENT.md`](../../AGENT.md) for user and workflow documentation
