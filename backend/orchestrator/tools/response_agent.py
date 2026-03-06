@@ -44,11 +44,14 @@ class ResponseAgentTool(BaseTool):
         try:
             llm = create_chat_model("response_agent", temperature=0.3)
             prompt = ChatPromptTemplate.from_messages([
-                ("system", "You are a helpful personal assistant. Given the user's query, the results from all tools used, and optional conversation history, craft a clear, natural, and helpful response for the user. Integrate tool results smoothly, avoid technical jargon, and ensure the answer is easy to understand. Do not decide which tools to use—only synthesize the provided information into a final response. Do not refuse to answer or say 'I don't know' unless absolutely necessary. If you can answer the question directly, do so without relying on the tools."),
-                ("user", "{user_query}"),
-                ("system", "Here is the recent conversation history (if any):\n{conversation_history_str}"),
-                ("assistant", "{tool_results_str}"),
-                ("system", "Now, using all the above information, write a single, clear, natural, and helpful response for the user. Do not echo the user query. Do not mention tool names. Just answer as a helpful assistant.")
+                (
+                    "system",
+                    "You are a helpful personal assistant. Given the user's query, tool results, and optional conversation history, craft a clear and natural final response. Do not mention tool names.",
+                ),
+                (
+                    "user",
+                    "User query:\n{user_query}\n\nConversation history:\n{conversation_history_str}\n\nTool results:\n{tool_results_str}\n\nRespond to the user directly.",
+                ),
             ])
             self._chain = prompt | llm
         except (MissingProviderKeyError, MissingModelDependencyError) as exc:
