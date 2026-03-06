@@ -24,6 +24,7 @@ if str(ROOT) not in sys.path:
 EVAL_ROOT = ROOT / "tests" / "llm_evals"
 CASES_DIR = EVAL_ROOT / "cases"
 RESULTS_DIR = EVAL_ROOT / "results"
+MAX_SAFE_EXPONENT = 64
 
 
 @dataclass
@@ -157,6 +158,8 @@ def _safe_eval_math(expression: str) -> Optional[float]:
             if isinstance(node.op, ast.Mod):
                 return left % right
             if isinstance(node.op, ast.Pow):
+                if abs(right) > MAX_SAFE_EXPONENT:
+                    raise ValueError(f"Exponent magnitude exceeds safe limit ({MAX_SAFE_EXPONENT})")
                 return left**right
             raise ValueError("Unsupported binary operator")
         raise ValueError("Unsupported expression")
@@ -294,8 +297,24 @@ def _check_turn_expectation(index: int, expectation: Dict[str, Any], actual: Tur
     return failures
 
 
-def _evaluate_case(case: Dict[str, Any], executions: Sequence[TurnExecution]) -> Tuple[bool, List[str]]:
+def _resolve_expected(case: Dict[str, Any], mode: str) -> Dict[str, Any]:
     expected = case.get("expected", {})
+    if not isinstance(expected, dict):
+        return {}
+
+    resolved = {k: v for k, v in expected.items() if k != "by_mode"}
+    by_mode = expected.get("by_mode")
+    if isinstance(by_mode, dict):
+        mode_override = by_mode.get(mode)
+        if isinstance(mode_override, dict):
+            resolved.update(mode_override)
+    return resolved
+
+
+def _evaluate_case(
+    case: Dict[str, Any], executions: Sequence[TurnExecution], mode: str
+) -> Tuple[bool, List[str]]:
+    expected = _resolve_expected(case, mode)
     failures: List[str] = []
 
     per_turn_expectations = expected.get("per_turn", [])
@@ -358,7 +377,7 @@ async def run_evals(args: argparse.Namespace) -> Dict[str, Any]:
                     execution = _mock_execute_turn(str(turn.get("message", "")), selected_documents)
                     executions.append(execution)
 
-            passed, failures = _evaluate_case(case, executions)
+            passed, failures = _evaluate_case(case, executions, args.mode)
             if execution_error:
                 passed = False
                 failures.insert(0, execution_error)

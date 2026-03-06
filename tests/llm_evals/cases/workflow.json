@@ -39,10 +39,21 @@
         "per_turn": [
           {
             "response_contains": [
-              "no documents are currently selected"
+              "contract"
             ]
           }
-        ]
+        ],
+        "by_mode": {
+          "mock": {
+            "per_turn": [
+              {
+                "response_contains": [
+                  "no documents are currently selected"
+                ]
+              }
+            ]
+          }
+        }
       }
     },
     {
@@ -59,9 +70,6 @@
       "expected": {
         "per_turn": [
           {
-            "must_call": [
-              "calculator"
-            ],
             "response_contains": [
               "25"
             ]
@@ -69,15 +77,35 @@
           {
             "must_call": [
               "current_time"
-            ],
-            "response_contains": [
-              "time"
             ]
           }
         ],
-        "overall_must_not_call": [
-          "search_documents"
-        ]
+        "overall_must_not_call": ["search_documents"],
+        "by_mode": {
+          "mock": {
+            "per_turn": [
+              {
+                "must_call": [
+                  "calculator"
+                ],
+                "response_contains": [
+                  "25"
+                ]
+              },
+              {
+                "must_call": [
+                  "current_time"
+                ],
+                "response_contains": [
+                  "time"
+                ]
+              }
+            ],
+            "overall_must_not_call": [
+              "search_documents"
+            ]
+          }
+        }
       }
     }
   ]

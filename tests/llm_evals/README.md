@@ -43,6 +43,13 @@ Supported assertions:
 - `overall_must_not_call`
 - `overall_response_contains`
 
+Optional mode-specific overrides:
+
+- `expected.by_mode.mock`
+- `expected.by_mode.live`
+
+If provided, the selected mode override replaces top-level `expected` keys with the same name.
+
 ## Reports
 
 Reports are written to:

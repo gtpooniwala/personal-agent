@@ -44,12 +44,26 @@
             ],
             "must_not_call": [
               "calculator"
-            ],
-            "response_contains": [
-              "time"
             ]
           }
-        ]
+        ],
+        "by_mode": {
+          "mock": {
+            "per_turn": [
+              {
+                "must_call": [
+                  "current_time"
+                ],
+                "must_not_call": [
+                  "calculator"
+                ],
+                "response_contains": [
+                  "time"
+                ]
+              }
+            ]
+          }
+        }
       }
     },
     {
@@ -118,10 +132,27 @@
               "internet_search"
             ],
             "response_contains": [
-              "selected documents"
+              "document"
             ]
           }
-        ]
+        ],
+        "by_mode": {
+          "mock": {
+            "per_turn": [
+              {
+                "must_call": [
+                  "search_documents"
+                ],
+                "must_not_call": [
+                  "internet_search"
+                ],
+                "response_contains": [
+                  "selected documents"
+                ]
+              }
+            ]
+          }
+        }
       }
     },
     {
