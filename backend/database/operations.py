@@ -12,7 +12,7 @@ class DatabaseOperations:
     """Database operations for the personal agent."""
     
     def __init__(self):
-        self.engine = create_engine(f"sqlite:///{settings.database_path}")
+        self.engine = create_engine(settings.database_url, pool_pre_ping=True)
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
         self.init_database()
     

@@ -8,11 +8,17 @@ import logging
 import uvicorn
 from time import perf_counter
 import uuid
+from sqlalchemy.engine.url import make_url
 
 # Configure structured logging
 configure_logging(settings.log_level)
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_database_url() -> str:
+    """Render configured database URL without exposing credentials."""
+    return make_url(settings.database_url).render_as_string(hide_password=True)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,7 +26,7 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Personal Agent API starting up...")
     logger.info(f"Environment: {settings.environment}")
-    logger.info(f"Database path: {settings.database_path}")
+    logger.info(f"Database URL: {_safe_database_url()}")
     langfuse_manager.initialize()
     
     yield

@@ -29,8 +29,14 @@ class TestDatabaseOperations(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
-        # Create an in-memory database for testing
-        self.engine = create_engine("sqlite:///:memory:")
+        database_url = os.environ.get("TEST_DATABASE_URL") or os.environ.get("DATABASE_URL")
+        if not database_url:
+            self.skipTest("DATABASE_URL is required for database tests.")
+        if not database_url.startswith("postgresql"):
+            self.skipTest(f"DATABASE_URL must use PostgreSQL for this suite. Got: {database_url}")
+
+        self.engine = create_engine(database_url)
+        Base.metadata.drop_all(bind=self.engine)
         Base.metadata.create_all(bind=self.engine)
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
         
