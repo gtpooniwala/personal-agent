@@ -19,7 +19,7 @@ gh api -X PUT "repos/${REPO}/branches/main/protection" \
   -F "allow_force_pushes=false" \
   -F "allow_deletions=false" \
   -F "block_creations=false" \
-  -F "required_conversation_resolution=true" \
+  -F "required_conversation_resolution=false" \
   -F "lock_branch=false" \
   -F "allow_fork_syncing=true"
 
