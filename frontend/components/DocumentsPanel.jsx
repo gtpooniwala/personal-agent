@@ -82,37 +82,37 @@ export default function DocumentsPanel({
 
             {!isLoading &&
               !error &&
-              documents.map((document) => {
-                const isSelected = selectedDocuments.has(document.id);
+              documents.map((doc) => {
+                const isSelected = selectedDocuments.has(doc.id);
                 return (
                   <article
-                    key={document.id}
+                    key={doc.id}
                     className={`document-card ${isSelected ? "selected" : ""}`}
                   >
-                    <label className="doc-main-row" htmlFor={`doc-${document.id}`}>
+                    <label className="doc-main-row" htmlFor={`doc-${doc.id}`}>
                       <input
-                        id={`doc-${document.id}`}
+                        id={`doc-${doc.id}`}
                         type="checkbox"
                         checked={isSelected}
-                        onChange={(event) => onToggleDocument(document.id, event.target.checked)}
+                        onChange={(event) => onToggleDocument(doc.id, event.target.checked)}
                       />
                       <span className="doc-text-wrap">
-                        <span className="doc-name" title={document.filename}>
-                          📄 {truncateText(document.filename, 28)}
+                        <span className="doc-name" title={doc.filename}>
+                          📄 {truncateText(doc.filename, 28)}
                         </span>
                         <span className="doc-meta">
-                          {formatFileSize(document.file_size)} • {formatRelativeTime(document.uploaded_at)}
+                          {formatFileSize(doc.file_size)} • {formatRelativeTime(doc.uploaded_at)}
                         </span>
                         <span className="doc-summary">
-                          {document.summary || "No summary available."}
+                          {doc.summary || "No summary available."}
                         </span>
                       </span>
                     </label>
                     <button
                       type="button"
                       className="icon-danger"
-                      aria-label={`Delete ${document.filename}`}
-                      onClick={() => onDeleteDocument(document.id, document.filename)}
+                      aria-label={`Delete ${doc.filename}`}
+                      onClick={() => onDeleteDocument(doc.id, doc.filename)}
                     >
                       🗑️
                     </button>

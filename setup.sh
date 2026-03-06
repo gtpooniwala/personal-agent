@@ -35,8 +35,8 @@ if ! command -v npm &> /dev/null; then
 fi
 
 echo "📋 Installing frontend dependencies..."
-cd frontend
-npm install
+cd frontend || { echo "❌ frontend directory not found."; exit 1; }
+npm install || { echo "❌ Failed to install frontend dependencies."; exit 1; }
 cd ..
 
 # Check if .env file exists

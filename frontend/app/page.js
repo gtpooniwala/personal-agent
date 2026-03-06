@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ChatPanel from "@/components/ChatPanel";
 import ConversationList from "@/components/ConversationList";
 import DocumentsPanel from "@/components/DocumentsPanel";
@@ -348,8 +348,6 @@ export default function HomePage() {
     }
   }, [messages]);
 
-  const selectedDocumentsStable = useMemo(() => selectedDocuments, [selectedDocuments]);
-
   return (
     <div className="app-root">
       <ConversationList
@@ -376,7 +374,7 @@ export default function HomePage() {
 
       <DocumentsPanel
         documents={documents}
-        selectedDocuments={selectedDocumentsStable}
+        selectedDocuments={selectedDocuments}
         isLoading={loadingDocuments}
         error={documentError}
         isUploading={uploading}
