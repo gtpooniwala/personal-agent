@@ -25,7 +25,7 @@ Status values: `todo`, `in_progress`, `done`, `blocked`.
 ## Long-Running Runtime Migration (OpenClaw-lite Direction)
 | Priority | Status | Change | Issue |
 |---|---|---|---|
-| P0 | todo | Architecture design doc for long-running runtime | [#14](https://github.com/gtpooniwala/personal-agent/issues/14) |
+| P0 | todo | Publish migration architecture design doc + PR decomposition and shared run vocabulary | [#14](https://github.com/gtpooniwala/personal-agent/issues/14) |
 | P0 | todo | Add run lifecycle schema (`runs`, `run_events`, `leases`) | [#15](https://github.com/gtpooniwala/personal-agent/issues/15) |
 | P0 | todo | Implement runtime worker queue with per-session serialization | [#16](https://github.com/gtpooniwala/personal-agent/issues/16) |
 | P0 | todo | Convert chat API to submit-run + status/events model | [#17](https://github.com/gtpooniwala/personal-agent/issues/17) |

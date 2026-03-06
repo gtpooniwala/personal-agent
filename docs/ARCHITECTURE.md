@@ -18,6 +18,15 @@ User Query → LangGraph Agent → Dynamic Route Decision (Graph-Based)
 
 **Key Innovation**: Graph-based agent execution with automatic tool binding, enabling natural conversation flow and persistent memory management.
 
+## Long-Running Runtime Architecture (Migration Direction)
+
+- **Primary contract**: asynchronous run submission (`POST /api/v1/runs`) plus status/events polling.
+- **Execution model**: dedicated worker processing with durable run state and event history.
+- **Compatibility**: `POST /api/v1/chat` is temporary and deprecated during migration.
+- **Ordering model**: first implementation enforces one active run per conversation/session.
+
+This model decouples request acceptance from execution, enables retries/recovery, and prevents single long tool call from blocking the HTTP request lifecycle.
+
 ### 2. Component Architecture
 
 ```text
@@ -100,7 +109,8 @@ User Query → LangGraph Agent → Dynamic Route Decision (Graph-Based)
 - RESTful API endpoints with full CRUD operations
 - Conversation management with passive maintenance
 - Document upload and management
-- Real-time chat processing
+- Async runtime submission (`/runs`) with status/events polling
+- Deprecation-safe chat shim endpoint (`/chat`) during migration
 - Health checks and tool listing
 
 **Models (`backend/api/models.py`)**
@@ -154,9 +164,9 @@ User Query → LangGraph Agent → Dynamic Route Decision (Graph-Based)
 ### 1. Message Processing Flow
 
 ```text
-User Input → Frontend → API → Agent Processing → Tool Execution → Response
-                                    ↓
-                            Database Storage ← Memory Update
+User Input → Frontend → POST /runs → Worker Queue → Agent Processing → Tool Execution → Persisted Message
+                                   ↓                        ↓
+                          Status/Events API       Database Storage ← Memory Update
 ```
 
 ### 2. Document Q&A Flow
@@ -207,7 +217,8 @@ Load Conversations → Maintenance Check → Title Generation (Async) → Empty 
 
 ### 3. Scalability Considerations
 - SQLite suitable for single-user deployment
-- Async processing for non-blocking operations
+- Dedicated worker runtime for non-blocking operations
+- Run-state persistence for restart-safe behavior
 - Modular design allows easy component scaling
 
 ## Future Architecture Enhancements

@@ -4,6 +4,34 @@ This document provides detailed documentation of the system flow, decision logic
 
 ## 🎯 Core System Flow
 
+This section reflects the migration target runtime: async run submission with status/event polling. The legacy direct flow below is preserved for historical context only.
+
+## Long-Running Runtime Flow (Migration)
+
+```mermaid
+graph TB
+    A[POST /api/v1/runs] --> B{Persist Run Record}
+    B --> C[Run Queue]
+    C --> D[Dedicated Worker]
+    D --> E[Load Conversation Context]
+    E --> F[LangGraph Orchestrator]
+    F --> G{Tool Required?}
+    G -->|Yes| H[Tool Registry + Tool Execution]
+    G -->|No| I[Response Agent]
+    H --> J[Emit Tool Events]
+    J --> F
+    F --> K[Persist Results]
+    K --> L[Emit completed/failed events]
+    M[GET /runs/{run_id}/status] --> N[Expose lifecycle state]
+    M --> O[GET /runs/{run_id}/events]
+    O --> P[Expose ordered progress stream]
+```
+
+### Transitional compatibility
+
+- `POST /api/v1/chat` remains temporarily available during migration.
+- It submits through the same run path and returns deprecation notes for callers.
+
 ### High-Level Request Processing
 
 ```mermaid

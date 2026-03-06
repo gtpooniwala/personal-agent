@@ -13,6 +13,14 @@ This project implements a sophisticated AI-powered personal assistant ("personal
 - Web interface for chat and document management
 - Extensible with new tools and integrations
 
+## Long-Running Runtime Migration
+
+The current target architecture moves from synchronous chat responses to a run-based asynchronous model:
+- `POST /api/v1/runs` is the primary execution path.
+- `GET /api/v1/runs/{run_id}/status` and `/events` provide progress visibility.
+- `POST /api/v1/chat` is kept temporarily as a deprecated compatibility shim.
+- Migration issue: [#14](https://github.com/gtpooniwala/personal-agent/issues/14) (design) with implementation split across #15-#19.
+
 ## Orchestrator Agent Prompt (Macro Context)
 
 The orchestrator agent is responsible for:
@@ -310,49 +318,30 @@ User Request → CoreOrchestrator → Tool Analysis → Delegation Decision
 
 ### Key Components & File Locations
 
-#### Core Agent System (`backend/agent/`)
+#### Core Orchestrator System (`backend/orchestrator/`)
 
-**`backend/agent/core.py`** - **CRITICAL FILE**
+**`backend/orchestrator/core.py`** - **CRITICAL FILE**
 
-- Contains the main `PersonalAgent` class
-- Implements smart routing logic (agent-driven, not hardcoded)
-- Handles conversation management and memory
-- Manages token tracking and cost monitoring
-- **Key Method**: `process_message()` - Always uses agent, falls back to direct LLM only if agent fails
+- LangGraph-backed orchestrator entry point and main request flow (`CoreOrchestrator`)
+- Maintains prompt flow, tool delegation, and response synthesis
+- Manages run-aware context boundaries and persistence handoff points
 
-```python
-# Current implementation (simplified)
-async def process_message(self, message: str, conversation_id: str):
-    try:
-        # Always use agent - let it decide when to use tools
-        result = self.agent({"input": message})
-        response = result.get("output", "")
-        intermediate_steps = result.get("intermediate_steps", [])
-    except Exception as e:
-        # Graceful fallback to direct LLM only if agent completely fails
-        llm_result = await self.llm.ainvoke(message)
-        response = getattr(llm_result, "content", str(llm_result))
-        intermediate_steps = []
-```
+**`backend/orchestrator/tools/`** - Tool implementations
 
-**`backend/agent/tools.py`** - Tool Registry & Implementations
+- Tool modules remain in the same domain-specific files (calculator, time, documents, scratchpad, etc.)
 
-- `CalculatorTool`: Mathematical expressions with exponentiation support (`^` → `**`)
-- `CurrentTimeTool`: Date/time queries with natural language processing
-- `ToolRegistry`: Manages available tools for the agent
-- Placeholder tools ready for implementation: Gmail, Calendar, Todoist
+**`backend/orchestrator/tool_registry.py`** - Tool management
 
-**`backend/agent/memory.py`** - Custom SQLite Memory
-
-- Extends LangChain's `ConversationBufferMemory`
-- Provides persistent conversation context across sessions
-- Integrates with database operations for message storage
+- Tool availability and context-sensitive registration
 
 #### API Layer (`backend/api/`)
 
 **`backend/api/routes.py`** - API Endpoints
 
-- `POST /api/v1/chat` - Main chat interface
+- `POST /api/v1/runs` - Primary asynchronous run submission
+- `GET /api/v1/runs/{run_id}/status` - Run lifecycle status
+- `GET /api/v1/runs/{run_id}/events` - Run progress stream snapshot
+- `POST /api/v1/chat` - Temporary compatibility shim (deprecated)
 - `GET /api/v1/conversations` - List all conversations
 - `POST /api/v1/conversations` - Create new conversation
 - `GET /api/v1/conversations/{id}/messages` - Get conversation history

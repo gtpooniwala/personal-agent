@@ -10,10 +10,10 @@ Currently, the MVP uses a default user system. No authentication is required for
 
 ## Core Endpoints
 
-### Chat & Conversations
+### Runtime APIs
 
-#### POST `/chat`
-Process a chat message through the LangChain agent.
+#### POST `/runs`
+Submit work to the orchestrator asynchronously.
 
 **Request Body:**
 ```json
@@ -27,18 +27,58 @@ Process a chat message through the LangChain agent.
 **Response:**
 ```json
 {
-  "response": "2 + 2 equals 4.",
-  "conversation_id": "generated-or-provided-uuid",
-  "agent_actions": [
-    {
-      "tool": "Calculator",
-      "input": "2 + 2",
-      "output": "4"
-    }
-  ],
-  "token_usage": 125
+  "run_id": "run-uuid",
+  "status": "queued",
+  "conversation_id": "generated-or-provided-uuid"
 }
 ```
+
+#### GET `/runs/{run_id}/status`
+Get current run lifecycle status.
+
+**Response:**
+```json
+{
+  "run_id": "run-uuid",
+  "status": "running",
+  "conversation_id": "conv-uuid",
+  "created_at": "2026-03-06T10:00:00Z",
+  "updated_at": "2026-03-06T10:00:02Z",
+  "error": null,
+  "result": null
+}
+```
+
+#### GET `/runs/{run_id}/events`
+Get ordered run progress messages for polling UIs and logging.
+
+**Response:**
+```json
+{
+  "run_id": "run-uuid",
+  "events": [
+    {
+      "type": "started",
+      "status": "running",
+      "message": "Run created and queued",
+      "created_at": "2026-03-06T10:00:01Z"
+    },
+    {
+      "type": "tool_call",
+      "status": "in_progress",
+      "tool": "Calculator",
+      "message": "Tool selected and executing",
+      "created_at": "2026-03-06T10:00:02Z"
+    }
+  ]
+}
+```
+
+#### POST `/chat`
+Temporary transition endpoint (deprecated).
+
+`POST /chat` remains temporarily available for local compatibility while clients migrate.
+It is expected to internally submit a run and return a deprecation warning in response metadata.
 
 #### GET `/conversations`
 Get all conversations for the user.
@@ -187,6 +227,30 @@ Health check endpoint.
 
 ## Data Models
 
+### Run Model
+```json
+{
+  "run_id": "run-uuid",
+  "status": "queued|running|retrying|succeeded|failed|cancelling|cancelled",
+  "conversation_id": "conv-uuid",
+  "created_at": "ISO-8601 datetime",
+  "updated_at": "ISO-8601 datetime",
+  "error": "string|null",
+  "result": "string|null"
+}
+```
+
+### Run Event
+```json
+{
+  "type": "started|tool_call|tool_result|failed|completed",
+  "status": "running|succeeded|failed",
+  "message": "string",
+  "tool": "optional string",
+  "created_at": "ISO-8601 datetime"
+}
+```
+
 ### Message Model
 ```json
 {
@@ -243,6 +307,7 @@ Health check endpoint.
 - `200` - Success
 - `400` - Bad Request (validation error, invalid input)
 - `404` - Not Found (conversation, document, etc.)
+- `409` - Conflict (invalid state transition)
 - `500` - Internal Server Error
 
 ### Specific Error Cases
@@ -256,6 +321,11 @@ Health check endpoint.
 - `404` - Conversation not found
 - `400` - Unable to generate title (too few messages)
 
+#### Run Errors
+- `404` - Run not found
+- `409` - Invalid state transition (for example, canceling terminal run)
+- `422` - Invalid run payload
+
 ## Rate Limiting
 Currently no rate limiting is implemented. For production deployment, consider implementing rate limiting based on:
 - Requests per minute per IP
@@ -267,7 +337,7 @@ Currently no rate limiting is implemented. For production deployment, consider i
 ### Basic Chat Flow
 ```javascript
 // Start a new conversation
-const chatResponse = await fetch('/api/v1/chat', {
+const runSubmit = await fetch('/api/v1/runs', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -277,8 +347,20 @@ const chatResponse = await fetch('/api/v1/chat', {
   })
 });
 
-const result = await chatResponse.json();
-console.log(result.conversation_id); // Use for subsequent messages
+const runData = await runSubmit.json();
+
+let status = await (await fetch(`/api/v1/runs/${runData.run_id}/status`)).json();
+while (status.status === 'queued' || status.status === 'running' || status.status === 'retrying') {
+  await new Promise(resolve => setTimeout(resolve, 500));
+  status = await (await fetch(`/api/v1/runs/${runData.run_id}/status`)).json();
+}
+
+if (status.status === 'succeeded') {
+  const events = await (await fetch(`/api/v1/runs/${runData.run_id}/events`)).json();
+  console.log('Run completed', status, events);
+} else {
+  console.error('Run failed', status.error);
+}
 ```
 
 ### Document Q&A Flow
@@ -295,7 +377,7 @@ const uploadResponse = await fetch('/api/v1/documents/upload', {
 const uploadResult = await uploadResponse.json();
 
 // Query the document
-const queryResponse = await fetch('/api/v1/chat', {
+const queryResponse = await fetch('/api/v1/runs', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -304,6 +386,13 @@ const queryResponse = await fetch('/api/v1/chat', {
     selected_documents: [uploadResult.document_id]
   })
 });
+
+const queryRunData = await queryResponse.json();
+let queryStatus = await (await fetch(`/api/v1/runs/${queryRunData.run_id}/status`)).json();
+while (queryStatus.status === 'queued' || queryStatus.status === 'running' || queryStatus.status === 'retrying') {
+  await new Promise(resolve => setTimeout(resolve, 500));
+  queryStatus = await (await fetch(`/api/v1/runs/${queryRunData.run_id}/status`)).json();
+}
 ```
 
 ### Conversation Management
@@ -322,10 +411,10 @@ const titleResponse = await fetch(`/api/v1/conversations/${convId}/generate-titl
 ```
 
 ## WebSocket Support
-The current implementation uses HTTP polling. For real-time features, consider implementing WebSocket endpoints for:
-- Live typing indicators
-- Real-time message streaming
-- Document processing status updates
+The current implementation uses HTTP polling for run status/events. For future real-time migration, consider SSE/WebSocket endpoints for:
+- Streamed run status transitions
+- Mid-run cancellation and control events
+- Lightweight presence updates
 
 ---
 

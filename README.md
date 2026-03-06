@@ -17,7 +17,7 @@ The assistant can:
 
 ```mermaid
 flowchart LR
-    UI["Frontend (Next.js App Router)"] --> API["FastAPI API Layer"]
+    UI["Frontend (Vanilla JS SPA)"] --> API["FastAPI API Layer"]
     API --> ORCH["LangGraph ReAct Orchestrator"]
     ORCH --> REG["Tool Registry"]
     ORCH --> LLM["Gemini Chat Model (Default)"]
@@ -38,11 +38,11 @@ flowchart LR
 ### Request Flow
 
 1. User sends a message from the frontend.
-2. `POST /api/v1/chat` passes the message and selected document IDs to the orchestrator.
-3. The LangGraph ReAct agent chooses tools based on intent and available context.
-4. Tool outputs are captured as `agent_actions` and persisted with the response.
-5. A response synthesis step generates the final user-facing answer.
-6. Conversation history is periodically summarized when token thresholds are exceeded.
+2. `POST /api/v1/runs` submits the request and returns a `run_id`.
+3. Backend worker processes run steps asynchronously (tool selection, tool execution, synthesis).
+4. Frontend polls `GET /api/v1/runs/{run_id}/status` and `GET /api/v1/runs/{run_id}/events`.
+5. When complete, the final response appears in persisted messages and conversation history.
+6. `POST /api/v1/chat` stays temporarily for local migration continuity with a deprecation warning.
 
 ## Implemented Capabilities
 
@@ -63,22 +63,8 @@ flowchart LR
 
 - Backend: Python, FastAPI, LangChain, LangGraph, SQLAlchemy
 - LLM/Embeddings: Gemini by default (`gemini-2.5-flash` + `text-embedding-004`), OpenAI optional via config
-- Frontend: Next.js (React), App Router, component-based UI
+- Frontend: HTML/CSS + modular ES6 JavaScript
 - Storage: SQLite + local filesystem (`data/`)
-
-### LangChain/LangGraph Migration Baseline
-
-Issue tracking: `#22` (`[Migration] Upgrade to latest LangChain/LangGraph stack`).
-
-- LangChain stack pinned to: `langchain==1.2.10`, `langgraph==1.0.10`
-- Related packages pinned: `langchain-openai==1.1.10`, `langchain-community==0.4.1`, `langchain-text-splitters==1.1.1`, `langgraph-checkpoint==4.0.1`, `langgraph-prebuilt==1.0.8`
-- Related dependency floors adopted in requirements:
-  `openai==2.26.0`, `requests==2.32.5`, `pydantic-settings==2.13.1`
-- Code migrated off removed APIs/import paths:
-  - `langchain.prompts` -> `langchain_core.prompts`
-  - `langchain.text_splitter` -> `langchain_text_splitters`
-  - `langchain.tools.BaseTool` -> `langchain_core.tools.BaseTool`
-  - `apredict()` -> `ainvoke()` patterns
 
 ## Quick Start (Manual, Recommended)
 
@@ -86,7 +72,6 @@ Issue tracking: `#22` (`[Migration] Upgrade to latest LangChain/LangGraph stack`
 
 - Python 3.11+
 - Gemini API key (default provider)
-- Node.js 18.17+
 
 ### 2) Install dependencies
 
@@ -115,12 +100,10 @@ uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 
 ```bash
 cd frontend
-cp .env.example .env.local
-npm install
-npm run dev
+python3 -m http.server 8081
 ```
 
-Open [http://127.0.0.1:3000](http://127.0.0.1:3000).
+Open [http://127.0.0.1:8081](http://127.0.0.1:8081).
 
 ## Alternative Startup Scripts
 
@@ -129,21 +112,6 @@ The repo includes:
 - `start_server.sh`: macOS Terminal automation (`osascript`) for backend + frontend startup
 
 Use these if your environment matches their assumptions.
-
-## Docker Compose (Backend + Frontend)
-
-Run both services together:
-
-```bash
-cp .env.example .env
-# Set GEMINI_API_KEY and NEXT_PUBLIC_API_BASE_URL in .env
-docker compose up --build
-```
-
-Endpoints:
-- Frontend: [http://127.0.0.1:3000](http://127.0.0.1:3000)
-- Backend API: [http://127.0.0.1:8000/api/v1](http://127.0.0.1:8000/api/v1)
-- API Docs: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
 ## Running Tests
 
@@ -225,7 +193,7 @@ personal-agent/
 │   ├── services/              # Document processing + retrieval
 │   ├── database/              # SQLAlchemy models + operations
 │   └── main.py                # API entrypoint
-├── frontend/                  # Next.js frontend app
+├── frontend/                  # Static SPA (HTML/CSS/JS)
 ├── tests/                     # Unit/integration-style tests
 ├── docs/                      # Extended architecture + feature docs
 └── data/                      # Local runtime data (DB, uploads, profiles, scratchpad)
