@@ -127,19 +127,25 @@ pytest tests -q
 
 Some tests rely on API/LLM behavior and are easier to run in an environment with full project dependencies.
 
-## Running Evals
+## Running Repository Checks
 
-Run the deterministic repository cleanup eval:
+Run deterministic repository checks:
 
 ```bash
-python tests/run_eval.py
+python tests/run_repo_checks.py
 ```
+
+These checks run in CI because they are deterministic and fast.
 
 Latest baseline (run on **March 4, 2026**):
 - Cases: `12`
 - Passed: `12`
 - Failed: `0`
-- Report: `tests/evals/results.json`
+- Report: `tests/repo_checks/results.json`
+
+## Running LLM/Workflow Evals
+
+LLM/workflow evals should be run locally when changes affect model prompts, tool-calling behavior, or orchestration flow.
 
 ## API Surface
 
@@ -211,6 +217,7 @@ Design choices reflected in this implementation:
 - [Workboard](docs/WORKBOARD.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Suggested Changes Tracker](docs/SUGGESTED_CHANGES.md)
+- [Engineering Workflow](docs/ENGINEERING_WORKFLOW.md)
 - [GitHub Issues](https://github.com/gtpooniwala/personal-agent/issues)
 
 ## License

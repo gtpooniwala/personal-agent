@@ -8,7 +8,7 @@ This file is the AI execution board for this repo.
 Workflow:
 1. Pick the top item from `Now`.
 2. Implement in a small, stable change.
-3. Run tests/eval relevant to the change.
+3. Run tests/repo-checks and any relevant local LLM/workflow evals.
 4. Commit and push.
 5. Update GitHub issue and move the item state in this file.
 
@@ -36,6 +36,8 @@ Workflow:
 - [ ] `todo` Convert chat API to submit-run + status/events endpoints ([#17](https://github.com/gtpooniwala/personal-agent/issues/17))
 - [ ] `todo` Add scheduler/heartbeat for autonomous workflows ([#18](https://github.com/gtpooniwala/personal-agent/issues/18))
 - [ ] `todo` Add runtime evals for lifecycle/retry/session isolation ([#19](https://github.com/gtpooniwala/personal-agent/issues/19))
+- [ ] `todo` Build real LLM/workflow evaluation harness (separate from deterministic repo checks) ([#23](https://github.com/gtpooniwala/personal-agent/issues/23))
+- [ ] `todo` Upgrade to latest LangChain/LangGraph stack (deferred major migration) ([#22](https://github.com/gtpooniwala/personal-agent/issues/22))
 
 ## Backlog
 - [ ] `todo` Chat naming polish ([#1](https://github.com/gtpooniwala/personal-agent/issues/1))
@@ -57,3 +59,4 @@ Workflow:
 - `02 Runtime Migration Core`: #14-#17
 - `03 Workflow Automation`: #18-#19
 - `Backlog / Future`: #1-#6
+- Follow branch/worktree/PR policy in [`ENGINEERING_WORKFLOW.md`](ENGINEERING_WORKFLOW.md).

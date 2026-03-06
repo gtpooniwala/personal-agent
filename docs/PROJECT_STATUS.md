@@ -7,7 +7,7 @@ Single source of truth for current implementation status, known risks, and execu
 
 ## Current State Snapshot
 - Branch health: `main` tracking `origin/main`
-- Static eval: `tests/run_eval.py` passing (`12/12` on March 5, 2026)
+- Deterministic repository checks: `tests/run_repo_checks.py` passing (`12/12` on March 5, 2026)
 - Unit test suite: present, but local run currently dependency-gated in bare environments
 - Runtime profile: local-first FastAPI + LangGraph + SQLite + vanilla JS frontend
 - Tracking system: GitHub labels + milestones + prioritized issue backlog established (`#7`-`#19` plus existing `#1`-`#6`)
@@ -24,7 +24,7 @@ Single source of truth for current implementation status, known risks, and execu
 | Integrations | Gmail read | Conditional setup | Low |
 
 Confidence rubric:
-- `High`: covered by runnable tests/evals and simple operational path
+- `High`: covered by runnable tests/repo-checks and simple operational path
 - `Medium`: implemented end-to-end, partial test confidence
 - `Low`: setup-fragile, weakly tested, or known edge-case risk
 
@@ -34,7 +34,7 @@ Confidence rubric:
 - Frontend inserts server/user content via `innerHTML` (XSS risk).
 - Calculator uses `eval(...)` despite input validation.
 - Upload failure path can reference `document_id` before assignment.
-- Behavioral eval coverage is still limited; current eval is mostly static invariants.
+- Behavioral eval coverage is still limited; current repository checks are mostly static invariants.
 
 ## Immediate Priorities
 1. Security and correctness fixes (`eval`, XSS, upload failure path).

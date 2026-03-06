@@ -1,0 +1,35 @@
+name: PR Policy
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches: [main]
+
+jobs:
+  enforce-pr-policy:
+    name: enforce-pr-policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate issue closing keyword in PR body
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          echo "$PR_BODY" | grep -Eiq '(close[sd]?|fix(e[sd])?|resolve[sd]?):?[[:space:]]+#([0-9]+)' || {
+            echo "PR body must include closing keyword, e.g. 'Closes #123'."
+            exit 1
+          }
+
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Ensure branch is up to date with main
+        run: |
+          git fetch origin main
+          BEHIND=$(git rev-list --left-right --count origin/main...HEAD | awk '{print $1}')
+          if [ "$BEHIND" -ne 0 ]; then
+            echo "Branch is behind origin/main by $BEHIND commit(s). Rebase required."
+            exit 1
+          fi

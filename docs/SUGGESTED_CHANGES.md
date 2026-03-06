@@ -31,6 +31,8 @@ Status values: `todo`, `in_progress`, `done`, `blocked`.
 | P0 | todo | Convert chat API to submit-run + status/events model | [#17](https://github.com/gtpooniwala/personal-agent/issues/17) |
 | P1 | todo | Add scheduler/heartbeat for autonomous workflows | [#18](https://github.com/gtpooniwala/personal-agent/issues/18) |
 | P1 | todo | Add runtime evals for lifecycle/retry/session isolation | [#19](https://github.com/gtpooniwala/personal-agent/issues/19) |
+| P1 | todo | Build real LLM/workflow evaluation harness (separate from deterministic repo checks) | [#23](https://github.com/gtpooniwala/personal-agent/issues/23) |
+| P1 | todo | Upgrade to latest LangChain/LangGraph stack (deferred major migration) | [#22](https://github.com/gtpooniwala/personal-agent/issues/22) |
 
 ## Future Backlog (Existing Product Ideas)
 | Priority | Status | Idea | Issue |
@@ -45,3 +47,7 @@ Status values: `todo`, `in_progress`, `done`, `blocked`.
 ## Notes
 - This file is now synced to live issue tracking.
 - If GitHub Project board access is added later, these issues can be batch-imported to that board.
+- Implementation process is enforced via:
+  - [`ENGINEERING_WORKFLOW.md`](ENGINEERING_WORKFLOW.md)
+  - CI checks in `.github/workflows/`
+  - PR template requiring issue-closing keywords
