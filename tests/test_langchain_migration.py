@@ -63,6 +63,7 @@ class TestLangchainMigrationSource(unittest.TestCase):
             "langchain": "1.2.10",
             "langgraph": "1.0.10",
             "langchain-openai": "1.1.10",
+            "langchain-google-genai": "4.2.1",
             "langchain-community": "0.4.1",
             "langchain-text-splitters": "1.1.1",
             "langgraph-checkpoint": "4.0.1",

@@ -129,6 +129,8 @@
               "search_documents"
             ],
             "must_not_call": [
+              "calculator",
+              "current_time",
               "internet_search"
             ],
             "response_contains": [
@@ -144,6 +146,8 @@
                   "search_documents"
                 ],
                 "must_not_call": [
+                  "calculator",
+                  "current_time",
                   "internet_search"
                 ],
                 "response_contains": [

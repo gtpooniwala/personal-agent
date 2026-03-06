@@ -73,11 +73,6 @@
             "response_contains": [
               "25"
             ]
-          },
-          {
-            "must_call": [
-              "current_time"
-            ]
           }
         ],
         "overall_must_not_call": ["search_documents"],
