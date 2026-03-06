@@ -65,6 +65,11 @@ def _utc_now_iso() -> str:
 
 
 def _load_suite_files(cases_dir: Path, suite_filter: Sequence[str]) -> List[Dict[str, Any]]:
+    if not cases_dir.exists():
+        raise ValueError(f"Cases directory does not exist: {cases_dir}")
+    if not cases_dir.is_dir():
+        raise ValueError(f"Cases path is not a directory: {cases_dir}")
+
     suites: List[Dict[str, Any]] = []
     selected = {s.strip() for s in suite_filter if s.strip()}
 
@@ -73,7 +78,10 @@ def _load_suite_files(cases_dir: Path, suite_filter: Sequence[str]) -> List[Dict
         suite_name = str(payload.get("suite", "")).strip()
         if selected and suite_name not in selected:
             continue
-        payload["_source_file"] = str(path.relative_to(ROOT))
+        try:
+            payload["_source_file"] = str(path.relative_to(ROOT))
+        except ValueError:
+            payload["_source_file"] = str(path)
         suites.append(payload)
 
     if selected:
@@ -81,6 +89,11 @@ def _load_suite_files(cases_dir: Path, suite_filter: Sequence[str]) -> List[Dict
         missing = sorted(selected - present)
         if missing:
             raise ValueError(f"Unknown suite name(s): {', '.join(missing)}")
+    elif not suites:
+        raise ValueError(
+            f"No eval suite files found in {cases_dir}. "
+            "Expected at least one *.json suite definition."
+        )
 
     return suites
 
@@ -370,6 +383,10 @@ async def run_evals(args: argparse.Namespace) -> Dict[str, Any]:
         "passed": sum(1 for r in results if r["passed"]),
         "failed": sum(1 for r in results if not r["passed"]),
     }
+    if summary["total"] == 0:
+        raise ValueError(
+            "No eval cases were executed. Check suite definitions and filters."
+        )
     summary["pass_rate"] = (summary["passed"] / summary["total"] * 100.0) if summary["total"] else 0.0
 
     suite_summaries: Dict[str, Dict[str, int]] = defaultdict(lambda: {"total": 0, "passed": 0, "failed": 0})
@@ -464,7 +481,16 @@ def main() -> int:
             print(preflight_error)
             print("=" * 60)
             return 2
-    payload = asyncio.run(run_evals(args))
+    try:
+        payload = asyncio.run(run_evals(args))
+    except ValueError as exc:
+        print("LLM Eval Harness")
+        print("=" * 60)
+        print(f"Mode: {args.mode}")
+        print("Status: blocked")
+        print(str(exc))
+        print("=" * 60)
+        return 2
     output_path = write_report(payload, args.output)
     print_summary(payload, output_path)
     return 0 if payload["summary"]["failed"] == 0 else 1
