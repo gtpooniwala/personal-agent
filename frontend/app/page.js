@@ -279,18 +279,18 @@ export default function HomePage() {
 
   const uploadFiles = useCallback(
     async (files) => {
-      uploadRunRef.current += 1;
-      const uploadRunId = uploadRunRef.current;
-      if (uploadResetTimerRef.current) {
-        clearTimeout(uploadResetTimerRef.current);
-        uploadResetTimerRef.current = null;
-      }
-
       const pdfFiles = files.filter((file) => file.type === "application/pdf");
 
       if (pdfFiles.length === 0) {
         setDocumentError("Please select PDF files only.");
         return;
+      }
+
+      uploadRunRef.current += 1;
+      const uploadRunId = uploadRunRef.current;
+      if (uploadResetTimerRef.current) {
+        clearTimeout(uploadResetTimerRef.current);
+        uploadResetTimerRef.current = null;
       }
 
       setUploading(true);
