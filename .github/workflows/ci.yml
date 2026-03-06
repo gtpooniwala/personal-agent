@@ -78,7 +78,7 @@ jobs:
 
       - name: Run backend unit tests
         run: |
-          python -m unittest discover -s tests -p "test_*.py" -v
+          python tests/run_unit_tests.py
 
   frontend_tests:
     name: frontend-tests
