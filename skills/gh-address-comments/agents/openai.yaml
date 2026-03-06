@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitHub Address Comments"
+  short_description: "Triage and resolve PR comments"
+  default_prompt: "Review all open PR comments and threads, classify each one (fix-now, discuss, defer-with-issue, no-action), take action, and resolve threads only after disposition and follow-through."

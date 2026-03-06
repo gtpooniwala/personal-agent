@@ -1,0 +1,4 @@
+interface:
+  display_name: "Repo Workflow Env"
+  short_description: "Set up branch/worktree + rebase checkpoints"
+  default_prompt: "Set up this task in a compliant worktree/branch, verify workflow guardrails, and report the ready-to-code environment."

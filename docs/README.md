@@ -6,7 +6,7 @@ Comprehensive documentation for the Personal Agent MVP - an intelligent AI assis
 
 ### 🏗️ **Core Architecture**
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) - System architecture and design patterns
-- [`AGENT.md`](AGENT.md) - AI agent architecture and LangGraph implementation
+- [`../AGENT.md`](../AGENT.md) - AI coding agent workflow contract
 - [`SYSTEM_FLOW.md`](SYSTEM_FLOW.md) - Detailed system flow, logic, and decision-making processes
 - [`FEATURES_OVERVIEW.md`](FEATURES_OVERVIEW.md) - Comprehensive overview of all implemented features
 
@@ -48,7 +48,7 @@ Comprehensive documentation for the Personal Agent MVP - an intelligent AI assis
 
 ### For Developers
 - **Getting Started**: [`SETUP.md`](SETUP.md) → [`DEVELOPMENT_GUIDE.md`](DEVELOPMENT_GUIDE.md)
-- **Architecture Deep Dive**: [`ARCHITECTURE.md`](ARCHITECTURE.md) → [`AGENT.md`](AGENT.md)
+- **Architecture Deep Dive**: [`ARCHITECTURE.md`](ARCHITECTURE.md) → [`../AGENT.md`](../AGENT.md)
 - **Adding Features**: [`FEATURE_TEMPLATE.md`](FEATURE_TEMPLATE.md) → [`features/`](features/)
 
 ### For Users

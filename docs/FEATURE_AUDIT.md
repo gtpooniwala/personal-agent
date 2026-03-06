@@ -172,7 +172,7 @@
 
 ### ✅ Complete Documentation
 - `README.md` - Main project documentation
-- `AGENT.md` - Technical architecture and editing guide
+- `AGENT.md` - AI coding agent workflow contract
 - `docs/features/conversation_summarisation.md` - Summarization system
 - `docs/features/GMAIL_TOOL.md` - Gmail integration documentation
 - `docs/features/RESPONSE_AGENT_SYSTEM.md` - Response agent documentation
@@ -181,7 +181,7 @@
 
 ### 🔄 Needs Updates
 - Feature status indicators in README.md
-- Tool availability matrix in AGENT.md
+- Tool availability matrix in architecture/features docs
 - API endpoint documentation
 - Frontend component documentation
 
