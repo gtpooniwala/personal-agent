@@ -19,7 +19,6 @@ Workflow:
 - `done`
 
 ## Now
-- [ ] `in_progress` Make local test workflow runnable and reduce skip-only passes ([#10](https://github.com/gtpooniwala/personal-agent/issues/10))
 - [ ] `todo` Add baseline observability and core runtime counters ([#11](https://github.com/gtpooniwala/personal-agent/issues/11))
 - [ ] `todo` Make Gmail tool optional in active tool list unless configured ([#12](https://github.com/gtpooniwala/personal-agent/issues/12))
 - [ ] `todo` Start migration core implementation sequence from `Migration Track` (`#15` + `#17`, then `#16`)
@@ -56,6 +55,7 @@ Execution sequence after #14:
 - [x] `done` Replace calculator `eval` with safe parser/evaluator ([#7](https://github.com/gtpooniwala/personal-agent/issues/7))
 - [x] `done` Remove XSS-prone `innerHTML` rendering in chat/conversation/document UIs ([#8](https://github.com/gtpooniwala/personal-agent/issues/8))
 - [x] `done` Fix upload error path referencing uninitialized `document_id` ([#9](https://github.com/gtpooniwala/personal-agent/issues/9))
+- [x] `done` Make local test workflow runnable and reduce skip-only passes ([#10](https://github.com/gtpooniwala/personal-agent/issues/10))
 - [x] `done` Publish migration architecture contract + PR decomposition ([#14](https://github.com/gtpooniwala/personal-agent/issues/14))
 - [x] `done` Upgrade to latest LangChain/LangGraph stack ([#22](https://github.com/gtpooniwala/personal-agent/issues/22))
 - [x] `done` Build real LLM/workflow evaluation harness ([#23](https://github.com/gtpooniwala/personal-agent/issues/23))
@@ -66,8 +66,7 @@ Execution sequence after #14:
 ## Notes
 - Keep items small enough to land in one commit when possible.
 - Prefer one GitHub issue per item, linked directly above.
-- Issue #10 progress snapshot: completed CI split into backend/frontend/repo checks with `detect-changes` gating and required aggregate gate.
-- Issue #10 remaining work: one documented local command that installs deps and runs meaningful tests; skip-only runs must surface as non-pass signal.
+- Issue #10 complete: local checks now run from one documented command with dependency setup, guarded unittest execution, and deterministic repo checks.
 - Milestone alignment:
 - `01 Foundation Hardening`: #7-#13
 - `02 Runtime Migration Core`: #14-#17

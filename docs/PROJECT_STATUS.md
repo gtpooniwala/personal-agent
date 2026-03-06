@@ -8,10 +8,10 @@ Single source of truth for current implementation status, known risks, and execu
 ## Current State Snapshot
 - Branch health: `main` tracking `origin/main`
 - Deterministic repository checks: `tests/run_repo_checks.py` passing (`12/12` on March 5, 2026)
-- Unit test suite: present, but local run currently dependency-gated in bare environments
-- Issue `#10` status: in progress (CI split work landed; local runnable test path and skip-only non-pass signaling still pending)
+- Unit test suite: runnable via `scripts/run_local_checks.sh` with guarded unittest execution (`tests/run_unit_tests.py`)
+- Issue `#10` status: complete (standard local test workflow + skip-only non-pass signal implemented)
 - Runtime profile: local-first FastAPI + LangGraph + SQLite + Next.js frontend
-- Foundation P0 baseline status: `#7`, `#8`, and `#9` are closed; remaining foundation work is `#10`-`#13`.
+- Foundation P0 baseline status: `#7`, `#8`, `#9`, and `#10` are closed; remaining foundation work is `#11`-`#13`.
 - Migration status: architecture contract (`#14`) and prerequisite upgrades/eval harness (`#22`, `#23`) are closed; core runtime implementation (`#15`-`#19`) remains open.
 - Active tracking: milestone-backed issues plus migration/frontend follow-ups (`#28`, `#29`, `#30`, `#31`).
 
@@ -39,10 +39,9 @@ Confidence rubric:
 - Runtime observability baseline is not in place yet (`#11`).
 - Frontend send-path race across conversations remains open (`#31`).
 - Behavioral eval coverage is still limited; current repository checks are mostly static invariants.
-- `#10` remaining gap: default local unittest flow is still dependency-gated and can produce skip-heavy outcomes.
 
 ## Immediate Priorities
-1. Complete remaining Foundation Hardening issues (`#10`, `#11`, `#12`, `#13`).
+1. Complete remaining Foundation Hardening issues (`#11`, `#12`, `#13`).
 2. Land core migration implementation in documented order (`#15` + `#17`, then `#16`).
 3. Address migration follow-up runtime fixes (`#28`, `#29`) before scheduler work.
 4. Expand runtime evals and lifecycle validation (`#19`) before autonomous workflows (`#18`).

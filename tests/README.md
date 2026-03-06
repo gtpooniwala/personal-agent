@@ -2,13 +2,26 @@
 
 This directory contains automated tests and deterministic repository checks.
 
-## Run Unit Tests
+## Run Standard Local Checks
 
 ```bash
-python -m unittest discover -s tests -p "test_*.py"
+scripts/run_local_checks.sh
 ```
 
-Recommended (with `pytest` installed):
+This command installs backend dependencies into `.venv`, runs guarded unit tests, and then runs deterministic repository checks.
+
+## Run Guarded Unit Tests Only
+
+```bash
+python3 tests/run_unit_tests.py
+```
+
+`tests/run_unit_tests.py` returns non-pass when:
+- no tests are discovered
+- all discovered tests are skipped
+- standard unittest failures/errors occur
+
+Optional (with `pytest` installed):
 
 ```bash
 pytest tests -q

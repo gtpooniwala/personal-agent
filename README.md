@@ -117,6 +117,27 @@ docker compose up --build
 docker compose down
 ```
 
+### Docker Troubleshooting
+
+Rebuild and restart services:
+
+```bash
+docker compose up --build -d
+docker compose ps
+```
+
+Inspect logs:
+
+```bash
+docker compose logs -f personal-agent frontend
+```
+
+Clean shutdown:
+
+```bash
+docker compose down
+```
+
 ## Debugging Without Docker (Optional)
 
 Use this only when you need local debugging outside containers.
@@ -153,11 +174,29 @@ Use these for local debugging if your environment matches their assumptions.
 
 ## Running Tests
 
+Standard local validation command:
+
 ```bash
-python -m unittest discover -s tests -p "test_*.py"
+scripts/run_local_checks.sh
 ```
 
-Optional (if you use `pytest`):
+This command:
+- creates `.venv` if needed
+- installs backend dependencies
+- runs guarded unit tests (`tests/run_unit_tests.py`)
+- runs deterministic repository checks (`tests/run_repo_checks.py`)
+
+Guardrails:
+- no discovered tests = non-pass
+- skip-only unit test runs = non-pass
+
+Optional direct unit-test runner:
+
+```bash
+python3 tests/run_unit_tests.py
+```
+
+Optional (if you use `pytest` directly):
 
 ```bash
 pytest tests -q
