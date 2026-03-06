@@ -8,7 +8,7 @@ Move from strong prototype to production-ready personal AI agent with reliable b
 Current high-priority execution objective: implement and validate the async run model (`#15`-`#17`) now that migration design and prerequisite upgrades are complete (`#14`, `#22`, `#23`).
 
 ## Now (Stabilize Core)
-- Finish remaining Foundation Hardening items (`#10`-`#13`).
+- Complete in-flight Foundation Hardening work (`#10`, `#11`, `#12`) and land Gmail reliability follow-up (`#40`).
 - Implement durable run lifecycle schema + async submission/status/event contracts (`#15`, `#17`).
 - Sequence worker execution and per-session serialization after data contract freeze (`#16`).
 - Address active frontend send correctness risk (`#31`) and IME Enter handling (`#30`).
@@ -23,7 +23,7 @@ Success criteria:
 - Add runtime eval coverage for lifecycle transitions, retries, and session isolation (`#19`).
 - Add scheduler/heartbeat primitives for autonomous workflows after core runtime stabilizes (`#18`).
 - Resolve async-path follow-up correctness/cleanup items (`#28`, `#29`).
-- Continue integration ergonomics and cleanup (`#12`, `#13` if still open).
+- Continue integration ergonomics and cleanup after foundation follow-ups settle (`#40`, then frontend polish).
 
 Success criteria:
 - Machine-readable runtime eval report with CI-friendly pass/fail signals.
@@ -54,4 +54,4 @@ Success criteria:
 - Future backlog milestone: [Backlog / Future](https://github.com/gtpooniwala/personal-agent/milestone/4)
 - Completed migration prerequisites: [#14](https://github.com/gtpooniwala/personal-agent/issues/14) (design + PR decomposition), [#22](https://github.com/gtpooniwala/personal-agent/issues/22), [#23](https://github.com/gtpooniwala/personal-agent/issues/23)
 - Core migration implementation set: [#15](https://github.com/gtpooniwala/personal-agent/issues/15), [#17](https://github.com/gtpooniwala/personal-agent/issues/17), [#16](https://github.com/gtpooniwala/personal-agent/issues/16), [#19](https://github.com/gtpooniwala/personal-agent/issues/19), [#18](https://github.com/gtpooniwala/personal-agent/issues/18)
-- Active migration/frontend follow-ups: [#28](https://github.com/gtpooniwala/personal-agent/issues/28), [#29](https://github.com/gtpooniwala/personal-agent/issues/29), [#31](https://github.com/gtpooniwala/personal-agent/issues/31), [#30](https://github.com/gtpooniwala/personal-agent/issues/30)
+- Active migration/frontend follow-ups: [#28](https://github.com/gtpooniwala/personal-agent/issues/28), [#29](https://github.com/gtpooniwala/personal-agent/issues/29), [#31](https://github.com/gtpooniwala/personal-agent/issues/31), [#30](https://github.com/gtpooniwala/personal-agent/issues/30), [#40](https://github.com/gtpooniwala/personal-agent/issues/40)

@@ -19,13 +19,15 @@ Workflow:
 - `done`
 
 ## Now
-- [ ] `todo` Add baseline observability and core runtime counters ([#11](https://github.com/gtpooniwala/personal-agent/issues/11))
-- [ ] `todo` Make Gmail tool optional in active tool list unless configured ([#12](https://github.com/gtpooniwala/personal-agent/issues/12))
+- [ ] `in_progress` Make local test workflow runnable and reduce skip-only passes ([#10](https://github.com/gtpooniwala/personal-agent/issues/10))
+- [ ] `in_progress` Add baseline observability and core runtime counters ([#11](https://github.com/gtpooniwala/personal-agent/issues/11))
+- [ ] `in_progress` Make Gmail tool optional in active tool list unless configured ([#12](https://github.com/gtpooniwala/personal-agent/issues/12))
+- [ ] `todo` Fix Gmail auth flow and dependency packaging ([#40](https://github.com/gtpooniwala/personal-agent/issues/40))
 - [ ] `todo` Start migration core implementation sequence from `Migration Track` (`#15` + `#17`, then `#16`)
 
 ## Next
-- [ ] `todo` Cleanup frontend rough edges and duplicate utility logic ([#13](https://github.com/gtpooniwala/personal-agent/issues/13))
 - [ ] `todo` Prevent cross-conversation message race on send ([#31](https://github.com/gtpooniwala/personal-agent/issues/31))
+- [ ] `todo` Guard Enter key send during IME composition ([#30](https://github.com/gtpooniwala/personal-agent/issues/30))
 
 ## Migration Track
 - [x] `done` Publish migration architecture contract + PR decomposition for long-running runtime ([#14](https://github.com/gtpooniwala/personal-agent/issues/14))
@@ -55,8 +57,9 @@ Execution sequence after #14:
 - [x] `done` Replace calculator `eval` with safe parser/evaluator ([#7](https://github.com/gtpooniwala/personal-agent/issues/7))
 - [x] `done` Remove XSS-prone `innerHTML` rendering in chat/conversation/document UIs ([#8](https://github.com/gtpooniwala/personal-agent/issues/8))
 - [x] `done` Fix upload error path referencing uninitialized `document_id` ([#9](https://github.com/gtpooniwala/personal-agent/issues/9))
-- [x] `done` Make local test workflow runnable and reduce skip-only passes ([#10](https://github.com/gtpooniwala/personal-agent/issues/10))
+- [x] `done` Cleanup frontend rough edges and duplicate utility logic ([#13](https://github.com/gtpooniwala/personal-agent/issues/13))
 - [x] `done` Publish migration architecture contract + PR decomposition ([#14](https://github.com/gtpooniwala/personal-agent/issues/14))
+- [x] `done` Enforce branch/worktree/PR policy checks ([#20](https://github.com/gtpooniwala/personal-agent/issues/20))
 - [x] `done` Upgrade to latest LangChain/LangGraph stack ([#22](https://github.com/gtpooniwala/personal-agent/issues/22))
 - [x] `done` Build real LLM/workflow evaluation harness ([#23](https://github.com/gtpooniwala/personal-agent/issues/23))
 - [x] `done` Move frontend from static HTML/JS to Next.js ([#24](https://github.com/gtpooniwala/personal-agent/issues/24))
@@ -66,9 +69,10 @@ Execution sequence after #14:
 ## Notes
 - Keep items small enough to land in one commit when possible.
 - Prefer one GitHub issue per item, linked directly above.
-- Issue #10 complete: local checks now run from one documented command with dependency setup, guarded unittest execution, and deterministic repo checks.
+- Status source of truth for execution tracking is this file + [`ROADMAP.md`](ROADMAP.md).
+- Deprecated status docs removed: `PROJECT_STATUS.md` and `SUGGESTED_CHANGES.md`.
 - Milestone alignment:
-- `01 Foundation Hardening`: #7-#13
+- `01 Foundation Hardening`: #7-#13, #40
 - `02 Runtime Migration Core`: #14-#17
 - `03 Workflow Automation`: #18-#19
 - `Backlog / Future`: #1-#6

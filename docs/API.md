@@ -1,32 +1,32 @@
 # API Documentation
 
-## Base URL
-- **Development host**: `http://127.0.0.1:8000`
-- **Interactive Docs**: `http://127.0.0.1:8000/docs`
-- **OpenAPI Schema**: `http://127.0.0.1:8000/openapi.json`
-- **Primary route notation in this doc**: bare paths (`/chat`, `/runs`, ...)
-- **Legacy route notation**: `/api/v1/...` (older deployments)
-- **Current implementation note**: on current mainline backend, prepend `/api/v1` to endpoint paths.
-- **Migration note**: bare-route notation documents the soon-to-land async runtime surface.
+## Scope And Status (As Of March 6, 2026)
+This document intentionally separates:
+- `Implemented now` behavior available on `main`.
+- `Planned target` behavior for the async runtime migration.
+
+Do not treat planned endpoints as currently available unless issues [#15](https://github.com/gtpooniwala/personal-agent/issues/15) and [#17](https://github.com/gtpooniwala/personal-agent/issues/17) are merged.
+
+## Base URLs
+- Development host: `http://127.0.0.1:8000`
+- Interactive docs: `http://127.0.0.1:8000/docs`
+- OpenAPI schema: `http://127.0.0.1:8000/openapi.json`
+
+Routing conventions:
+- Implemented now: all API routes are mounted under `/api/v1`.
+- Planned target: runtime endpoints also exposed as bare routes (`/chat`, `/runs`, ...).
 
 ## Authentication
-Currently, the MVP uses a default user system. No authentication is required for API calls.
+Implemented now: no auth; single default-user behavior.
 
-## Core Endpoints
+## Endpoint Matrix
 
-### Runtime APIs
+### Implemented Now (Current Mainline)
 
-Current implementation (today):
-- `POST /api/v1/chat` (legacy synchronous behavior).
+#### POST `/api/v1/chat`
+Current behavior: synchronous chat request/response.
 
-Target runtime behavior (rolling out soon):
-- `POST /chat` and `POST /runs` submit asynchronous work and return a run handle.
-- `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events` provide polling visibility.
-
-#### POST `/runs`
-Submit work to the orchestrator asynchronously.
-
-**Request Body:**
+Request body:
 ```json
 {
   "message": "What's 2 + 2?",
@@ -35,7 +35,87 @@ Submit work to the orchestrator asynchronously.
 }
 ```
 
-**Response:**
+Response body:
+```json
+{
+  "response": "2 + 2 = 4",
+  "conversation_id": "conv-uuid",
+  "agent_actions": [
+    {
+      "tool": "calculator",
+      "input": "2+2",
+      "output": "4"
+    }
+  ],
+  "token_usage": 123,
+  "cost": 0.00012,
+  "error": false
+}
+```
+
+#### GET `/api/v1/conversations`
+Get all conversations.
+
+#### POST `/api/v1/conversations`
+Create conversation.
+
+Request body:
+```json
+{
+  "title": "New Conversation"
+}
+```
+
+#### GET `/api/v1/conversations/{conversation_id}/messages`
+Get messages for one conversation.
+
+#### POST `/api/v1/conversations/{conversation_id}/generate-title`
+Generate a title for an existing conversation.
+
+#### GET `/api/v1/tools`
+List available tools.
+
+#### POST `/api/v1/documents/upload`
+Upload PDF (`multipart/form-data`, `file`, max 50MB).
+
+#### GET `/api/v1/documents`
+List uploaded documents.
+
+#### DELETE `/api/v1/documents/{document_id}`
+Delete a document.
+
+#### GET `/api/v1/health`
+Service health endpoint.
+
+Response body:
+```json
+{
+  "status": "healthy",
+  "timestamp": "2026-03-06T10:00:00Z",
+  "version": "1.0.0"
+}
+```
+
+### Planned Target (Not Yet Implemented On Main)
+
+These endpoints document migration intent and are not guaranteed to exist yet:
+
+#### POST `/chat`
+Target behavior: asynchronous submit endpoint returning `run_id`.
+
+#### POST `/runs`
+Target behavior: asynchronous submit endpoint returning `run_id`.
+
+Planned request body:
+```json
+{
+  "message": "What's 2 + 2?",
+  "conversation_id": "optional-uuid",
+  "selected_documents": ["doc-id-1", "doc-id-2"]
+}
+```
+
+Planned response body:
 ```json
 {
   "run_id": "run-uuid",
@@ -45,9 +125,9 @@ Submit work to the orchestrator asynchronously.
 ```
 
 #### GET `/runs/{run_id}/status`
-Get current run lifecycle status.
+Target behavior: return lifecycle state for polling clients.
 
-**Response:**
+Planned response body:
 ```json
 {
   "run_id": "run-uuid",
@@ -61,12 +141,9 @@ Get current run lifecycle status.
 ```
 
 #### GET `/runs/{run_id}/events`
-Get ordered run progress messages for polling UIs and logging.
+Target behavior: ordered progress events for polling UIs.
 
-Contract note: cursor/pagination parameters for this endpoint are intentionally left flexible in this phase.
-Before finalizing the implementation contract, the AI coding agent must confirm details with the user.
-
-**Response:**
+Planned response body:
 ```json
 {
   "run_id": "run-uuid",
@@ -80,7 +157,7 @@ Before finalizing the implementation contract, the AI coding agent must confirm 
     {
       "type": "tool_call",
       "status": "running",
-      "tool": "Calculator",
+      "tool": "calculator",
       "message": "Tool selected and executing",
       "created_at": "2026-03-06T10:00:02Z"
     }
@@ -88,165 +165,68 @@ Before finalizing the implementation contract, the AI coding agent must confirm 
 }
 ```
 
-#### POST `/chat`
-Asynchronous conversational submission endpoint.
-
-Target behavior: `POST /chat` and `POST /runs` both submit asynchronous work and return a run handle.
-Legacy `POST /api/v1/chat` synchronous behavior is deprecated and should be removed after migration completion.
-
-#### GET `/conversations`
-Get all conversations for the user.
-
-**Response:**
-```json
-[
-  {
-    "id": "conv-uuid",
-    "title": "Mathematical Calculations",
-    "created_at": "2025-06-08T10:00:00Z",
-    "updated_at": "2025-06-08T10:30:00Z",
-    "message_count": 4
-  }
-]
-```
-
-#### POST `/conversations`
-Create a new conversation.
-
-**Request Body:**
-```json
-{
-  "title": "New Conversation"
-}
-```
-
-#### GET `/conversations/{conversation_id}/messages`
-Get messages for a specific conversation.
-
-**Response:**
-```json
-[
-  {
-    "role": "user",
-    "content": "Hello!",
-    "timestamp": "2025-06-08T10:00:00Z",
-    "token_usage": null,
-    "agent_actions": null
-  },
-  {
-    "role": "assistant", 
-    "content": "Hello! How can I help you today?",
-    "timestamp": "2025-06-08T10:00:01Z",
-    "token_usage": 45,
-    "agent_actions": []
-  }
-]
-```
-
-#### POST `/conversations/{conversation_id}/generate-title`
-Manually generate a title for a conversation.
-
-**Response:**
-```json
-{
-  "conversation_id": "conv-uuid",
-  "title": "Generated Title",
-  "generated_at": "2025-06-08T10:00:00Z"
-}
-```
-
-### Tools
-
-#### GET `/tools`
-Get list of available tools.
-
-**Response:**
-```json
-[
-  {
-    "name": "Calculator",
-    "description": "Perform mathematical calculations"
-  },
-  {
-    "name": "CurrentTime", 
-    "description": "Get current date and time"
-  }
-]
-```
-
-### Documents
-
-#### POST `/documents/upload`
-Upload a PDF document for processing.
-
-**Request:**
-- Content-Type: `multipart/form-data`
-- File field: `file` (PDF, max 50MB)
-
-**Response:**
-```json
-{
-  "document_id": "doc-uuid",
-  "filename": "document.pdf",
-  "file_size": 1024000,
-  "status": "processing",
-  "message": "Document uploaded successfully and is being processed"
-}
-```
-
-#### GET `/documents`
-Get list of uploaded documents.
-
-**Response:**
-```json
-{
-  "documents": [
-    {
-      "id": "doc-uuid",
-      "filename": "document.pdf", 
-      "file_size": 1024000,
-      "uploaded_at": "2025-06-08T10:00:00Z",
-      "processed": true,
-      "total_chunks": 25
-    }
-  ],
-  "total_count": 1
-}
-```
-
-#### DELETE `/documents/{document_id}`
-Delete a document and its associated data.
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Document deleted successfully"
-}
-```
-
-### System
-
-#### GET `/health`
-Health check endpoint.
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "timestamp": "2025-06-08T10:00:00Z",
-  "version": "1.0.0"
-}
-```
+Contract note: pagination/cursor shape for events remains intentionally flexible until `#17` is finalized.
 
 ## Data Models
 
-### Run Model
+### Implemented Models
+
+#### ChatResponse
 ```json
 {
-  "run_id": "run-uuid",
+  "response": "string",
+  "conversation_id": "string",
+  "agent_actions": "array|null",
+  "token_usage": "number|null",
+  "cost": "number|null",
+  "error": "boolean"
+}
+```
+
+#### Message
+```json
+{
+  "id": "string",
+  "role": "user|assistant",
+  "content": "string",
+  "timestamp": "ISO-8601 datetime",
+  "agent_actions": "array|null",
+  "token_usage": "number|null"
+}
+```
+
+#### Conversation
+```json
+{
+  "id": "string",
+  "title": "string",
+  "created_at": "ISO-8601 datetime",
+  "updated_at": "ISO-8601 datetime",
+  "message_count": "number|null"
+}
+```
+
+#### Document
+```json
+{
+  "id": "string",
+  "filename": "string",
+  "file_size": "number",
+  "uploaded_at": "ISO-8601 datetime",
+  "processed": "boolean",
+  "total_chunks": "number",
+  "summary": "string"
+}
+```
+
+### Planned Runtime Models (Migration Target)
+
+#### Run
+```json
+{
+  "run_id": "string",
   "status": "queued|running|retrying|succeeded|failed|cancelling|cancelled",
-  "conversation_id": "conv-uuid",
+  "conversation_id": "string",
   "created_at": "ISO-8601 datetime",
   "updated_at": "ISO-8601 datetime",
   "error": "string|null",
@@ -254,104 +234,39 @@ Health check endpoint.
 }
 ```
 
-### Run Event
+#### RunEvent
 ```json
 {
   "type": "started|tool_call|tool_result|retrying|failed|succeeded|cancelled",
   "status": "queued|running|retrying|succeeded|failed|cancelling|cancelled",
   "message": "string",
-  "tool": "optional string",
+  "tool": "string|null",
   "created_at": "ISO-8601 datetime"
-}
-```
-
-### Message Model
-```json
-{
-  "role": "user|assistant",
-  "content": "string",
-  "timestamp": "ISO-8601 datetime",
-  "token_usage": "number|null",
-  "agent_actions": "array|null"
-}
-```
-
-### Agent Action Model
-```json
-{
-  "tool": "string",
-  "input": "string", 
-  "output": "string"
-}
-```
-
-### Conversation Model
-```json
-{
-  "id": "uuid",
-  "title": "string",
-  "created_at": "ISO-8601 datetime",
-  "updated_at": "ISO-8601 datetime", 
-  "message_count": "number"
-}
-```
-
-### Document Model
-```json
-{
-  "id": "uuid",
-  "filename": "string",
-  "file_size": "number",
-  "uploaded_at": "ISO-8601 datetime",
-  "processed": "boolean",
-  "total_chunks": "number"
 }
 ```
 
 ## Error Handling
 
-### Standard Error Response
+Standard error payload:
 ```json
 {
   "detail": "Error message describing what went wrong"
 }
 ```
 
-### Common HTTP Status Codes
-- `200` - Success
-- `400` - Bad Request (validation error, invalid input)
-- `404` - Not Found (conversation, document, etc.)
-- `409` - Conflict (invalid state transition)
-- `500` - Internal Server Error
-
-### Specific Error Cases
-
-#### Document Upload Errors
-- `400` - Invalid file type (only PDF supported)
-- `400` - File too large (max 50MB)
-- `500` - Processing failure
-
-#### Conversation Errors
-- `404` - Conversation not found
-- `400` - Unable to generate title (too few messages)
-
-#### Run Errors
-- `404` - Run not found
-- `409` - Invalid state transition (for example, canceling terminal run)
-- `422` - Invalid run payload
-
-## Rate Limiting
-Currently no rate limiting is implemented. For production deployment, consider implementing rate limiting based on:
-- Requests per minute per IP
-- Token usage limits
-- Document upload limits
+Common status codes:
+- `200` success
+- `400` invalid input
+- `404` resource missing
+- `409` invalid state transition (target run lifecycle)
+- `422` invalid payload shape
+- `500` internal server error
 
 ## Usage Examples
 
-### Basic Chat Flow
+### Implemented Now: Synchronous Chat
 ```javascript
-// Start a new conversation
-const runSubmit = await fetch('/runs', {
+const response = await fetch('/api/v1/chat', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -361,83 +276,30 @@ const runSubmit = await fetch('/runs', {
   })
 });
 
-const runData = await runSubmit.json();
-const maxAttempts = 120; // 60s total with 500ms interval
-
-let status = await (await fetch(`/runs/${runData.run_id}/status`)).json();
-for (let attempts = 0; attempts < maxAttempts && (status.status === 'queued' || status.status === 'running' || status.status === 'retrying'); attempts++) {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  status = await (await fetch(`/runs/${runData.run_id}/status`)).json();
-}
-if (status.status === 'queued' || status.status === 'running' || status.status === 'retrying') {
-  throw new Error('Run polling timed out');
-}
-
-if (status.status === 'succeeded') {
-  const events = await (await fetch(`/runs/${runData.run_id}/events`)).json();
-  console.log('Run succeeded', status, events);
-} else {
-  console.error('Run failed', status.error);
-}
+const data = await response.json();
+console.log(data.response, data.conversation_id);
 ```
 
-### Document Q&A Flow
+### Planned Target: Async Run Polling
 ```javascript
-// Upload document
-const formData = new FormData();
-formData.append('file', pdfFile);
-
-const uploadResponse = await fetch('/documents/upload', {
-  method: 'POST',
-  body: formData
-});
-
-const uploadResult = await uploadResponse.json();
-
-// Query the document
-const queryResponse = await fetch('/runs', {
+const submit = await fetch('/runs', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    message: "Summarize the uploaded document",
-    conversation_id: "existing-conv-id",
-    selected_documents: [uploadResult.document_id]
+    message: 'Summarize the uploaded document',
+    conversation_id: 'existing-conv-id',
+    selected_documents: ['doc-id']
   })
 });
 
-const queryRunData = await queryResponse.json();
-const queryMaxAttempts = 120; // 60s total with 500ms interval
-let queryStatus = await (await fetch(`/runs/${queryRunData.run_id}/status`)).json();
-for (let attempts = 0; attempts < queryMaxAttempts && (queryStatus.status === 'queued' || queryStatus.status === 'running' || queryStatus.status === 'retrying'); attempts++) {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  queryStatus = await (await fetch(`/runs/${queryRunData.run_id}/status`)).json();
-}
-if (queryStatus.status === 'queued' || queryStatus.status === 'running' || queryStatus.status === 'retrying') {
-  throw new Error('Document query run polling timed out');
+const { run_id } = await submit.json();
+let status = await (await fetch(`/runs/${run_id}/status`)).json();
+while (['queued', 'running', 'retrying'].includes(status.status)) {
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  status = await (await fetch(`/runs/${run_id}/status`)).json();
 }
 ```
 
-### Conversation Management
-```javascript
-// Get all conversations
-const conversations = await fetch('/conversations').then(r => r.json());
-
-// Get specific conversation messages
-const messages = await fetch(`/conversations/${convId}/messages`)
-  .then(r => r.json());
-
-// Generate title for conversation
-const titleResponse = await fetch(`/conversations/${convId}/generate-title`, {
-  method: 'POST'
-});
-```
-
-## WebSocket Support
-The current implementation uses HTTP polling for run status/events. For future real-time migration, consider SSE/WebSocket endpoints for:
-- Streamed run status transitions
-- Mid-run cancellation and control events
-- Lightweight presence updates
-
----
-
-For interactive API exploration, visit the auto-generated docs at `/docs` when running the server.
+## Realtime Notes
+Implemented now: polling style interactions.
+Planned target: SSE/WebSocket can be considered after async run lifecycle is stable.

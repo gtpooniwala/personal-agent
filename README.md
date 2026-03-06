@@ -328,10 +328,8 @@ Design choices reflected in this implementation:
 - [Runtime Migration Architecture](docs/MIGRATION_RUNTIME_ARCHITECTURE.md)
 - [Feature Overview](docs/FEATURES_OVERVIEW.md)
 - [Development Guide](docs/DEVELOPMENT_GUIDE.md)
-- [Project Status](docs/PROJECT_STATUS.md)
 - [Workboard](docs/WORKBOARD.md)
 - [Roadmap](docs/ROADMAP.md)
-- [Suggested Changes Tracker](docs/SUGGESTED_CHANGES.md)
 - [Engineering Workflow](docs/ENGINEERING_WORKFLOW.md)
 - [GitHub Issues](https://github.com/gtpooniwala/personal-agent/issues)
 
