@@ -30,6 +30,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "run_checks=true" >> "$GITHUB_OUTPUT"
+            echo "run_frontend_checks=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git fetch origin "${{ github.base_ref }}"
@@ -40,12 +41,38 @@ jobs:
           else
             echo "run_checks=false" >> "$GITHUB_OUTPUT"
           fi
+          if echo "$CHANGED" | grep -E '^frontend/'; then
+            echo "run_frontend_checks=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_frontend_checks=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install dependencies
         if: steps.changes.outputs.run_checks == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
+
+      - name: Setup Node
+        if: steps.changes.outputs.run_frontend_checks == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        if: steps.changes.outputs.run_frontend_checks == 'true'
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run frontend checks
+        if: steps.changes.outputs.run_frontend_checks == 'true'
+        run: |
+          cd frontend
+          npm run lint
+          npm run build
 
       - name: Run unit tests
         if: steps.changes.outputs.run_checks == 'true'
