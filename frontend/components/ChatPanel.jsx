@@ -94,6 +94,10 @@ export default function ChatPanel({
           placeholder="Type your message here..."
           onChange={(event) => onChangeMessage(event.target.value)}
           onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing || event.keyCode === 229) {
+              return;
+            }
+
             if (event.key === "Enter") {
               event.preventDefault();
               onSendMessage();

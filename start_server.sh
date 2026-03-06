@@ -43,7 +43,7 @@ echo "✅ Backend server started in a new Terminal window."
 # Open frontend Next.js dev server in new Terminal window
 osascript <<END
   tell application "Terminal"
-    do script "cd \"$PROJECT_ROOT/frontend\"; if [ ! -d node_modules ]; then npm install; fi; npm run dev"
+    do script "cd \"$PROJECT_ROOT/frontend\"; if [ ! -d node_modules ]; then npm install || exit 1; fi; npm run dev || exit 1"
     activate
   end tell
 END

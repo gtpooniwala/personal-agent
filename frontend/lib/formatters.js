@@ -13,27 +13,35 @@ export function formatRelativeTime(dateString) {
   }
 
   const diffMs = Date.now() - parsed.getTime();
-  const seconds = Math.floor(diffMs / 1000);
-  const minutes = Math.floor(diffMs / 60000);
-  const hours = Math.floor(diffMs / 3600000);
-  const days = Math.floor(diffMs / 86400000);
+  const isFuture = diffMs < 0;
+  const absoluteDiffMs = Math.abs(diffMs);
+  const seconds = Math.floor(absoluteDiffMs / 1000);
+  const minutes = Math.floor(absoluteDiffMs / 60000);
+  const hours = Math.floor(absoluteDiffMs / 3600000);
+  const days = Math.floor(absoluteDiffMs / 86400000);
   const years = Math.floor(days / 365);
 
-  if (seconds < 30) return "Just now";
-  if (seconds < 60) return `${seconds}s ago`;
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days < 7) return `${days} day${days === 1 ? "" : "s"} ago`;
+  const formatShort = (value, unit) => (isFuture ? `in ${value}${unit}` : `${value}${unit} ago`);
+  const formatLong = (value, unit) =>
+    isFuture
+      ? `in ${value} ${unit}${value === 1 ? "" : "s"}`
+      : `${value} ${unit}${value === 1 ? "" : "s"} ago`;
+
+  if (seconds < 30) return isFuture ? "in a few seconds" : "Just now";
+  if (seconds < 60) return formatShort(seconds, "s");
+  if (minutes < 60) return formatShort(minutes, "m");
+  if (hours < 24) return formatShort(hours, "h");
+  if (days < 7) return formatLong(days, "day");
   if (days < 30) {
     const weeks = Math.max(1, Math.floor(days / 7));
-    return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
+    return formatLong(weeks, "week");
   }
   if (days < 365) {
     const months = Math.max(1, Math.floor(days / 30));
-    return `${months} month${months === 1 ? "" : "s"} ago`;
+    return formatLong(months, "month");
   }
 
-  return `${years} year${years === 1 ? "" : "s"} ago`;
+  return formatLong(years, "year");
 }
 
 export function formatFileSize(bytes) {

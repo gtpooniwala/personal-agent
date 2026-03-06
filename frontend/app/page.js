@@ -51,6 +51,8 @@ export default function HomePage() {
   const [dragActive, setDragActive] = useState(false);
 
   const fileInputRef = useRef(null);
+  const activeConversationIdRef = useRef(null);
+  const latestMessagesRequestRef = useRef(0);
 
   const loadTools = useCallback(async () => {
     try {
@@ -104,17 +106,34 @@ export default function HomePage() {
       return;
     }
 
+    const requestId = latestMessagesRequestRef.current + 1;
+    latestMessagesRequestRef.current = requestId;
+
     setLoadingMessages(true);
     setChatError("");
 
     try {
       const payload = await apiCall(`/conversations/${conversationId}/messages`);
+      if (
+        requestId !== latestMessagesRequestRef.current ||
+        conversationId !== activeConversationIdRef.current
+      ) {
+        return;
+      }
       setMessages(normalizeMessages(payload));
     } catch {
+      if (
+        requestId !== latestMessagesRequestRef.current ||
+        conversationId !== activeConversationIdRef.current
+      ) {
+        return;
+      }
       setMessages([]);
       setChatError("Failed to load conversation messages.");
     } finally {
-      setLoadingMessages(false);
+      if (requestId === latestMessagesRequestRef.current) {
+        setLoadingMessages(false);
+      }
     }
   }, []);
 
@@ -166,12 +185,13 @@ export default function HomePage() {
 
   const sendMessage = useCallback(async () => {
     const trimmedMessage = messageInput.trim();
+    const requestConversationId = currentConversationId;
 
     if (!trimmedMessage || sendingMessage) {
       return;
     }
 
-    if (!currentConversationId) {
+    if (!requestConversationId) {
       setChatError("Create a conversation before sending a message.");
       return;
     }
@@ -206,7 +226,7 @@ export default function HomePage() {
         method: "POST",
         body: JSON.stringify({
           message: trimmedMessage,
-          conversation_id: currentConversationId,
+          conversation_id: requestConversationId,
           selected_documents: Array.from(selectedDocuments),
         }),
       });
@@ -219,30 +239,34 @@ export default function HomePage() {
         agent_actions: response?.agent_actions || [],
       };
 
-      setMessages((previousMessages) => [
-        ...previousMessages.filter((message) => message.id !== thinkingId),
-        assistantMessage,
-      ]);
+      if (activeConversationIdRef.current === requestConversationId) {
+        setMessages((previousMessages) => [
+          ...previousMessages.filter((message) => message.id !== thinkingId),
+          assistantMessage,
+        ]);
+      }
 
-      await loadConversations(currentConversationId);
+      await loadConversations();
     } catch {
-      setMessages((previousMessages) => [
-        ...previousMessages.filter((message) => message.id !== thinkingId),
-        {
-          id: localId("error"),
-          role: "assistant",
-          content: "[Error: Failed to send message]",
-          timestamp: new Date().toISOString(),
-          agent_actions: [],
-        },
-      ]);
-      setChatError("Failed to send message.");
+      if (activeConversationIdRef.current === requestConversationId) {
+        setMessages((previousMessages) => [
+          ...previousMessages.filter((message) => message.id !== thinkingId),
+          {
+            id: localId("error"),
+            role: "assistant",
+            content: "[Error: Failed to send message]",
+            timestamp: new Date().toISOString(),
+            agent_actions: [],
+          },
+        ]);
+        setChatError("Failed to send message.");
+      }
     } finally {
       setSendingMessage(false);
     }
   }, [
-    currentConversationId,
     loadConversations,
+    currentConversationId,
     messageInput,
     selectedDocuments,
     sendingMessage,
@@ -336,6 +360,10 @@ export default function HomePage() {
     void loadConversations();
     void loadDocuments();
   }, [loadConversations, loadDocuments, loadTools]);
+
+  useEffect(() => {
+    activeConversationIdRef.current = currentConversationId;
+  }, [currentConversationId]);
 
   useEffect(() => {
     void loadConversationMessages(currentConversationId);

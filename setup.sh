@@ -34,6 +34,13 @@ if ! command -v npm &> /dev/null; then
     exit 1
 fi
 
+node_major="$(node -v | sed -E 's/^v([0-9]+).*/\1/')"
+if [ -z "$node_major" ] || [ "$node_major" -lt 18 ]; then
+    echo "❌ Node.js 18+ is required for the Next.js frontend."
+    echo "Detected: $(node -v)"
+    exit 1
+fi
+
 echo "📋 Installing frontend dependencies..."
 cd frontend || { echo "❌ frontend directory not found."; exit 1; }
 npm install || { echo "❌ Failed to install frontend dependencies."; exit 1; }
