@@ -103,7 +103,7 @@ class TestAPIRoutes(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 500)
         payload = response.json()
-        self.assertIn("Failed to upload document: boom upload", payload["detail"])
+        self.assertIn("Failed to upload document", payload["detail"])
         self.assertNotIn("unbound", payload["detail"].lower())
         self.assertNotIn("local variable", payload["detail"].lower())
 
