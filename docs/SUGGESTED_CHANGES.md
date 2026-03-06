@@ -17,7 +17,7 @@ Status values: `todo`, `in_progress`, `done`, `blocked`.
 | P0 | done | Replace calculator `eval(...)` with safe expression evaluator | [#7](https://github.com/gtpooniwala/personal-agent/issues/7) |
 | P0 | done | Remove XSS-prone dynamic `innerHTML` rendering in frontend | [#8](https://github.com/gtpooniwala/personal-agent/issues/8) |
 | P0 | done | Fix upload failure path with uninitialized `document_id` | [#9](https://github.com/gtpooniwala/personal-agent/issues/9) |
-| P1 | in_progress | Make local test workflow runnable; reduce skip-only green runs | [#10](https://github.com/gtpooniwala/personal-agent/issues/10) |
+| P1 | done | Make local test workflow runnable; reduce skip-only green runs | [#10](https://github.com/gtpooniwala/personal-agent/issues/10) |
 | P1 | todo | Add baseline observability (structured logs + runtime counters) | [#11](https://github.com/gtpooniwala/personal-agent/issues/11) |
 | P1 | todo | Gate Gmail tool by dependency/config readiness | [#12](https://github.com/gtpooniwala/personal-agent/issues/12) |
 | P2 | todo | Cleanup frontend rough edges and duplicate utility paths | [#13](https://github.com/gtpooniwala/personal-agent/issues/13) |
@@ -56,8 +56,7 @@ Status values: `todo`, `in_progress`, `done`, `blocked`.
 ## Notes
 - This file is now synced to live issue tracking.
 - If GitHub Project board access is added later, these issues can be batch-imported to that board.
-- Issue #10 progress: CI now separates backend/frontend/repo checks with `detect-changes` gating.
-- Issue #10 remaining work: provide a single documented local command that installs test deps and runs meaningful tests, and treat skip-only outcomes as non-pass.
+- Issue #10 complete: CI uses guarded backend unit-test runner, and local checks are available via one documented command (`scripts/run_local_checks.sh`).
 - Implementation process is enforced via:
   - [`ENGINEERING_WORKFLOW.md`](ENGINEERING_WORKFLOW.md)
   - CI checks in `.github/workflows/`
