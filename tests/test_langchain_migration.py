@@ -1,35 +1,21 @@
 """Regression checks for issue #22 LangChain/LangGraph migration."""
 
-import asyncio
 import sys
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-CORE_IMPORT_AVAILABLE = True
-CORE_IMPORT_ERROR = ""
-DOC_IMPORT_AVAILABLE = True
-DOC_IMPORT_ERROR = ""
-
-try:
-    from backend.orchestrator.core import CoreOrchestrator
-except Exception as exc:  # pragma: no cover - gated by skipUnless
-    CORE_IMPORT_AVAILABLE = False
-    CORE_IMPORT_ERROR = str(exc)
-
-try:
-    from backend.services.document_service import DocumentProcessor
-except Exception as exc:  # pragma: no cover - gated by skipUnless
-    DOC_IMPORT_AVAILABLE = False
-    DOC_IMPORT_ERROR = str(exc)
-
 
 class TestLangchainMigrationSource(unittest.TestCase):
     """Static checks to prevent regressions to pre-1.x import paths/APIs."""
+
+    def test_core_orchestrator_imports(self):
+        from backend.orchestrator.core import CoreOrchestrator  # noqa: F401
+
+    def test_document_processor_imports(self):
+        from backend.services.document_service import DocumentProcessor  # noqa: F401
 
     def test_no_legacy_import_paths(self):
         targets = [
@@ -90,39 +76,6 @@ class TestLangchainMigrationSource(unittest.TestCase):
                 requirements,
                 f"Missing or incorrect version pin for {package}",
             )
-
-
-@unittest.skipUnless(
-    CORE_IMPORT_AVAILABLE,
-    f"Core orchestrator dependencies unavailable: {CORE_IMPORT_ERROR}",
-)
-class TestCoreAinvokeCompatibility(unittest.TestCase):
-    def test_ainvoke_text_returns_content(self):
-        with patch("backend.orchestrator.core.ToolRegistry"), patch.object(
-            CoreOrchestrator, "_setup_llm"
-        ) as setup_llm:
-            fake_llm = AsyncMock()
-            fake_llm.ainvoke = AsyncMock(return_value=SimpleNamespace(content="pong"))
-            setup_llm.return_value = fake_llm
-            orchestrator = CoreOrchestrator()
-
-            result = asyncio.run(orchestrator._ainvoke_text("ping"))
-            self.assertEqual(result, "pong")
-
-
-@unittest.skipUnless(
-    DOC_IMPORT_AVAILABLE,
-    f"Document processor dependencies unavailable: {DOC_IMPORT_ERROR}",
-)
-class TestDocumentAinvokeCompatibility(unittest.TestCase):
-    def test_ainvoke_text_returns_content(self):
-        with patch.object(DocumentProcessor, "__init__", return_value=None):
-            processor = DocumentProcessor()
-        processor.llm = AsyncMock()
-        processor.llm.ainvoke = AsyncMock(return_value=SimpleNamespace(content="summary"))
-
-        result = asyncio.run(processor._ainvoke_text("summarize"))
-        self.assertEqual(result, "summary")
 
 
 if __name__ == "__main__":

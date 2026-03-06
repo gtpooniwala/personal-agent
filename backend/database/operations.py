@@ -15,7 +15,6 @@ class DatabaseOperations:
         self.engine = create_engine(f"sqlite:///{settings.database_path}")
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
         self.init_database()
-        atexit.register(self.close)
     
     def init_database(self):
         """Initialize database tables."""
@@ -244,3 +243,4 @@ class DatabaseOperations:
 
 # Global database operations instance
 db_ops = DatabaseOperations()
+atexit.register(db_ops.close)

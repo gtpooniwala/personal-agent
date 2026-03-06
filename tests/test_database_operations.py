@@ -36,7 +36,7 @@ class TestDatabaseOperations(unittest.TestCase):
         
         # Create a mock database operations instance
         self.db_ops = DatabaseOperations()
-        self.db_ops.engine.dispose()
+        self.db_ops.close()
         # Replace the engine and session with our test ones
         self.db_ops.engine = self.engine
         self.db_ops.SessionLocal = SessionLocal
