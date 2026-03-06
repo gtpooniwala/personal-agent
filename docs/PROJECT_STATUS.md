@@ -9,7 +9,7 @@ Single source of truth for current implementation status, known risks, and execu
 - Branch health: `main` tracking `origin/main`
 - Deterministic repository checks: `tests/run_repo_checks.py` passing (`12/12` on March 5, 2026)
 - Unit test suite: present, but local run currently dependency-gated in bare environments
-- Runtime profile: local-first FastAPI + LangGraph + SQLite + vanilla JS frontend
+- Runtime profile: local-first FastAPI + LangGraph + SQLite + Next.js frontend
 - Foundation P0 baseline status: `#7`, `#8`, and `#9` are closed; remaining foundation work is `#10`-`#13`.
 - Migration status: architecture contract (`#14`) and prerequisite upgrades/eval harness (`#22`, `#23`) are closed; core runtime implementation (`#15`-`#19`) remains open.
 - Active tracking: milestone-backed issues plus migration/frontend follow-ups (`#28`, `#29`, `#30`, `#31`).

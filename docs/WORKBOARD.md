@@ -22,12 +22,10 @@ Workflow:
 - [ ] `todo` Make local test workflow runnable and reduce skip-only passes ([#10](https://github.com/gtpooniwala/personal-agent/issues/10))
 - [ ] `todo` Add baseline observability and core runtime counters ([#11](https://github.com/gtpooniwala/personal-agent/issues/11))
 - [ ] `todo` Make Gmail tool optional in active tool list unless configured ([#12](https://github.com/gtpooniwala/personal-agent/issues/12))
-- [ ] `todo` Add run lifecycle schema (`runs`, `run_events`, `leases`) ([#15](https://github.com/gtpooniwala/personal-agent/issues/15))
+- [ ] `todo` Start migration core implementation sequence from `Migration Track` (`#15` + `#17`, then `#16`)
 
 ## Next
 - [ ] `todo` Cleanup frontend rough edges and duplicate utility logic ([#13](https://github.com/gtpooniwala/personal-agent/issues/13))
-- [ ] `todo` Deliver async submission contracts for `/chat` and `/runs` plus status/events endpoints ([#17](https://github.com/gtpooniwala/personal-agent/issues/17))
-- [ ] `todo` Implement runtime worker queue with per-session serialization ([#16](https://github.com/gtpooniwala/personal-agent/issues/16))
 - [ ] `todo` Prevent cross-conversation message race on send ([#31](https://github.com/gtpooniwala/personal-agent/issues/31))
 
 ## Migration Track
