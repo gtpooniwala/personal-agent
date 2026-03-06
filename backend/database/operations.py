@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from backend.database.models import Base, Conversation, Message, MemoryStore
+from backend.database.models import Base, Conversation, Message, MemoryStore, RuntimeCounter
 from backend.config import settings
 from typing import List, Optional, Dict, Any
 import json
@@ -237,6 +237,38 @@ class DatabaseOperations:
             session.delete(conversation)
             session.commit()
             return True
+        finally:
+            session.close()
+
+    def increment_runtime_counter(self, key: str, amount: int = 1) -> int:
+        """Increment and return a runtime counter."""
+        if amount < 0:
+            raise ValueError("Counter increment amount must be non-negative")
+
+        session = self.get_session()
+        try:
+            counter = session.query(RuntimeCounter).filter(RuntimeCounter.key == key).first()
+            if counter is None:
+                counter = RuntimeCounter(key=key, value=0)
+                session.add(counter)
+                session.flush()
+
+            counter.value += amount
+            counter.updated_at = datetime.now(timezone.utc)
+            session.commit()
+            return counter.value
+        finally:
+            session.close()
+
+    def get_runtime_counters(self, prefix: Optional[str] = None) -> Dict[str, int]:
+        """Return runtime counters optionally filtered by key prefix."""
+        session = self.get_session()
+        try:
+            query = session.query(RuntimeCounter)
+            if prefix:
+                query = query.filter(RuntimeCounter.key.like(f"{prefix}%"))
+            rows = query.order_by(RuntimeCounter.key.asc()).all()
+            return {row.key: row.value for row in rows}
         finally:
             session.close()
 

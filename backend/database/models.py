@@ -104,3 +104,13 @@ class DocumentChunk(Base):
     
     # Relationship to document
     document = relationship("Document", back_populates="chunks")
+
+
+class RuntimeCounter(Base):
+    """Aggregated runtime counters for low-cost local observability."""
+
+    __tablename__ = "runtime_counters"
+
+    key = Column(String, primary_key=True)
+    value = Column(Integer, nullable=False, default=0)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
