@@ -31,10 +31,14 @@ class DummyTool:
     f"Tool registry test dependencies unavailable: {TOOL_REGISTRY_IMPORT_ERROR}"
 )
 class TestToolRegistry(unittest.TestCase):
-    def _build_registry(self, selected_documents=None):
+    def _build_registry(self, selected_documents=None, gmail_ready=False):
         with patch("backend.orchestrator.tool_registry.CalculatorTool", return_value=DummyTool("calculator")), \
              patch("backend.orchestrator.tool_registry.CurrentTimeTool", return_value=DummyTool("current_time")), \
              patch("backend.orchestrator.tool_registry.ScratchpadTool", return_value=DummyTool("scratchpad")), \
+             patch(
+                 "backend.orchestrator.tool_registry.get_gmail_readiness",
+                 return_value=(gmail_ready, [] if gmail_ready else ["feature_flag_disabled"])
+             ), \
              patch("backend.orchestrator.tool_registry.GmailReadTool", return_value=DummyTool("gmail_read")), \
              patch("backend.orchestrator.tool_registry.ResponseAgentTool", return_value=DummyTool("response_agent")), \
              patch("backend.orchestrator.tool_registry.InternetSearchTool", return_value=DummyTool("internet_search")), \
@@ -49,11 +53,18 @@ class TestToolRegistry(unittest.TestCase):
         self.assertIn("calculator", names)
         self.assertIn("current_time", names)
         self.assertNotIn("search_documents", names)
+        self.assertNotIn("gmail_read", names)
 
     def test_get_available_tools_with_documents(self):
         registry = self._build_registry(selected_documents=["doc-1"])
         names = [tool.name for tool in registry.get_available_tools()]
         self.assertIn("search_documents", names)
+        self.assertNotIn("gmail_read", names)
+
+    def test_get_available_tools_includes_gmail_when_ready(self):
+        registry = self._build_registry(selected_documents=[], gmail_ready=True)
+        names = [tool.name for tool in registry.get_available_tools()]
+        self.assertIn("gmail_read", names)
 
     def test_register_and_unregister_tool(self):
         registry = self._build_registry()

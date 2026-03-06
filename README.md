@@ -59,7 +59,7 @@ Target runtime path (rolling out soon):
 | Scratchpad tool | Implemented | Persistent per-user notes |
 | User profile tool | Implemented | Long-term profile memory (JSON + LLM merge) |
 | Internet search tool | Implemented | DuckDuckGo default, optional Bing/Google/SerpAPI |
-| Gmail read tool | Conditional | Requires OAuth credentials/setup |
+| Gmail read tool | Conditional | Hidden by default; enable with `ENABLE_GMAIL_INTEGRATION=true` + valid `GMAIL_CREDENTIALS_PATH` and Gmail dependencies |
 | Calendar/Todoist tools | Placeholder | Scaffold exists, not wired into active tool set |
 
 ## Stack
