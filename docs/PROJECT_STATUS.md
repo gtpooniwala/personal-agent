@@ -11,7 +11,7 @@ Single source of truth for current implementation status, known risks, and execu
 - Unit test suite: runnable via `scripts/run_local_checks.sh` with guarded unittest execution (`tests/run_unit_tests.py`)
 - Issue `#10` status: complete (standard local test workflow + skip-only non-pass signal implemented)
 - Runtime profile: local-first FastAPI + LangGraph + SQLite + Next.js frontend
-- Foundation P0 baseline status: `#7`, `#8`, and `#9` are closed; remaining foundation work is `#10`-`#13`.
+- Foundation P0 baseline status: `#7`, `#8`, `#9`, and `#10` are closed; remaining foundation work is `#11`-`#13`.
 - Migration status: architecture contract (`#14`) and prerequisite upgrades/eval harness (`#22`, `#23`) are closed; core runtime implementation (`#15`-`#19`) remains open.
 - Active tracking: milestone-backed issues plus migration/frontend follow-ups (`#28`, `#29`, `#30`, `#31`).
 
