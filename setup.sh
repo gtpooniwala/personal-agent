@@ -28,15 +28,14 @@ echo "📋 Installing dependencies..."
 pip install -r backend/requirements.txt
 
 # Install frontend dependencies
-if ! command -v npm &> /dev/null; then
+if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
     echo "❌ Node.js/npm is required for the Next.js frontend but was not found."
-    echo "Install Node.js 18+ and run: cd frontend && npm install"
+    echo "Install Node.js 18.17+ and run: cd frontend && npm install"
     exit 1
 fi
 
-node_major="$(node -v | sed -E 's/^v([0-9]+).*/\1/')"
-if [ -z "$node_major" ] || [ "$node_major" -lt 18 ]; then
-    echo "❌ Node.js 18+ is required for the Next.js frontend."
+if ! node -e "const [major, minor] = process.versions.node.split('.').map(Number); process.exit(major > 18 || (major === 18 && minor >= 17) ? 0 : 1)"; then
+    echo "❌ Node.js 18.17+ is required for the Next.js frontend."
     echo "Detected: $(node -v)"
     exit 1
 fi

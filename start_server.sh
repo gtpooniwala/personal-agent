@@ -10,10 +10,16 @@ if ! command -v conda &> /dev/null; then
     exit 1
 fi
 
-# Check if npm is available
-if ! command -v npm &> /dev/null; then
-    echo "❌ Error: npm is not installed or not in PATH"
-    echo "Please install Node.js 18+"
+# Check Node.js/npm prerequisites for frontend
+if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
+    echo "❌ Error: Node.js and npm are required but not installed or not in PATH"
+    echo "Please install Node.js 18.17+"
+    exit 1
+fi
+
+if ! node -e "const [major, minor] = process.versions.node.split('.').map(Number); process.exit(major > 18 || (major === 18 && minor >= 17) ? 0 : 1)"; then
+    echo "❌ Error: Node.js 18.17+ is required for the Next.js frontend."
+    echo "Detected: $(node -v)"
     exit 1
 fi
 

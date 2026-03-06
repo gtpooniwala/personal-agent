@@ -53,6 +53,8 @@ export default function HomePage() {
   const fileInputRef = useRef(null);
   const activeConversationIdRef = useRef(null);
   const latestMessagesRequestRef = useRef(0);
+  const uploadRunRef = useRef(0);
+  const uploadResetTimerRef = useRef(null);
 
   const loadTools = useCallback(async () => {
     try {
@@ -102,6 +104,9 @@ export default function HomePage() {
 
   const loadConversationMessages = useCallback(async (conversationId) => {
     if (!conversationId) {
+      latestMessagesRequestRef.current += 1;
+      setLoadingMessages(false);
+      setChatError("");
       setMessages([]);
       return;
     }
@@ -274,6 +279,13 @@ export default function HomePage() {
 
   const uploadFiles = useCallback(
     async (files) => {
+      uploadRunRef.current += 1;
+      const uploadRunId = uploadRunRef.current;
+      if (uploadResetTimerRef.current) {
+        clearTimeout(uploadResetTimerRef.current);
+        uploadResetTimerRef.current = null;
+      }
+
       const pdfFiles = files.filter((file) => file.type === "application/pdf");
 
       if (pdfFiles.length === 0) {
@@ -305,9 +317,13 @@ export default function HomePage() {
         setDocumentError(`Failed to upload: ${failedUploads.join(", ")}`);
       }
 
-      setTimeout(() => {
+      uploadResetTimerRef.current = setTimeout(() => {
+        if (uploadRunId !== uploadRunRef.current) {
+          return;
+        }
         setUploading(false);
         setUploadProgress(0);
+        uploadResetTimerRef.current = null;
       }, 500);
     },
     [loadDocuments],
@@ -375,6 +391,14 @@ export default function HomePage() {
       container.scrollTop = container.scrollHeight;
     }
   }, [messages]);
+
+  useEffect(() => {
+    return () => {
+      if (uploadResetTimerRef.current) {
+        clearTimeout(uploadResetTimerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="app-root">
