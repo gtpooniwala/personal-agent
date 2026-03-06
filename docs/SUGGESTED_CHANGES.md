@@ -1,6 +1,6 @@
 # Suggested Changes Tracker
 
-Last updated: March 5, 2026
+Last updated: March 6, 2026
 
 This file tracks the planned work with live GitHub issue links.
 Status values: `todo`, `in_progress`, `done`, `blocked`.
@@ -16,7 +16,7 @@ Status values: `todo`, `in_progress`, `done`, `blocked`.
 |---|---|---|---|
 | P0 | todo | Replace calculator `eval(...)` with safe expression evaluator | [#7](https://github.com/gtpooniwala/personal-agent/issues/7) |
 | P0 | todo | Remove XSS-prone dynamic `innerHTML` rendering in frontend | [#8](https://github.com/gtpooniwala/personal-agent/issues/8) |
-| P0 | todo | Fix upload failure path with uninitialized `document_id` | [#9](https://github.com/gtpooniwala/personal-agent/issues/9) |
+| P0 | done | Fix upload failure path with uninitialized `document_id` | [#9](https://github.com/gtpooniwala/personal-agent/issues/9) |
 | P1 | todo | Make local test workflow runnable; reduce skip-only green runs | [#10](https://github.com/gtpooniwala/personal-agent/issues/10) |
 | P1 | todo | Add baseline observability (structured logs + runtime counters) | [#11](https://github.com/gtpooniwala/personal-agent/issues/11) |
 | P1 | todo | Gate Gmail tool by dependency/config readiness | [#12](https://github.com/gtpooniwala/personal-agent/issues/12) |

@@ -1,6 +1,6 @@
 # Workboard
 
-Last updated: March 5, 2026
+Last updated: March 6, 2026
 
 ## How This Is Used
 This file is the AI execution board for this repo.
@@ -20,7 +20,6 @@ Workflow:
 
 ## Now
 - [ ] `todo` Replace calculator `eval` with safe parser/evaluator ([#7](https://github.com/gtpooniwala/personal-agent/issues/7))
-- [ ] `todo` Fix upload error path referencing uninitialized `document_id` ([#9](https://github.com/gtpooniwala/personal-agent/issues/9))
 - [ ] `todo` Remove XSS-prone `innerHTML` rendering in chat/conversation/document UIs ([#8](https://github.com/gtpooniwala/personal-agent/issues/8))
 - [ ] `todo` Make local test workflow runnable and reduce skip-only passes ([#10](https://github.com/gtpooniwala/personal-agent/issues/10))
 
@@ -55,6 +54,7 @@ Scope confirmation rule:
 - [ ] `todo` Memory feature expansion ([#6](https://github.com/gtpooniwala/personal-agent/issues/6))
 
 ## Done
+- [x] `done` Fix upload error path referencing uninitialized `document_id` ([#9](https://github.com/gtpooniwala/personal-agent/issues/9))
 - [x] `done` Legacy module cleanup + import hygiene baseline eval
 - [x] `done` README architecture/setup refresh
 

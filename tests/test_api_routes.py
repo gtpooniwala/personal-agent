@@ -94,6 +94,19 @@ class TestAPIRoutes(unittest.TestCase):
         self.assertEqual(payload["filename"], "sample.pdf")
         self.assertEqual(payload["status"], "processing")
 
+    @patch("backend.api.routes.doc_processor.process_pdf_upload", new_callable=AsyncMock)
+    def test_upload_document_processing_failure_returns_deterministic_500(self, mock_process_pdf_upload):
+        mock_process_pdf_upload.side_effect = RuntimeError("boom upload")
+        response = self.client.post(
+            "/api/v1/documents/upload",
+            files={"file": ("sample.pdf", b"%PDF-1.4 mock", "application/pdf")},
+        )
+        self.assertEqual(response.status_code, 500)
+        payload = response.json()
+        self.assertIn("Failed to upload document: boom upload", payload["detail"])
+        self.assertNotIn("unbound", payload["detail"].lower())
+        self.assertNotIn("local variable", payload["detail"].lower())
+
     @patch("backend.api.routes.doc_processor.delete_document")
     def test_delete_document_not_found(self, mock_delete_document):
         mock_delete_document.return_value = False
