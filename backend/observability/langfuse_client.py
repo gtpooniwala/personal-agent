@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 import logging
+import sys
 from typing import Any, Dict, Optional
 
 from backend.config import settings
@@ -128,17 +129,40 @@ class LangfuseClientManager:
             kwargs["usage_details"] = usage_details
 
         try:
-            with self._client.start_as_current_observation(**kwargs) as observation:
-                trace_id = str(getattr(observation, "trace_id", "") or "")
-                with push_context(conversation_id=conversation_id, trace_id=trace_id):
-                    yield observation
+            observation_cm = self._client.start_as_current_observation(**kwargs)
         except Exception:
             logger.exception(
-                "Langfuse observation failed; continuing without trace",
-                extra={"event": "langfuse.observe_failed"},
+                "Langfuse observation setup failed; continuing without trace",
+                extra={"event": "langfuse.observe_setup_failed"},
             )
             with push_context(conversation_id=conversation_id):
                 yield _NoopObservation()
+            return
+
+        try:
+            observation = observation_cm.__enter__()
+        except Exception:
+            logger.exception(
+                "Langfuse observation start failed; continuing without trace",
+                extra={"event": "langfuse.observe_start_failed"},
+            )
+            with push_context(conversation_id=conversation_id):
+                yield _NoopObservation()
+            return
+
+        trace_id = str(getattr(observation, "trace_id", "") or "")
+        try:
+            with push_context(conversation_id=conversation_id, trace_id=trace_id):
+                yield observation
+        finally:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            try:
+                observation_cm.__exit__(exc_type, exc_value, exc_tb)
+            except Exception:
+                logger.exception(
+                    "Langfuse observation close failed",
+                    extra={"event": "langfuse.observe_close_failed"},
+                )
 
 
 langfuse_manager = LangfuseClientManager()
