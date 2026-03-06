@@ -7,7 +7,7 @@ Closes #
 
 ## Validation
 - [ ] `python -m unittest discover -s tests -p "test_*.py" -v`
-- [ ] `python tests/run_eval.py`
+- [ ] If this PR changes LLM/tool-calling behavior or agent workflow logic, run local eval(s) and include commands/results in PR description
 
 ## Workflow Checklist
 - [ ] Branch created via worktree (not `main`)

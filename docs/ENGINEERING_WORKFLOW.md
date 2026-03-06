@@ -60,6 +60,8 @@ scripts/sync_main.sh
 - `CI / test-and-eval`
 - `PR Policy / enforce-pr-policy`
 
+CI runs unit tests only. Evals are local and should be run when a change can affect LLM/tool-calling behavior or agent workflows.
+
 ## Setup Commands
 1. Install hooks:
 ```bash

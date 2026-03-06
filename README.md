@@ -135,6 +135,8 @@ Run the deterministic repository cleanup eval:
 python tests/run_eval.py
 ```
 
+Evals are intentionally not part of CI. Run them locally when changes affect LLM/tool-calling behavior or agent workflow logic.
+
 Latest baseline (run on **March 4, 2026**):
 - Cases: `12`
 - Passed: `12`

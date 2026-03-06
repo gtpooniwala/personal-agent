@@ -26,3 +26,5 @@ Repository workflow contract for Claude Code.
   - `CI / test-and-eval`
   - `PR Policy / enforce-pr-policy`
 - Do not merge if checks fail.
+- CI runs unit tests only.
+- Run evals locally only when changes can impact LLM/tool-calling behavior or agent workflows; summarize results in the PR.
