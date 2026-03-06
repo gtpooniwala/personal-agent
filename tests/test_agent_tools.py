@@ -40,6 +40,10 @@ class TestCalculatorTool(unittest.TestCase):
         result = self.tool._run("2**8")
         self.assertIn("256", result)
 
+    def test_calculator_preserves_large_integer_precision(self):
+        result = self.tool._run("9007199254740993 + 1")
+        self.assertIn("9007199254740994", result)
+
     def test_calculator_handles_division_by_zero(self):
         result = self.tool._run("10 / 0")
         self.assertIn("Division by zero", result)

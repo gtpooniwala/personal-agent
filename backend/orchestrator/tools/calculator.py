@@ -38,21 +38,28 @@ def _safe_eval_expression(expression: str) -> float:
         if not isinstance(node, ALLOWED_AST_NODES):
             raise ValueError(f"Unsupported syntax: {type(node).__name__}")
 
-    def _eval(node: ast.AST) -> float:
+    def _validate_number(value: object) -> int | float:
+        if type(value) not in (int, float):
+            raise ValueError("Expression produced a non-real result.")
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ValueError("Expression produced a non-finite result.")
+        return value
+
+    def _eval(node: ast.AST) -> int | float:
         if isinstance(node, ast.Expression):
             return _eval(node.body)
 
         if isinstance(node, ast.Constant):
             if type(node.value) not in (int, float):
                 raise ValueError("Only numeric literals are allowed.")
-            return float(node.value)
+            return node.value
 
         if isinstance(node, ast.UnaryOp):
             operand = _eval(node.operand)
             if isinstance(node.op, ast.UAdd):
-                return operand
+                return _validate_number(+operand)
             if isinstance(node.op, ast.USub):
-                return -operand
+                return _validate_number(-operand)
             raise ValueError("Unsupported unary operator.")
 
         if isinstance(node, ast.BinOp):
@@ -60,28 +67,25 @@ def _safe_eval_expression(expression: str) -> float:
             right = _eval(node.right)
 
             if isinstance(node.op, ast.Add):
-                return left + right
+                return _validate_number(left + right)
             if isinstance(node.op, ast.Sub):
-                return left - right
+                return _validate_number(left - right)
             if isinstance(node.op, ast.Mult):
-                return left * right
+                return _validate_number(left * right)
             if isinstance(node.op, ast.Div):
-                return left / right
+                return _validate_number(left / right)
             if isinstance(node.op, ast.Pow):
                 if abs(right) > MAX_SAFE_EXPONENT:
                     raise ValueError(
                         f"Exponent magnitude exceeds safe limit ({MAX_SAFE_EXPONENT})."
                     )
-                return left**right
+                return _validate_number(left**right)
 
             raise ValueError("Unsupported binary operator.")
 
         raise ValueError("Unsupported expression.")
 
-    result = _eval(parsed)
-    if not math.isfinite(result):
-        raise ValueError("Expression produced a non-finite result.")
-    return result
+    return _validate_number(_eval(parsed))
 
 
 class CalculatorInput(BaseModel):
