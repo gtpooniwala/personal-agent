@@ -14,7 +14,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+/lib/
 lib64/
 parts/
 sdist/
@@ -137,6 +137,8 @@ frontend/node_modules/
 frontend/.next/
 frontend/out/
 frontend/.env.local
+!frontend/lib/
+!frontend/lib/**
 
 test_results.json
 backend/test_results.json
