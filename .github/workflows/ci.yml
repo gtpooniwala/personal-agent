@@ -72,6 +72,7 @@ jobs:
         run: |
           cd frontend
           npm run lint
+          npm run test
           npm run build
 
       - name: Run unit tests
