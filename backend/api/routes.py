@@ -99,11 +99,11 @@ def check_conversation_maintenance(conversations: List[dict]) -> None:
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """Process a chat message through the LangChain agent."""
-    conversation_id = request.conversation_id
+    conversation_id = request.conversation_id or orchestrator.create_conversation()
     payload_preview = {
         "message_chars": len(request.message or ""),
         "selected_documents_count": len(request.selected_documents or []),
-        "has_conversation_id": bool(conversation_id),
+        "has_conversation_id": bool(request.conversation_id),
     }
     with observe_operation(
         name="api.chat",
@@ -114,10 +114,6 @@ async def chat(request: ChatRequest):
         metadata={"component": "api", "endpoint": "/api/v1/chat"},
     ) as observation:
         try:
-            # Create new conversation if not provided
-            if not conversation_id:
-                conversation_id = orchestrator.create_conversation()
-
             with push_context(conversation_id=conversation_id):
                 # Process message with orchestrator
                 result = await orchestrator.process_request(
@@ -147,7 +143,7 @@ async def chat(request: ChatRequest):
 
         except Exception as e:
             logger.error(f"Error in chat endpoint: {str(e)}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail="Failed to process chat request")
 
 
 @router.get("/conversations", response_model=List[ConversationResponse])
@@ -170,7 +166,7 @@ async def get_conversations():
             return [ConversationResponse(**conv) for conv in conversations]
         except Exception as e:
             logger.error(f"Error getting conversations: {str(e)}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail="Failed to retrieve conversations")
 
 
 @router.post("/conversations", response_model=ConversationResponse)
@@ -196,9 +192,11 @@ async def create_conversation(request: ConversationCreate):
             update_observation(observation, output={"conversation_id": conversation_id})
             return ConversationResponse(**conversation)
 
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Error creating conversation: {str(e)}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail="Failed to create conversation")
 
 
 @router.get("/conversations/{conversation_id}/messages", response_model=List[MessageResponse])
@@ -217,7 +215,7 @@ async def get_conversation_messages(conversation_id: str):
             return [MessageResponse(**msg) for msg in messages]
         except Exception as e:
             logger.error(f"Error getting conversation messages: {str(e)}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail="Failed to retrieve conversation messages")
 
 
 @router.get("/tools", response_model=List[ToolInfo])
@@ -235,7 +233,7 @@ async def get_available_tools():
             return [ToolInfo(**tool) for tool in tools]
         except Exception as e:
             logger.error(f"Error getting tools: {str(e)}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail="Failed to retrieve available tools")
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -292,7 +290,7 @@ async def upload_document(file: UploadFile = File(...)):
             raise
         except Exception as e:
             logger.error(f"Error uploading document: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Failed to upload document: {str(e)}")
+            raise HTTPException(status_code=500, detail="Failed to upload document")
 
 
 @router.get("/documents", response_model=DocumentListResponse)
@@ -328,7 +326,7 @@ async def get_documents():
 
         except Exception as e:
             logger.error(f"Error getting documents: {str(e)}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail="Failed to retrieve documents")
 
 
 @router.delete("/documents/{document_id}", response_model=DocumentDeleteResponse)
@@ -357,7 +355,7 @@ async def delete_document(document_id: str):
             raise
         except Exception as e:
             logger.error(f"Error deleting document: {str(e)}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail="Failed to delete document")
 
 
 @router.post("/conversations/{conversation_id}/generate-title", response_model=TitleGenerationResponse)
@@ -388,4 +386,4 @@ async def generate_conversation_title(conversation_id: str):
             raise
         except Exception as e:
             logger.error(f"Error generating conversation title: {str(e)}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail="Failed to generate conversation title")

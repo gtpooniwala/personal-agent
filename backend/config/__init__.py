@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = None
     langfuse_public_key: Optional[str] = None
     langfuse_secret_key: Optional[str] = None
-    langfuse_base_url: Optional[str] = None
+    langfuse_base_url: str = "https://cloud.langfuse.com"
     langfuse_enabled: bool = Field(
         default=False,
         validation_alias=AliasChoices("LANGFUSE_ENABLED", "LANGFUSE_TRACING_ENABLED"),
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     langfuse_sample_rate: float = 1.0
 
     # Core application settings
-    database_path: str = "data/agent.db"
+    database_path: str = "data/personal_agent.db"
     log_level: str = "INFO"
     debug: bool = False
 

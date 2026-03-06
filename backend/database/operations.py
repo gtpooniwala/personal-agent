@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from backend.database.models import Base, Conversation, Message, MemoryStore, RuntimeCounter
 from backend.config import settings
@@ -247,16 +247,30 @@ class DatabaseOperations:
 
         session = self.get_session()
         try:
-            counter = session.query(RuntimeCounter).filter(RuntimeCounter.key == key).first()
-            if counter is None:
-                counter = RuntimeCounter(key=key, value=0)
-                session.add(counter)
-                session.flush()
-
-            counter.value += amount
-            counter.updated_at = datetime.now(timezone.utc)
+            now = datetime.now(timezone.utc)
+            session.execute(
+                text(
+                    """
+                    INSERT INTO runtime_counters ("key", value, updated_at)
+                    VALUES (:key, :amount, :updated_at)
+                    ON CONFLICT("key")
+                    DO UPDATE SET
+                        value = runtime_counters.value + :amount,
+                        updated_at = :updated_at
+                    """
+                ),
+                {
+                    "key": key,
+                    "amount": amount,
+                    "updated_at": now,
+                },
+            )
             session.commit()
-            return counter.value
+            value = session.execute(
+                text('SELECT value FROM runtime_counters WHERE "key" = :key'),
+                {"key": key},
+            ).scalar_one()
+            return int(value)
         finally:
             session.close()
 

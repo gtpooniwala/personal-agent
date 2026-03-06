@@ -319,7 +319,7 @@ Your effectiveness is measured by:
 
             except (MissingProviderKeyError, MissingModelDependencyError) as e:
                 logger.warning(f"LLM setup error: {str(e)}")
-                response = str(e)
+                response = "I can't process this request right now because the model configuration is unavailable."
                 db_ops.save_message(conversation_id, "assistant", response)
                 increment_counter("orchestrator.process_request.handled_error_total")
                 update_observation(
@@ -335,7 +335,7 @@ Your effectiveness is measured by:
                 }
             except Exception as e:
                 logger.error(f"Error in orchestrator processing: {str(e)}")
-                error_response = f"I apologize, but I encountered an error while processing your request: {str(e)}"
+                error_response = "I apologize, but I encountered an internal error while processing your request. Please try again."
 
                 # Save error response
                 db_ops.save_message(conversation_id, "assistant", error_response)
