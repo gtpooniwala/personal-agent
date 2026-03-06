@@ -6,6 +6,8 @@
 - **OpenAPI Schema**: `http://127.0.0.1:8000/openapi.json`
 - **Primary route notation in this doc**: bare paths (`/chat`, `/runs`, ...)
 - **Legacy route notation**: `/api/v1/...` (older deployments)
+- **Current implementation note**: on current mainline backend, prepend `/api/v1` to endpoint paths.
+- **Migration note**: bare-route notation documents the soon-to-land async runtime surface.
 
 ## Authentication
 Currently, the MVP uses a default user system. No authentication is required for API calls.
@@ -13,6 +15,13 @@ Currently, the MVP uses a default user system. No authentication is required for
 ## Core Endpoints
 
 ### Runtime APIs
+
+Current implementation (today):
+- `POST /api/v1/chat` (legacy synchronous behavior).
+
+Target runtime behavior (rolling out soon):
+- `POST /chat` and `POST /runs` submit asynchronous work and return a run handle.
+- `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events` provide polling visibility.
 
 #### POST `/runs`
 Submit work to the orchestrator asynchronously.
@@ -82,7 +91,7 @@ Before finalizing the implementation contract, the AI coding agent must confirm 
 #### POST `/chat`
 Asynchronous conversational submission endpoint.
 
-`POST /chat` and `POST /runs` both submit asynchronous work and return a run handle.
+Target behavior: `POST /chat` and `POST /runs` both submit asynchronous work and return a run handle.
 Legacy `POST /api/v1/chat` synchronous behavior is deprecated and should be removed after migration completion.
 
 #### GET `/conversations`

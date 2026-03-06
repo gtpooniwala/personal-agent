@@ -8,6 +8,9 @@ This section reflects the migration target runtime: async run submission with st
 
 ## Long-Running Runtime Flow (Migration)
 
+> TODO: This migration diagram is an in-progress draft and needs a follow-up update during runtime implementation.
+> The status/events edge structure is intentionally left as-is in this docs PR.
+
 ```mermaid
 graph TB
     A[POST /runs or POST /chat] --> B{Persist Run Record}

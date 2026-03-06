@@ -27,12 +27,16 @@ User Query → LangGraph Agent → Dynamic Route Decision (Graph-Based)
 
 This model decouples request acceptance from execution, enables retries/recovery, and prevents single long tool call from blocking the HTTP request lifecycle.
 
+Current vs soon:
+- Current implementation (today): `POST /api/v1/chat` synchronous request lifecycle.
+- Rolling out soon: async `/chat` and `/runs` runtime with status/events polling.
+
 ### 2. Component Architecture
 
 ```text
 ┌─────────────────┐    ┌─────────────────────────────────┐    ┌─────────────────┐
 │   Frontend      │    │         Backend                 │    │   Database      │
-│   (HTML/JS)     │◄──►│      (FastAPI)                  │◄──►│   (SQLite)      │
+│   (Next.js)     │◄──►│      (FastAPI)                  │◄──►│   (SQLite)      │
 │                 │    │                                 │    │                 │
 │ • Chat UI       │    │  ┌─────────────────────────────┐ │    │ • Conversations │
 │ • Tool Display  │    │  │    HYBRID INTELLIGENCE      │ │    │ • Messages      │
@@ -142,8 +146,8 @@ This model decouples request acceptance from execution, enables retries/recovery
 
 ### Frontend Architecture
 
-#### Single-Page Application (`frontend/index.html`)
-- **Technology**: Vanilla HTML5, CSS3, JavaScript ES6+
+#### Next.js Application (`frontend/`)
+- **Technology**: Next.js + React
 - **Design**: Responsive layout with sidebar navigation
 - **Features**: 
   - Real-time chat interface
@@ -162,6 +166,8 @@ This model decouples request acceptance from execution, enables retries/recovery
 ## Data Flow
 
 ### 1. Message Processing Flow
+
+Migration-target flow (to be finalized during runtime implementation):
 
 ```text
 User Input → Frontend → POST /runs → Worker Queue → Agent Processing → Tool Execution → Persisted Message

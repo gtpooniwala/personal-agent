@@ -2,7 +2,7 @@
 
 This document is the canonical design reference for the runtime migration in issue #14.
 
-## Why this migration is now
+## Why migrate now
 The legacy synchronous chat path (`POST /api/v1/chat`) makes long or complex workflows fragile because:
 - every request must complete in one HTTP response window,
 - recovery is impossible if the process crashes mid-run,
@@ -63,7 +63,7 @@ Expected semantics:
 - Concurrent sessions may run in parallel where worker/process capacity allows.
 - This avoids cross-conversation state races without overcomplicating local workflow.
 
-## Operational visibility (Option B)
+## Operational visibility
 - Primary path for this migration: HTTP polling via status/events.
 - SSE/WebSocket can be added later without changing run schema when useful.
 

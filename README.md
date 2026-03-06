@@ -17,7 +17,7 @@ The assistant can:
 
 ```mermaid
 flowchart LR
-    UI["Frontend (Vanilla JS SPA)"] --> API["FastAPI API Layer"]
+    UI["Frontend (Next.js App Router)"] --> API["FastAPI API Layer"]
     API --> ORCH["LangGraph ReAct Orchestrator"]
     ORCH --> REG["Tool Registry"]
     ORCH --> LLM["Gemini Chat Model (Default)"]
@@ -37,12 +37,15 @@ flowchart LR
 
 ### Request Flow
 
+Current runtime path (today):
 1. User sends a message from the frontend.
-2. `POST /runs` or `POST /chat` submits asynchronous work and returns a `run_id`.
-3. Backend worker processes run steps asynchronously (tool selection, tool execution, synthesis).
-4. Frontend polls `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events`.
-5. When complete, the final response appears in persisted messages and conversation history.
-6. Legacy `POST /api/v1/chat` (synchronous) is deprecated; new behavior uses async `/chat` and `/runs`.
+2. `POST /api/v1/chat` processes the request in-request and returns the assistant response.
+
+Target runtime path (rolling out soon):
+1. `POST /chat` or `POST /runs` submits asynchronous work and returns a `run_id`.
+2. Backend worker processes run steps asynchronously (tool selection, tool execution, synthesis).
+3. Frontend polls `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events`.
+4. Legacy `POST /api/v1/chat` synchronous behavior is deprecated and will be removed.
 
 ## Implemented Capabilities
 
@@ -63,55 +66,76 @@ flowchart LR
 
 - Backend: Python, FastAPI, LangChain, LangGraph, SQLAlchemy
 - LLM/Embeddings: Gemini by default (`gemini-2.5-flash` + `text-embedding-004`), OpenAI optional via config
-- Frontend: HTML/CSS + modular ES6 JavaScript
+- Frontend: Next.js + React
 - Storage: SQLite + local filesystem (`data/`)
 
-## Quick Start (Manual, Recommended)
+## Quick Start (Docker, Recommended)
 
 ### 1) Prerequisites
 
-- Python 3.11+
+- Docker Desktop (or Docker Engine + Compose plugin)
 - Gemini API key (default provider)
 
-### 2) Install dependencies
+### 2) Configure environment
 
 ```bash
 git clone https://github.com/gtpooniwala/personal-agent.git
 cd personal-agent
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r backend/requirements.txt
-```
-
-### 3) Configure environment
-
-```bash
 cp .env.example .env
 # Edit .env and set GEMINI_API_KEY
 ```
 
-### 4) Run backend
+### 3) Start backend + frontend
 
 ```bash
+docker compose up --build
+```
+
+### 4) Access services
+
+- Frontend: [http://127.0.0.1:3000](http://127.0.0.1:3000)
+- Backend API: [http://127.0.0.1:8000](http://127.0.0.1:8000)
+- Swagger UI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+### 5) Stop services
+
+```bash
+docker compose down
+```
+
+## Debugging Without Docker (Optional)
+
+Use this only when you need local debugging outside containers.
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 18.17+
+
+### Backend (debug)
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
 uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-### 5) Run frontend (new terminal)
+### Frontend (debug, new terminal)
 
 ```bash
 cd frontend
-python3 -m http.server 8081
+npm install
+npm run dev
 ```
 
-Open [http://127.0.0.1:8081](http://127.0.0.1:8081).
-
-## Alternative Startup Scripts
+## Alternative Local Scripts
 
 The repo includes:
 - `setup.sh`: conda-based setup
 - `start_server.sh`: macOS Terminal automation (`osascript`) for backend + frontend startup
 
-Use these if your environment matches their assumptions.
+Use these for local debugging if your environment matches their assumptions.
 
 ## Running Tests
 
@@ -169,8 +193,13 @@ Base URL: `http://127.0.0.1:8000`
 Route notation:
 - Primary notation in docs: bare routes (`/chat`, `/runs`, ...)
 - Legacy compatibility notation: `/api/v1/...` (older deployments)
+- Current mainline implementation still serves routes under `/api/v1`.
+- Bare-route notation is the target runtime contract rolling out next.
 
 Core endpoints:
+- Current implementation:
+  - `POST /api/v1/chat` (legacy synchronous path)
+- Target migration behavior (rolling out soon):
 - `POST /runs`
 - `GET /runs/{run_id}/status`
 - `GET /runs/{run_id}/events`
@@ -200,7 +229,7 @@ personal-agent/
 │   ├── services/              # Document processing + retrieval
 │   ├── database/              # SQLAlchemy models + operations
 │   └── main.py                # API entrypoint
-├── frontend/                  # Static SPA (HTML/CSS/JS)
+├── frontend/                  # Next.js frontend app
 ├── tests/                     # Unit/integration-style tests
 ├── docs/                      # Extended architecture + feature docs
 └── data/                      # Local runtime data (DB, uploads, profiles, scratchpad)

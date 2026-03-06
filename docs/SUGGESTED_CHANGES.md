@@ -25,10 +25,10 @@ Status values: `todo`, `in_progress`, `done`, `blocked`.
 ## Long-Running Runtime Migration (OpenClaw-lite Direction)
 | Priority | Status | Change | Issue |
 |---|---|---|---|
-| P0 | todo | Publish migration architecture design doc + PR decomposition and shared run vocabulary | [#14](https://github.com/gtpooniwala/personal-agent/issues/14) |
+| P0 | done | Publish migration architecture design doc + PR decomposition and shared run vocabulary | [#14](https://github.com/gtpooniwala/personal-agent/issues/14) |
 | P0 | todo | Add run lifecycle schema (`runs`, `run_events`, `leases`) | [#15](https://github.com/gtpooniwala/personal-agent/issues/15) |
 | P0 | todo | Implement runtime worker queue with per-session serialization | [#16](https://github.com/gtpooniwala/personal-agent/issues/16) |
-| P0 | todo | Convert chat API to submit-run + status/events model | [#17](https://github.com/gtpooniwala/personal-agent/issues/17) |
+| P0 | todo | Deliver async submission contracts for `/chat` and `/runs` plus status/events model | [#17](https://github.com/gtpooniwala/personal-agent/issues/17) |
 | P1 | todo | Add scheduler/heartbeat for autonomous workflows | [#18](https://github.com/gtpooniwala/personal-agent/issues/18) |
 | P1 | todo | Add runtime evals for lifecycle/retry/session isolation | [#19](https://github.com/gtpooniwala/personal-agent/issues/19) |
 | P1 | todo | Build real LLM/workflow evaluation harness (separate from deterministic repo checks) | [#23](https://github.com/gtpooniwala/personal-agent/issues/23) |

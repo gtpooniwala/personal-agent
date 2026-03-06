@@ -327,7 +327,8 @@ User Request → CoreOrchestrator → Tool Analysis → Delegation Decision
 
 - LangGraph-backed orchestrator entry point and main request flow (`CoreOrchestrator`)
 - Maintains prompt flow, tool delegation, and response synthesis
-- Manages run-aware context boundaries and persistence handoff points
+- Current behavior: manages conversation context and LangGraph agent state
+- Planned soon: manage run-aware context boundaries and persistence handoff points
 
 **`backend/orchestrator/tools/`** - Tool implementations
 
@@ -907,20 +908,10 @@ conda activate personalagent
 
 ### Development Dependencies
 
-```python
-# backend/requirements.txt (see file for full list)
-langchain==0.3.15
-langchain-openai==0.3.7
-langchain-community==0.3.15
-langchain-google-genai==2.0.9
-langgraph==0.2.70
-fastapi==0.111.0
-uvicorn[standard]==0.30.0
-python-dotenv==1.0.1
-pydantic==2.7.4
-pydantic-settings==2.4.0
-sqlalchemy==2.0.30
-aiofiles==23.2.1
+Use the requirements file directly to avoid doc/version drift:
+
+```bash
+pip install -r backend/requirements.txt
 ```
 
 ### Development Workflow
