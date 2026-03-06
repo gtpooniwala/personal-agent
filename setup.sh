@@ -27,6 +27,18 @@ conda activate personalagent
 echo "📋 Installing dependencies..."
 pip install -r backend/requirements.txt
 
+# Install frontend dependencies
+if ! command -v npm &> /dev/null; then
+    echo "❌ Node.js/npm is required for the Next.js frontend but was not found."
+    echo "Install Node.js 18+ and run: cd frontend && npm install"
+    exit 1
+fi
+
+echo "📋 Installing frontend dependencies..."
+cd frontend
+npm install
+cd ..
+
 # Check if .env file exists
 if [ ! -f ".env" ]; then
     echo "⚙️  Creating environment configuration..."
@@ -46,7 +58,7 @@ echo "📋 Next steps:"
 echo "1. Edit .env and add your Gemini API key"
 echo "2. Activate the conda environment: conda activate personalagent"
 echo "3. Start the backend: uvicorn backend.main:app --reload"
-echo "4. Start the frontend: cd frontend && python3 -m http.server 8081"
-echo "5. Open http://127.0.0.1:8081 in your browser"
+echo "4. Start the frontend: cd frontend && npm run dev"
+echo "5. Open http://127.0.0.1:3000 in your browser"
 echo ""
 echo "🚀 Your Personal Agent MVP is ready to use!"

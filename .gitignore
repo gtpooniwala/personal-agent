@@ -133,6 +133,10 @@ data/
 logs/
 *.sqlite
 *.db
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
 
 test_results.json
 backend/test_results.json
