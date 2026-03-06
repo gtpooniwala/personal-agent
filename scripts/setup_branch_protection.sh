@@ -12,8 +12,8 @@ cat > "${PAYLOAD_FILE}" <<EOF
   "required_status_checks": {
     "strict": true,
     "checks": [
-      {"context": "CI / tests-and-repo-checks", "app_id": ${GITHUB_ACTIONS_APP_ID}},
-      {"context": "PR Policy / enforce-pr-policy", "app_id": ${GITHUB_ACTIONS_APP_ID}}
+      {"context": "tests-and-repo-checks", "app_id": ${GITHUB_ACTIONS_APP_ID}},
+      {"context": "enforce-pr-policy", "app_id": ${GITHUB_ACTIONS_APP_ID}}
     ]
   },
   "enforce_admins": true,
