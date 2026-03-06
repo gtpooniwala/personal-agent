@@ -4,46 +4,35 @@ Canonical workflow contract for AI coding agents in this repository.
 
 ## Scope
 - This is the source of truth for git/worktree/PR workflow policy.
-- `docs/AGENT.md` is technical architecture documentation, not workflow policy.
+- Architecture and feature docs live under `docs/` (for example, `docs/ARCHITECTURE.md` and `docs/features/`).
 
-## Mandatory Git Process
+## Mandatory Contract
 1. Never commit directly to `main`.
 2. Never do active feature work in the `main` worktree.
 3. Always create a dedicated worktree and branch for each issue or task.
-4. Branch prefixes:
-   - `codex/` for Codex work
-   - `claude/` for Claude work
+4. Branch naming must follow `<agent>/<type>/<issue>-<slug>`:
+   - Codex: `codex/<type>/<issue>-<slug>`
+   - Claude: `claude/<type>/<issue>-<slug>`
 5. Push feature branches only; do not push feature commits to `main`.
 6. Open PRs targeting `main`.
-7. Reference and close relevant issues from PR descriptions (`Closes #<id>`).
+7. Reference relevant issues from PR descriptions (`Refs #<id>` at minimum); use closing keywords (`Closes/Fixes/Resolves #<id>`) only when the PR fully completes the issue.
 8. Rebase on `origin/main`:
    - before starting work
    - before pushing
    - before opening or updating a PR
 9. Merge using **Squash and merge** only.
+10. For code-change workflow tasks, apply `repo-workflow-env` and `repo-commit-pr-flow`. For PR review comments, apply `gh-address-comments`. For failing checks, apply `gh-fix-ci`.
 
-## Worktree Commands
-- Sync main:
-  - `scripts/sync_main.sh`
-- Create a new Codex worktree:
-  - `scripts/new_worktree.sh codex <type> <issue> <slug>`
-- Create a new Claude worktree:
-  - `scripts/new_worktree.sh claude <type> <issue> <slug>`
+## Required Checks
+- `CI / tests-and-repo-checks`
+- `PR Policy / enforce-pr-policy`
 
-## Standard Branch + PR Flow
-1. Start from an up-to-date `origin/main`.
-2. Create and switch into a dedicated worktree.
-3. Make changes and commit on the feature branch.
-4. Push the feature branch:
-   - `git push -u origin <branch-name>`
-5. Open a PR to `main`:
-   - `gh pr create --base main --head <branch-name> ...`
-6. Keep rebasing on `origin/main` until merge.
+## Required Commands
+- New worktree: `scripts/new_worktree.sh <agent:codex|claude> <type> <issue> <slug>`
+- Sync with main: `scripts/sync_main.sh`
+- Sync repo-managed skills into Codex home: `scripts/sync_skills.sh`
 
-## CI/Policy
-- Required checks:
-  - `CI / tests-and-repo-checks`
-  - `PR Policy / enforce-pr-policy`
+## Notes
 - Do not merge if required checks fail.
-- CI runs unit tests and deterministic repository checks.
+- CI runs backend/frontend tests and deterministic repository checks.
 - Run local LLM/workflow evals when orchestration, prompting, or tool-calling behavior changes, and summarize results in the PR.

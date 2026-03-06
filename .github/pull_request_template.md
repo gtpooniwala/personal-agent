@@ -3,7 +3,8 @@
 - Why?
 
 ## Linked Issue
-Closes #
+Refs #
+- Use `Closes #<id>` only when this PR fully completes the issue.
 
 ## Validation
 - [ ] `python -m unittest discover -s tests -p "test_*.py" -v`

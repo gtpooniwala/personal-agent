@@ -1,6 +1,6 @@
 # Engineering Workflow
 
-Last updated: March 5, 2026
+Last updated: March 6, 2026
 
 ## Goals
 - No direct commits to `main`
@@ -13,6 +13,7 @@ Last updated: March 5, 2026
 - Branch naming:
   - Codex: `codex/<type>/<issue>-<slug>`
   - Claude: `claude/<type>/<issue>-<slug>`
+- CI policy rejects PRs whose head branch does not match this contract.
 - Examples:
   - `codex/fix/7-safe-calculator`
   - `claude/feat/16-runtime-worker`
@@ -32,10 +33,12 @@ scripts/sync_main.sh
 ```
 
 ## PR Rules
-- Every PR must link and close an issue using a closing keyword:
-  - `Closes #123` or `Fixes #123`
+- Every PR must reference an issue:
+  - Non-closing references are allowed for partial work: `Refs #123` / `Related to #123`
+  - Use closing keywords only when fully complete: `Closes #123` / `Fixes #123`
 - PRs target `main` only.
 - Rebase branch on latest `origin/main` before push and before PR update.
+- PR branch history must remain linear (no merge commits).
 - Merge strategy is `Squash and merge` only.
 - Do not merge until:
   - Required CI checks pass
@@ -73,3 +76,18 @@ chmod +x .githooks/pre-push
 ```bash
 scripts/setup_branch_protection.sh
 ```
+
+3. Sync repo-managed skills into Codex home:
+```bash
+scripts/sync_skills.sh
+```
+
+## Skills And Ownership
+- Repository source of truth for workflow skills lives in `skills/`.
+- Runtime skill location is `${CODEX_HOME:-$HOME/.codex}/skills/`.
+- Sync from repository to runtime with `scripts/sync_skills.sh`.
+- Current workflow skills:
+  - `repo-workflow-env`: branch/worktree creation and rebase checkpoints
+  - `repo-commit-pr-flow`: commit slicing, push/PR workflow, final checklist
+  - `gh-address-comments`: triage and resolve PR comments/threads
+  - `gh-fix-ci`: investigate and fix failing GitHub Actions checks

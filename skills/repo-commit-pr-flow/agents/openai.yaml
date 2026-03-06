@@ -1,0 +1,4 @@
+interface:
+  display_name: "Repo Commit PR Flow"
+  short_description: "Policy-compliant commit/push/PR flow"
+  default_prompt: "Prepare focused commits, run checks, push safely, and create/update the PR with required policy fields."
