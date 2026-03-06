@@ -129,6 +129,21 @@ The repo includes:
 
 Use these if your environment matches their assumptions.
 
+## Docker Compose (Backend + Frontend)
+
+Run both services together:
+
+```bash
+cp .env.example .env
+# Set OPENAI_API_KEY in .env
+docker compose up --build
+```
+
+Endpoints:
+- Frontend: [http://127.0.0.1:3000](http://127.0.0.1:3000)
+- Backend API: [http://127.0.0.1:8000/api/v1](http://127.0.0.1:8000/api/v1)
+- API Docs: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
 ## Running Tests
 
 ```bash

@@ -1,16 +1,17 @@
-version: '3.8'
-
 services:
   personal-agent:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-dummy}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-dummy}
       - DATABASE_PATH=/app/data/personal_agent.db
       - HOST=0.0.0.0
       - PORT=8000
+      - ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -21,7 +22,24 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-
-networks:
-  default:
-    name: personal-agent-network
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api/v1}
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api/v1}
+      - PORT=3000
+    depends_on:
+      personal-agent:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

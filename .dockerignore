@@ -1,0 +1,17 @@
+.git
+.gitignore
+.worktrees
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.venv
+venv
+.env
+.DS_Store
+logs
+frontend/node_modules
+frontend/.next
+frontend/out
+tests/__pycache__
