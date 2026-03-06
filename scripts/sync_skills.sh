@@ -72,6 +72,9 @@ sync_one() {
 
   local src="${SOURCE_ROOT}/${skill_name}"
   local dst="${DEST_ROOT}/${skill_name}"
+  local src_real=""
+  local dst_parent_real=""
+  local dst_real=""
 
   if [[ ! -d "${src}" ]]; then
     echo "Skill not found in repo: ${skill_name}"
@@ -90,6 +93,14 @@ sync_one() {
       exit 1
       ;;
   esac
+
+  src_real="$(cd "${src}" && pwd -P)"
+  dst_parent_real="$(cd "$(dirname "${dst}")" && pwd -P)"
+  dst_real="${dst_parent_real}/$(basename "${dst}")"
+  if [[ "${src_real}" == "${dst_real}" || "${src_real}" == "${dst_real}/"* || "${dst_real}" == "${src_real}/"* ]]; then
+    echo "Refusing to sync because source and destination overlap: ${src_real} <-> ${dst_real}"
+    exit 1
+  fi
 
   rm -rf "${dst}"
   cp -R "${src}" "${dst}"

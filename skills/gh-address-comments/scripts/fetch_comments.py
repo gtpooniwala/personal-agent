@@ -77,6 +77,7 @@ query(
           originalStartLine
           resolvedBy { login }
           comments(first: 100) {
+            pageInfo { hasNextPage endCursor }
             nodes {
               id
               body
@@ -235,6 +236,8 @@ def fetch_all(owner: str, repo: str, number: int) -> dict[str, Any]:
         if not (comments_cursor or reviews_cursor or threads_cursor):
             break
 
+    annotate_truncated_thread_comments(review_threads)
+
     assert pr_meta is not None
     return {
         "pull_request": pr_meta,
@@ -256,6 +259,19 @@ def extend_unique(
         if node_id:
             seen_ids.add(node_id)
         target.append(node)
+
+
+def annotate_truncated_thread_comments(review_threads: list[dict[str, Any]]) -> None:
+    for thread in review_threads:
+        comments_block = thread.get("comments")
+        if not isinstance(comments_block, dict):
+            continue
+        page_info = comments_block.get("pageInfo")
+        if not isinstance(page_info, dict):
+            continue
+        if page_info.get("hasNextPage"):
+            thread["commentsTruncated"] = True
+            thread["commentsNextCursor"] = page_info.get("endCursor")
 
 
 def main() -> None:

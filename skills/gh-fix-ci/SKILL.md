@@ -37,9 +37,9 @@ Prereq: authenticate with the standard GitHub CLI once (for example, run `gh aut
      - `python "<path-to-skill>/scripts/inspect_pr_checks.py" --repo "." --pr "<number-or-url>"`
      - Add `--json` for machine-friendly output.
    - Manual fallback:
-     - `gh pr checks <pr> --json name,state,bucket,link,startedAt,completedAt,workflow`
-       - If a field is rejected, rerun with the available fields reported by `gh`.
-     - For each failing check, extract the run id from `detailsUrl` and run:
+    - `gh pr checks <pr> --json name,state,bucket,link,detailsUrl,startedAt,completedAt,workflow`
+      - If a field is rejected, rerun with the available fields reported by `gh`.
+    - For each failing check, extract the run id from `detailsUrl` (or `link` when `detailsUrl` is unavailable) and run:
        - `gh run view <run_id> --json name,workflowName,conclusion,status,url,event,headBranch,headSha`
        - `gh run view <run_id> --log`
      - If the run log says it is still in progress, fetch job logs directly (the endpoint returns a zip archive):
