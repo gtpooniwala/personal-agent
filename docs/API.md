@@ -362,11 +362,15 @@ const runSubmit = await fetch('/runs', {
 });
 
 const runData = await runSubmit.json();
+const maxAttempts = 120; // 60s total with 500ms interval
 
 let status = await (await fetch(`/runs/${runData.run_id}/status`)).json();
-while (status.status === 'queued' || status.status === 'running' || status.status === 'retrying') {
+for (let attempts = 0; attempts < maxAttempts && (status.status === 'queued' || status.status === 'running' || status.status === 'retrying'); attempts++) {
   await new Promise(resolve => setTimeout(resolve, 500));
   status = await (await fetch(`/runs/${runData.run_id}/status`)).json();
+}
+if (status.status === 'queued' || status.status === 'running' || status.status === 'retrying') {
+  throw new Error('Run polling timed out');
 }
 
 if (status.status === 'succeeded') {
@@ -402,10 +406,14 @@ const queryResponse = await fetch('/runs', {
 });
 
 const queryRunData = await queryResponse.json();
+const queryMaxAttempts = 120; // 60s total with 500ms interval
 let queryStatus = await (await fetch(`/runs/${queryRunData.run_id}/status`)).json();
-while (queryStatus.status === 'queued' || queryStatus.status === 'running' || queryStatus.status === 'retrying') {
+for (let attempts = 0; attempts < queryMaxAttempts && (queryStatus.status === 'queued' || queryStatus.status === 'running' || queryStatus.status === 'retrying'); attempts++) {
   await new Promise(resolve => setTimeout(resolve, 500));
   queryStatus = await (await fetch(`/runs/${queryRunData.run_id}/status`)).json();
+}
+if (queryStatus.status === 'queued' || queryStatus.status === 'running' || queryStatus.status === 'retrying') {
+  throw new Error('Document query run polling timed out');
 }
 ```
 

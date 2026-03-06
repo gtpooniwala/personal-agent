@@ -69,6 +69,19 @@ Target runtime path (rolling out soon):
 - Frontend: Next.js + React
 - Storage: SQLite + local filesystem (`data/`)
 
+## LangChain/LangGraph Migration Baseline
+
+Contributor reference for current migration state:
+- Dependency source of truth:
+  - Backend: `backend/requirements.txt`
+  - Frontend: `frontend/package.json`
+- Completed baseline:
+  - LangGraph ReAct orchestration is the active architecture.
+  - Tool routing is centralized in the orchestrator tool registry.
+- Runtime migration status:
+  - Current implementation uses `POST /api/v1/chat` synchronous request lifecycle.
+  - Next target is async `/chat` + `/runs` submission with status/events polling.
+
 ## Quick Start (Docker, Recommended)
 
 ### 1) Prerequisites
