@@ -2,15 +2,10 @@
 
 from __future__ import annotations
 
+from importlib import import_module
 from typing import Any, Dict, Optional, Tuple
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-
-try:
-    from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
-except Exception:  # pragma: no cover - optional dependency in some environments
-    ChatGoogleGenerativeAI = None
-    GoogleGenerativeAIEmbeddings = None
 
 from backend.config import llm_config, settings
 
@@ -31,6 +26,40 @@ class MissingProviderKeyError(RuntimeError):
 
 class MissingModelDependencyError(RuntimeError):
     """Raised when the selected provider package is missing."""
+
+
+def _import_gemini_module() -> Any:
+    try:
+        return import_module("langchain_google_genai")
+    except ModuleNotFoundError as exc:
+        if exc.name == "langchain_google_genai":
+            raise MissingModelDependencyError(
+                "Gemini provider selected but langchain-google-genai is not installed. "
+                "Install backend/requirements.txt dependencies and retry."
+            ) from exc
+        raise
+
+
+def _load_gemini_chat_class() -> Any:
+    module = _import_gemini_module()
+    chat_class = getattr(module, "ChatGoogleGenerativeAI", None)
+    if chat_class is None:
+        raise MissingModelDependencyError(
+            "Gemini provider selected but ChatGoogleGenerativeAI is unavailable in "
+            "langchain-google-genai."
+        )
+    return chat_class
+
+
+def _load_gemini_embeddings_class() -> Any:
+    module = _import_gemini_module()
+    embeddings_class = getattr(module, "GoogleGenerativeAIEmbeddings", None)
+    if embeddings_class is None:
+        raise MissingModelDependencyError(
+            "Gemini embeddings selected but GoogleGenerativeAIEmbeddings is unavailable in "
+            "langchain-google-genai."
+        )
+    return embeddings_class
 
 
 def _config_default_provider() -> str:
@@ -114,11 +143,7 @@ def create_chat_model(
     provider, model_name = _split_provider_model(configured_model, provider_default)
 
     if provider == "gemini":
-        if ChatGoogleGenerativeAI is None:
-            raise MissingModelDependencyError(
-                "Gemini provider selected but langchain-google-genai is not installed. "
-                "Install backend/requirements.txt dependencies and retry."
-            )
+        chat_model_class = _load_gemini_chat_class()
         if not settings.gemini_api_key:
             raise MissingProviderKeyError(_missing_key_message("gemini"))
 
@@ -129,7 +154,7 @@ def create_chat_model(
         }
         if max_tokens is not None:
             kwargs["max_output_tokens"] = max_tokens
-        return ChatGoogleGenerativeAI(**kwargs)
+        return chat_model_class(**kwargs)
 
     if provider == "openai":
         if not settings.openai_api_key:
@@ -158,14 +183,10 @@ def create_embeddings_model():
     provider, model_name = _split_provider_model(model_name, provider)
 
     if provider == "gemini":
-        if GoogleGenerativeAIEmbeddings is None:
-            raise MissingModelDependencyError(
-                "Gemini embeddings selected but langchain-google-genai is not installed. "
-                "Install backend/requirements.txt dependencies and retry."
-            )
+        embeddings_model_class = _load_gemini_embeddings_class()
         if not settings.gemini_api_key:
             raise MissingProviderKeyError(_missing_key_message("gemini"))
-        return GoogleGenerativeAIEmbeddings(model=model_name, google_api_key=settings.gemini_api_key)
+        return embeddings_model_class(model=model_name, google_api_key=settings.gemini_api_key)
 
     if provider == "openai":
         if not settings.openai_api_key:

@@ -3,6 +3,7 @@
 import os
 import sys
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 # Add project root to path
@@ -30,9 +31,9 @@ class TestLLMProviderRouting(unittest.TestCase):
             provider.settings, "openai_api_key", "test-openai-key"
         ), patch.object(provider.settings, "gemini_api_key", "test-gemini-key"), patch(
             "backend.llm.provider.OpenAIEmbeddings"
-        ) as mock_openai_embeddings, patch(
-            "backend.llm.provider.GoogleGenerativeAIEmbeddings"
-        ) as mock_gemini_embeddings:
+        ) as mock_openai_embeddings, patch.object(
+            provider, "_load_gemini_embeddings_class"
+        ) as mock_load_gemini_embeddings_class:
             expected = object()
             mock_openai_embeddings.return_value = expected
 
@@ -43,7 +44,31 @@ class TestLLMProviderRouting(unittest.TestCase):
                 model="text-embedding-3-small",
                 openai_api_key="test-openai-key",
             )
-            mock_gemini_embeddings.assert_not_called()
+            mock_load_gemini_embeddings_class.assert_not_called()
+
+    def test_import_gemini_module_maps_missing_package_to_dependency_error(self):
+        missing_error = ModuleNotFoundError("No module named 'langchain_google_genai'")
+        missing_error.name = "langchain_google_genai"
+
+        with patch("backend.llm.provider.import_module", side_effect=missing_error):
+            with self.assertRaises(provider.MissingModelDependencyError) as ctx:
+                provider._import_gemini_module()
+
+        self.assertIn("langchain-google-genai is not installed", str(ctx.exception))
+
+    def test_import_gemini_module_does_not_mask_runtime_import_failure(self):
+        with patch("backend.llm.provider.import_module", side_effect=RuntimeError("boom")):
+            with self.assertRaisesRegex(RuntimeError, "boom"):
+                provider._import_gemini_module()
+
+    def test_load_gemini_classes_read_from_imported_module(self):
+        fake_module = SimpleNamespace(
+            ChatGoogleGenerativeAI=object,
+            GoogleGenerativeAIEmbeddings=object,
+        )
+        with patch("backend.llm.provider.import_module", return_value=fake_module):
+            self.assertIs(provider._load_gemini_chat_class(), object)
+            self.assertIs(provider._load_gemini_embeddings_class(), object)
 
 
 if __name__ == "__main__":
