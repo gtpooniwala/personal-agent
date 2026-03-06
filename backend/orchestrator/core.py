@@ -138,6 +138,47 @@ Your effectiveness is measured by:
             return [history[summary_idx]] + pre_summary + history[summary_idx+1:]
         else:
             return history
+
+    def _build_langgraph_messages(self, condensed_history: List[Dict[str, Any]]) -> List:
+        """
+        Convert stored conversation history to LangChain messages for graph invocation.
+        Summary system messages are preserved as a synthetic context HumanMessage because
+        some model integrations reject mid-history SystemMessage entries.
+        """
+        messages = []
+        summary_blocks: List[str] = []
+        summary_prefix = "[CONVERSATION SUMMARY]"
+
+        for msg in condensed_history:
+            role = msg.get("role")
+            content = str(msg.get("content", ""))
+
+            if role == "user":
+                messages.append(HumanMessage(content=content))
+            elif role == "assistant":
+                messages.append(AIMessage(content=content))
+            elif role == "system":
+                if content.startswith(summary_prefix):
+                    summary_text = content[len(summary_prefix):].strip() or content.strip()
+                    if summary_text:
+                        summary_blocks.append(summary_text)
+                # Skip all system messages in rolling history.
+                continue
+
+        if summary_blocks:
+            summary_context = "\n\n".join(summary_blocks)
+            messages.insert(
+                0,
+                HumanMessage(
+                    content=(
+                        "Context from earlier conversation summary (for reference only; "
+                        "not a new user request):\n"
+                        f"{summary_context}"
+                    )
+                ),
+            )
+
+        return messages
     
     async def process_request(
         self, 
@@ -170,16 +211,7 @@ Your effectiveness is measured by:
 
             # Use condensed conversation history for agent context
             condensed_history = self.get_condensed_conversation_history(conversation_id)
-            messages = []
-            for msg in condensed_history:
-                if msg['role'] == 'user':
-                    messages.append(HumanMessage(content=msg['content']))
-                elif msg['role'] == 'assistant':
-                    messages.append(AIMessage(content=msg['content']))
-                elif msg['role'] == 'system':
-                    # Some LangGraph model integrations reject system messages inside rolling history.
-                    continue
-                # Optionally, handle other system/tool messages here if needed
+            messages = self._build_langgraph_messages(condensed_history)
             token_usage = None
             try:
                 config = {"configurable": {"thread_id": conversation_id}}

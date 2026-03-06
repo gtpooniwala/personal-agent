@@ -17,6 +17,7 @@ CORE_ORCHESTRATOR_IMPORT_ERROR = ""
 try:
     from backend.orchestrator.core import CoreOrchestrator
     from backend.database.operations import db_ops
+    from langchain_core.messages import AIMessage, HumanMessage
 except Exception as exc:
     CORE_ORCHESTRATOR_TESTS_AVAILABLE = False
     CORE_ORCHESTRATOR_IMPORT_ERROR = str(exc)
@@ -86,6 +87,62 @@ class TestCoreOrchestrator(unittest.TestCase):
             tools = self.orchestrator.get_available_tools()
             self.assertEqual(len(tools), 1)
             self.assertEqual(tools[0]["name"], "calculator")
+
+    def test_build_langgraph_messages_preserves_summary_as_context(self):
+        """Conversation summaries should be preserved without replaying SystemMessage objects."""
+        condensed_history = [
+            {
+                "id": "s1",
+                "role": "system",
+                "content": "[CONVERSATION SUMMARY]\nUser discussed vacation planning and dates.",
+                "timestamp": "2025-01-01T00:00:00",
+            },
+            {
+                "id": "u1",
+                "role": "user",
+                "content": "Can we continue the itinerary?",
+                "timestamp": "2025-01-01T00:01:00",
+            },
+            {
+                "id": "a1",
+                "role": "assistant",
+                "content": "Sure, what destination?",
+                "timestamp": "2025-01-01T00:02:00",
+            },
+        ]
+
+        messages = self.orchestrator._build_langgraph_messages(condensed_history)
+
+        self.assertEqual(len(messages), 3)
+        self.assertIsInstance(messages[0], HumanMessage)
+        self.assertIn("Context from earlier conversation summary", messages[0].content)
+        self.assertIn("vacation planning and dates", messages[0].content)
+        self.assertIsInstance(messages[1], HumanMessage)
+        self.assertEqual(messages[1].content, "Can we continue the itinerary?")
+        self.assertIsInstance(messages[2], AIMessage)
+        self.assertEqual(messages[2].content, "Sure, what destination?")
+
+    def test_build_langgraph_messages_ignores_non_summary_system_messages(self):
+        """Non-summary system messages should not be passed into rolling model history."""
+        condensed_history = [
+            {
+                "id": "sys1",
+                "role": "system",
+                "content": "internal system note",
+                "timestamp": "2025-01-01T00:00:00",
+            },
+            {
+                "id": "u1",
+                "role": "user",
+                "content": "Hello",
+                "timestamp": "2025-01-01T00:01:00",
+            },
+        ]
+
+        messages = self.orchestrator._build_langgraph_messages(condensed_history)
+        self.assertEqual(len(messages), 1)
+        self.assertIsInstance(messages[0], HumanMessage)
+        self.assertEqual(messages[0].content, "Hello")
 
 
 if __name__ == '__main__':
