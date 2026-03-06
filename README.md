@@ -96,6 +96,7 @@ git clone https://github.com/gtpooniwala/personal-agent.git
 cd personal-agent
 cp .env.example .env
 # Edit .env and set GEMINI_API_KEY
+# Optional observability: set LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_BASE_URL
 ```
 
 ### 3) Start backend + frontend
@@ -171,6 +172,19 @@ Run deterministic repository checks:
 ```bash
 python tests/run_repo_checks.py
 ```
+
+## Observability Baseline
+
+- Structured JSON logs are emitted by the backend (request ID + route + latency fields).
+- Runtime counters are stored in SQLite (`runtime_counters` table).
+- Langfuse tracing is enabled when the following env vars are set:
+  - `LANGFUSE_PUBLIC_KEY`
+  - `LANGFUSE_SECRET_KEY`
+  - `LANGFUSE_BASE_URL` (defaults to `https://cloud.langfuse.com`)
+  - `LANGFUSE_ENABLED=true`
+  - Optional: `LANGFUSE_SAMPLE_RATE` (`0.0` to `1.0`)
+
+Langfuse instrumentation currently covers active API endpoints and orchestration paths (excluding `GET /api/v1/health` by design).
 
 These checks run in CI because they are deterministic and fast.
 
