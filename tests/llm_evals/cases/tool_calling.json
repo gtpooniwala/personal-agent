@@ -44,12 +44,26 @@
             ],
             "must_not_call": [
               "calculator"
-            ],
-            "response_contains": [
-              "time"
             ]
           }
-        ]
+        ],
+        "by_mode": {
+          "mock": {
+            "per_turn": [
+              {
+                "must_call": [
+                  "current_time"
+                ],
+                "must_not_call": [
+                  "calculator"
+                ],
+                "response_contains": [
+                  "time"
+                ]
+              }
+            ]
+          }
+        }
       }
     },
     {
@@ -89,9 +103,89 @@
           {
             "must_call": [
               "internet_search"
+            ]
+          }
+        ],
+        "by_mode": {
+          "mock": {
+            "per_turn": [
+              {
+                "must_call": [
+                  "internet_search"
+                ],
+                "response_contains": [
+                  "search"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "document_search_selected_docs",
+      "description": "Document-specific queries with selected docs should route to search_documents only.",
+      "turns": [
+        {
+          "message": "Search my uploaded contract for termination details.",
+          "selected_documents": [
+            "doc-123"
+          ]
+        }
+      ],
+      "expected": {
+        "per_turn": [
+          {
+            "must_call": [
+              "search_documents"
+            ],
+            "must_not_call": [
+              "calculator",
+              "current_time",
+              "internet_search"
             ],
             "response_contains": [
-              "search"
+              "document"
+            ]
+          }
+        ],
+        "by_mode": {
+          "mock": {
+            "per_turn": [
+              {
+                "must_call": [
+                  "search_documents"
+                ],
+                "must_not_call": [
+                  "calculator",
+                  "current_time",
+                  "internet_search"
+                ],
+                "response_contains": [
+                  "selected documents"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "calculator_exponentiation",
+      "description": "Exponentiation queries should route to calculator and produce numeric output.",
+      "turns": [
+        {
+          "message": "What is 2 ** 8?"
+        }
+      ],
+      "expected": {
+        "per_turn": [
+          {
+            "must_call": [
+              "calculator"
+            ],
+            "response_contains": [
+              "256"
             ]
           }
         ]

@@ -24,6 +24,7 @@ if str(ROOT) not in sys.path:
 EVAL_ROOT = ROOT / "tests" / "llm_evals"
 CASES_DIR = EVAL_ROOT / "cases"
 RESULTS_DIR = EVAL_ROOT / "results"
+MAX_SAFE_EXPONENT = 64
 
 
 @dataclass
@@ -122,6 +123,7 @@ def _safe_eval_math(expression: str) -> Optional[float]:
         ast.Mult,
         ast.Div,
         ast.Mod,
+        ast.Pow,
         ast.USub,
         ast.UAdd,
         ast.Constant,
@@ -155,6 +157,10 @@ def _safe_eval_math(expression: str) -> Optional[float]:
                 return left / right
             if isinstance(node.op, ast.Mod):
                 return left % right
+            if isinstance(node.op, ast.Pow):
+                if abs(right) > MAX_SAFE_EXPONENT:
+                    raise ValueError(f"Exponent magnitude exceeds safe limit ({MAX_SAFE_EXPONENT})")
+                return left**right
             raise ValueError("Unsupported binary operator")
         raise ValueError("Unsupported expression")
 
@@ -284,6 +290,12 @@ def _check_turn_expectation(index: int, expectation: Dict[str, Any], actual: Tur
         if needle not in response_lower:
             failures.append(f"turn {index}: response missing expected text '{needle}'")
 
+    contains_any = _ensure_list(expectation.get("response_contains_any"))
+    if contains_any and not any(needle in response_lower for needle in contains_any):
+        failures.append(
+            f"turn {index}: response missing any expected text from {contains_any}"
+        )
+
     for needle in _ensure_list(expectation.get("response_not_contains")):
         if needle in response_lower:
             failures.append(f"turn {index}: response unexpectedly contains '{needle}'")
@@ -291,8 +303,37 @@ def _check_turn_expectation(index: int, expectation: Dict[str, Any], actual: Tur
     return failures
 
 
-def _evaluate_case(case: Dict[str, Any], executions: Sequence[TurnExecution]) -> Tuple[bool, List[str]]:
-    expected = case.get("expected", {})
+def _resolve_expected(case: Dict[str, Any], mode: str) -> Dict[str, Any]:
+    case_id = str(case.get("id", "unknown"))
+    expected = case.get("expected")
+    if expected is None:
+        raise ValueError(f"Case '{case_id}' is missing required 'expected' object")
+    if not isinstance(expected, dict):
+        raise ValueError(f"Case '{case_id}' has invalid 'expected': must be an object")
+
+    resolved = {k: v for k, v in expected.items() if k != "by_mode"}
+    by_mode = expected.get("by_mode")
+    if by_mode is not None and not isinstance(by_mode, dict):
+        raise ValueError(f"Case '{case_id}' has invalid 'expected.by_mode': must be an object")
+    if isinstance(by_mode, dict):
+        mode_override = by_mode.get(mode)
+        if mode_override is not None and not isinstance(mode_override, dict):
+            raise ValueError(
+                f"Case '{case_id}' has invalid 'expected.by_mode.{mode}': must be an object"
+            )
+        if isinstance(mode_override, dict):
+            resolved.update(mode_override)
+
+    if "per_turn" in resolved and not isinstance(resolved["per_turn"], list):
+        raise ValueError(f"Case '{case_id}' has invalid 'expected.per_turn': must be a list")
+
+    return resolved
+
+
+def _evaluate_case(
+    case: Dict[str, Any], executions: Sequence[TurnExecution], mode: str
+) -> Tuple[bool, List[str]]:
+    expected = _resolve_expected(case, mode)
     failures: List[str] = []
 
     per_turn_expectations = expected.get("per_turn", [])
@@ -355,7 +396,7 @@ async def run_evals(args: argparse.Namespace) -> Dict[str, Any]:
                     execution = _mock_execute_turn(str(turn.get("message", "")), selected_documents)
                     executions.append(execution)
 
-            passed, failures = _evaluate_case(case, executions)
+            passed, failures = _evaluate_case(case, executions, args.mode)
             if execution_error:
                 passed = False
                 failures.insert(0, execution_error)

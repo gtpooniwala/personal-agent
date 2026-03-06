@@ -36,12 +36,17 @@ class TestDatabaseOperations(unittest.TestCase):
         
         # Create a mock database operations instance
         self.db_ops = DatabaseOperations()
+        self.db_ops.close()
         # Replace the engine and session with our test ones
         self.db_ops.engine = self.engine
         self.db_ops.SessionLocal = SessionLocal
         
         self.test_conversation_id = "test_conv_123"
         self.test_user_id = "test_user"
+
+    def tearDown(self):
+        """Dispose test database connections."""
+        self.db_ops.close()
         
     def test_create_conversation(self):
         """Test creating a new conversation."""

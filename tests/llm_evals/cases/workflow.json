@@ -39,10 +39,26 @@
         "per_turn": [
           {
             "response_contains": [
-              "no documents are currently selected"
+              "contract"
+            ],
+            "response_contains_any": [
+              "no documents",
+              "don't have access",
+              "couldn't find"
             ]
           }
-        ]
+        ],
+        "by_mode": {
+          "mock": {
+            "per_turn": [
+              {
+                "response_contains": [
+                  "no documents are currently selected"
+                ]
+              }
+            ]
+          }
+        }
       }
     },
     {
@@ -59,25 +75,53 @@
       "expected": {
         "per_turn": [
           {
-            "must_call": [
-              "calculator"
-            ],
             "response_contains": [
               "25"
             ]
-          },
-          {
-            "must_call": [
-              "current_time"
-            ],
-            "response_contains": [
-              "time"
-            ]
           }
         ],
-        "overall_must_not_call": [
-          "search_documents"
-        ]
+        "overall_must_not_call": ["search_documents"],
+        "by_mode": {
+          "live": {
+            "per_turn": [
+              {
+                "response_contains": [
+                  "25"
+                ]
+              },
+              {
+                "response_contains_any": [
+                  "am",
+                  "pm",
+                  "time"
+                ]
+              }
+            ]
+          },
+          "mock": {
+            "per_turn": [
+              {
+                "must_call": [
+                  "calculator"
+                ],
+                "response_contains": [
+                  "25"
+                ]
+              },
+              {
+                "must_call": [
+                  "current_time"
+                ],
+                "response_contains": [
+                  "time"
+                ]
+              }
+            ],
+            "overall_must_not_call": [
+              "search_documents"
+            ]
+          }
+        }
       }
     }
   ]

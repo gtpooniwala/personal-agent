@@ -4,7 +4,8 @@ from backend.database.models import Base, Conversation, Message, MemoryStore
 from backend.config import settings
 from typing import List, Optional, Dict, Any
 import json
-from datetime import datetime
+from datetime import datetime, timezone
+import atexit
 
 
 class DatabaseOperations:
@@ -22,11 +23,16 @@ class DatabaseOperations:
     def get_session(self) -> Session:
         """Get database session."""
         return self.SessionLocal()
+
+    def close(self):
+        """Dispose database engine and release pooled connections."""
+        if getattr(self, "engine", None) is not None:
+            self.engine.dispose()
     
     def create_conversation(self, title: Optional[str] = None, user_id: str = "default") -> str:
         """Create a new conversation and return its ID."""
         if not title:
-            title = f"Conversation {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+            title = f"Conversation {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}"
         
         session = self.get_session()
         try:
@@ -83,7 +89,7 @@ class DatabaseOperations:
                 Conversation.id == conversation_id
             ).first()
             if conversation:
-                conversation.updated_at = datetime.utcnow()
+                conversation.updated_at = datetime.now(timezone.utc)
             
             session.commit()
             return message.id
@@ -178,7 +184,7 @@ class DatabaseOperations:
                 return False
             
             conversation.title = title
-            conversation.updated_at = datetime.utcnow()
+            conversation.updated_at = datetime.now(timezone.utc)
             session.commit()
             return True
         finally:
@@ -237,3 +243,4 @@ class DatabaseOperations:
 
 # Global database operations instance
 db_ops = DatabaseOperations()
+atexit.register(db_ops.close)

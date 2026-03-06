@@ -38,10 +38,18 @@ Supported assertions:
 - `per_turn[].must_call`
 - `per_turn[].must_not_call`
 - `per_turn[].response_contains`
+- `per_turn[].response_contains_any` (at least one substring must match)
 - `per_turn[].response_not_contains`
 - `overall_must_call`
 - `overall_must_not_call`
 - `overall_response_contains`
+
+Optional mode-specific overrides:
+
+- `expected.by_mode.mock`
+- `expected.by_mode.live`
+
+If provided, the selected mode override replaces top-level `expected` keys with the same name.
 
 ## Reports
 

@@ -1,4 +1,4 @@
-from langchain.tools import BaseTool
+from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field, model_validator
 from typing import Dict, Any, Optional, Literal, Type
 import json

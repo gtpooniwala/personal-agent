@@ -1,4 +1,4 @@
-from langchain.tools import BaseTool
+from langchain_core.tools import BaseTool
 from backend.llm import create_chat_model
 
 class SummarisationAgent(BaseTool):

@@ -5,10 +5,10 @@ Document processing service for PDF text extraction and chunking.
 import uuid
 from typing import List, Dict, Any, Optional
 from pathlib import Path
-import PyPDF2
+from pypdf import PdfReader
 import logging
 
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from backend.database.models import Document, DocumentChunk
 from backend.database.operations import db_ops
 from backend.llm import (
@@ -191,7 +191,7 @@ class DocumentProcessor:
             text_content = []
             
             with open(file_path, 'rb') as file:
-                pdf_reader = PyPDF2.PdfReader(file)
+                pdf_reader = PdfReader(file)
                 
                 for page_num, page in enumerate(pdf_reader.pages):
                     try:
@@ -207,7 +207,7 @@ class DocumentProcessor:
         except Exception as e:
             logger.error(f"Error extracting PDF text: {str(e)}")
             raise
-    
+
     async def _generate_document_summary(self, text_content: str) -> str:
         """
         Generate a concise one-sentence summary of the document content.

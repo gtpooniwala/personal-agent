@@ -330,7 +330,8 @@ async def process_message(self, message: str, conversation_id: str):
         intermediate_steps = result.get("intermediate_steps", [])
     except Exception as e:
         # Graceful fallback to direct LLM only if agent completely fails
-        response = await self.llm.apredict(message)
+        llm_result = await self.llm.ainvoke(message)
+        response = getattr(llm_result, "content", str(llm_result))
         intermediate_steps = []
 ```
 

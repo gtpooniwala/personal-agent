@@ -1,4 +1,4 @@
-from langchain.tools import BaseTool
+from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 from typing import Optional, Literal, Type
@@ -64,7 +64,12 @@ Examples: "What time is it?", "What's today's date?", "current time" """
     
     args_schema: Type[BaseModel] = TimeInput
     
-    def _run(self, query: str = "now") -> str:
+    def _run(
+        self,
+        query: str = "now",
+        format_type: Optional[Literal["standard", "verbose", "iso"]] = "standard",
+        **kwargs,
+    ) -> str:
         """
         Get current date and time information using validated input.
         
@@ -77,8 +82,8 @@ Examples: "What time is it?", "What's today's date?", "current time" """
         try:
             # Parse input using Pydantic model
             try:
-                parsed_input = TimeInput(query=query)
-            except Exception as e:
+                parsed_input = TimeInput(query=query, format_type=format_type)
+            except Exception:
                 # Fallback for simple usage
                 parsed_input = TimeInput()
             
@@ -100,6 +105,11 @@ Examples: "What time is it?", "What's today's date?", "current time" """
             logger.error(f"Time tool error: {str(e)}")
             return f"Error getting current time: {str(e)}"
     
-    async def _arun(self, query: str = "now") -> str:
+    async def _arun(
+        self,
+        query: str = "now",
+        format_type: Optional[Literal["standard", "verbose", "iso"]] = "standard",
+        **kwargs,
+    ) -> str:
         """Async version of the time tool."""
-        return self._run(query)
+        return self._run(query=query, format_type=format_type, **kwargs)

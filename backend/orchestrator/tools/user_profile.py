@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field, PrivateAttr
 from typing import Literal, Optional, Dict, Any
 import os
 import json
-from langchain.tools import BaseTool
+from langchain_core.tools import BaseTool
 from backend.llm import create_chat_model, MissingProviderKeyError, MissingModelDependencyError
 
 # Use BASE_DIR from environment or fallback to project root
