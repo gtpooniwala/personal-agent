@@ -72,7 +72,18 @@ def _split_provider_model(model_name: str, fallback_provider: str) -> Tuple[str,
 
     if lower.startswith("gemini") or lower.startswith("models/"):
         return "gemini", model
-    if lower.startswith("gpt-") or lower.startswith("o1") or lower.startswith("o3") or lower.startswith("o4"):
+    if lower.startswith(
+        (
+            "gpt-",
+            "o1",
+            "o3",
+            "o4",
+            "text-embedding-",
+            "text-similarity-",
+            "text-search-",
+            "code-search-",
+        )
+    ):
         return "openai", model
 
     return fallback_provider, model
