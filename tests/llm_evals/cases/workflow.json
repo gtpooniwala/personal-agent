@@ -40,6 +40,11 @@
           {
             "response_contains": [
               "contract"
+            ],
+            "response_contains_any": [
+              "no documents",
+              "don't have access",
+              "couldn't find"
             ]
           }
         ],

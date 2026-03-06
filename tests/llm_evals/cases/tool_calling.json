@@ -103,12 +103,23 @@
           {
             "must_call": [
               "internet_search"
-            ],
-            "response_contains": [
-              "search"
             ]
           }
-        ]
+        ],
+        "by_mode": {
+          "mock": {
+            "per_turn": [
+              {
+                "must_call": [
+                  "internet_search"
+                ],
+                "response_contains": [
+                  "search"
+                ]
+              }
+            ]
+          }
+        }
       }
     },
     {

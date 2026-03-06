@@ -290,6 +290,12 @@ def _check_turn_expectation(index: int, expectation: Dict[str, Any], actual: Tur
         if needle not in response_lower:
             failures.append(f"turn {index}: response missing expected text '{needle}'")
 
+    contains_any = _ensure_list(expectation.get("response_contains_any"))
+    if contains_any and not any(needle in response_lower for needle in contains_any):
+        failures.append(
+            f"turn {index}: response missing any expected text from {contains_any}"
+        )
+
     for needle in _ensure_list(expectation.get("response_not_contains")):
         if needle in response_lower:
             failures.append(f"turn {index}: response unexpectedly contains '{needle}'")
@@ -298,16 +304,29 @@ def _check_turn_expectation(index: int, expectation: Dict[str, Any], actual: Tur
 
 
 def _resolve_expected(case: Dict[str, Any], mode: str) -> Dict[str, Any]:
-    expected = case.get("expected", {})
+    case_id = str(case.get("id", "unknown"))
+    expected = case.get("expected")
+    if expected is None:
+        raise ValueError(f"Case '{case_id}' is missing required 'expected' object")
     if not isinstance(expected, dict):
-        return {}
+        raise ValueError(f"Case '{case_id}' has invalid 'expected': must be an object")
 
     resolved = {k: v for k, v in expected.items() if k != "by_mode"}
     by_mode = expected.get("by_mode")
+    if by_mode is not None and not isinstance(by_mode, dict):
+        raise ValueError(f"Case '{case_id}' has invalid 'expected.by_mode': must be an object")
     if isinstance(by_mode, dict):
         mode_override = by_mode.get(mode)
+        if mode_override is not None and not isinstance(mode_override, dict):
+            raise ValueError(
+                f"Case '{case_id}' has invalid 'expected.by_mode.{mode}': must be an object"
+            )
         if isinstance(mode_override, dict):
             resolved.update(mode_override)
+
+    if "per_turn" in resolved and not isinstance(resolved["per_turn"], list):
+        raise ValueError(f"Case '{case_id}' has invalid 'expected.per_turn': must be a list")
+
     return resolved
 
 

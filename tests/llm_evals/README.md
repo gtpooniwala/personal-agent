@@ -38,6 +38,7 @@ Supported assertions:
 - `per_turn[].must_call`
 - `per_turn[].must_not_call`
 - `per_turn[].response_contains`
+- `per_turn[].response_contains_any` (at least one substring must match)
 - `per_turn[].response_not_contains`
 - `overall_must_call`
 - `overall_must_not_call`
