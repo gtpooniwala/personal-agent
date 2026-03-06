@@ -1,36 +1,27 @@
-# Personal Agent Dockerfile
 FROM python:3.11-slim
 
-# Set working directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app \
+    HOST=0.0.0.0 \
+    PORT=8000
 
-# Copy requirements and install Python dependencies
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -r requirements.txt
 
-# Copy application code
-COPY . .
+RUN addgroup --system app && adduser --system --ingroup app app
 
-# Create necessary directories
-RUN mkdir -p data logs
+COPY --chown=app:app backend ./backend
 
-# Set environment variables
-ENV PYTHONPATH=/app
-ENV HOST=0.0.0.0
-ENV PORT=8000
+RUN mkdir -p /app/data /app/logs && chown -R app:app /app/data /app/logs
 
-# Expose port
+USER app
+
 EXPOSE 8000
-
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=5)" || exit 1
 
-# Run the application
 CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

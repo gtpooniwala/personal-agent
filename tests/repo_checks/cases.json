@@ -35,14 +35,14 @@
     "id": "docker_health_endpoint",
     "type": "contains",
     "path": "Dockerfile",
-    "pattern": "http://localhost:8000/api/v1/health",
+    "pattern": "/api/v1/health",
     "description": "Docker healthcheck points to versioned API health endpoint"
   },
   {
     "id": "compose_health_endpoint",
     "type": "contains",
     "path": "docker-compose.yml",
-    "pattern": "http://localhost:8000/api/v1/health",
+    "pattern": "/api/v1/health",
     "description": "Compose healthcheck points to versioned API health endpoint"
   },
   {

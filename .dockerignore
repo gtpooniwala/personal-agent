@@ -17,3 +17,13 @@ frontend/.next
 frontend/out
 frontend/.env.local
 tests/__pycache__
+docs
+tests
+frontend
+assets
+skills
+README*
+AGENT.md
+AGENTS.md
+CLAUDE.md
+scripts
