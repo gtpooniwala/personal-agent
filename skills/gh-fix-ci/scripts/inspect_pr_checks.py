@@ -426,17 +426,36 @@ def parse_available_fields(message: str) -> list[str]:
     if "Available fields:" not in message:
         return []
     fields: list[str] = []
+    seen: set[str] = set()
     collecting = False
     for line in message.splitlines():
         if "Available fields:" in line:
             collecting = True
+            _, suffix = line.split("Available fields:", 1)
+            for field in parse_field_tokens(suffix):
+                if field not in seen:
+                    seen.add(field)
+                    fields.append(field)
             continue
         if not collecting:
             continue
-        field = line.strip()
-        if not field:
-            continue
-        fields.append(field)
+        for field in parse_field_tokens(line):
+            if field not in seen:
+                seen.add(field)
+                fields.append(field)
+    return fields
+
+
+def parse_field_tokens(raw: str) -> list[str]:
+    stripped = raw.strip()
+    if not stripped:
+        return []
+    stripped = re.sub(r"^[-*]\s*", "", stripped)
+    candidates = [token.strip().rstrip(",") for token in stripped.split(",")]
+    fields: list[str] = []
+    for candidate in candidates:
+        if re.fullmatch(r"[A-Za-z][A-Za-z0-9]*", candidate):
+            fields.append(candidate)
     return fields
 
 

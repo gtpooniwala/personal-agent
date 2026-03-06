@@ -11,9 +11,10 @@ Use this skill when changes are ready to commit, push, or publish as a PR.
 
 ## Non-negotiable contract
 - Keep commits granular and task-focused.
-- Do not push from `main`.
+- Do not commit or push feature work from `main`; use a dedicated branch/worktree.
 - Keep branch rebased on latest `origin/main`.
-- PR must target `main` and include a closing keyword (`Closes #<id>`).
+- PR must target `main` and include an issue reference (`Refs #<id>` minimum).
+- Use closing keywords (`Closes/Fixes/Resolves #<id>`) only when the PR fully completes that issue.
 - Merge strategy is squash-only.
 
 ## Workflow
@@ -35,7 +36,7 @@ Use this skill when changes are ready to commit, push, or publish as a PR.
 
 5. Open or update PR.
 - Use `.github/pull_request_template.md`.
-- Include issue-closing keyword in PR body.
+- Include issue reference in PR body (`Refs #<id>` minimum).
 - Include validation commands/results, and eval results when LLM/tool-calling behavior changed.
 
 6. Final policy checklist.

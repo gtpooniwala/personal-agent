@@ -37,7 +37,7 @@ jobs:
           CHANGED="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
           echo "$CHANGED"
 
-          if echo "$CHANGED" | grep -Eq '^(backend/|tests/|scripts/|\.githooks/|Dockerfile|docker-compose\.yml|setup\.sh|start_server\.sh|backend/requirements\.txt)'; then
+          if echo "$CHANGED" | grep -Eq '^(backend/|tests/|scripts/|\.githooks/|Dockerfile|docker-compose\.yml|setup\.sh|start_server\.sh|backend/requirements\.txt|\.github/workflows/)'; then
             echo "run_backend_tests=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_backend_tests=false" >> "$GITHUB_OUTPUT"
