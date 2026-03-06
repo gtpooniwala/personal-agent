@@ -7,6 +7,11 @@ if [ "$BRANCH" = "main" ]; then
   exit 1
 fi
 
+if ! echo "$BRANCH" | grep -Eq '^(codex|claude)/[a-z0-9][a-z0-9-]*/[0-9]+-[a-z0-9][a-z0-9-]*$'; then
+  echo "Push blocked: branch must match <agent>/<type>/<issue>-<slug> (e.g. codex/fix/7-safe-calculator)."
+  exit 1
+fi
+
 if ! git fetch origin main >/dev/null 2>&1; then
   echo "Push blocked: failed to fetch origin/main. Fix remote connectivity and retry."
   exit 1

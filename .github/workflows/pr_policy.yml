@@ -5,11 +5,24 @@ on:
     types: [opened, edited, synchronize, reopened]
     branches: [main]
 
+concurrency:
+  group: pr-policy-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   enforce-pr-policy:
     name: enforce-pr-policy
     runs-on: ubuntu-latest
     steps:
+      - name: Validate branch naming contract
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          echo "$HEAD_REF" | grep -Eq '^(codex|claude)/[a-z0-9][a-z0-9-]*/[0-9]+-[a-z0-9][a-z0-9-]*$' || {
+            echo "Branch must match: <agent>/<type>/<issue>-<slug> (e.g. codex/fix/7-safe-calculator)."
+            exit 1
+          }
+
       - name: Validate issue closing keyword in PR body
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
@@ -31,5 +44,14 @@ jobs:
           BEHIND=$(git rev-list --left-right --count origin/main...HEAD | awk '{print $1}')
           if [ "$BEHIND" -ne 0 ]; then
             echo "Branch is behind origin/main by $BEHIND commit(s). Rebase required."
+            exit 1
+          fi
+
+      - name: Ensure PR branch has no merge commits
+        run: |
+          git fetch origin main
+          MERGE_COUNT=$(git rev-list --count --merges origin/main..HEAD)
+          if [ "$MERGE_COUNT" -ne 0 ]; then
+            echo "PR branch contains $MERGE_COUNT merge commit(s). Rebase/squash to linear history."
             exit 1
           fi
