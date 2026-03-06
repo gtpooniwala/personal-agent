@@ -57,8 +57,19 @@ fi
 
 mkdir -p "${DEST_ROOT}"
 
+validate_skill_name() {
+  local skill_name="$1"
+  if [[ ! "${skill_name}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+    echo "Invalid skill name: ${skill_name}"
+    echo "Skill names may contain only letters, digits, '.', '_' and '-' (no path separators)."
+    exit 1
+  fi
+}
+
 sync_one() {
   local skill_name="$1"
+  validate_skill_name "${skill_name}"
+
   local src="${SOURCE_ROOT}/${skill_name}"
   local dst="${DEST_ROOT}/${skill_name}"
 

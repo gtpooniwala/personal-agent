@@ -19,6 +19,7 @@ import json
 import subprocess
 import sys
 from typing import Any
+from urllib.parse import urlparse
 
 QUERY = """\
 query(
@@ -123,13 +124,27 @@ def gh_pr_view_json(fields: str) -> dict[str, Any]:
 def get_current_pr_ref() -> tuple[str, str, int]:
     """
     Resolve the PR for the current branch (whatever gh considers associated).
-    Works for cross-repo PRs too, by reading head repository owner/name.
+    Works for cross-repo PRs by deriving base owner/repo from the PR URL.
     """
-    pr = gh_pr_view_json("number,headRepositoryOwner,headRepository")
-    owner = pr["headRepositoryOwner"]["login"]
-    repo = pr["headRepository"]["name"]
+    pr = gh_pr_view_json("number,url")
+    owner, repo = parse_repo_from_pr_url(str(pr.get("url") or ""))
+    if not owner or not repo:
+        repo_view = _run_json(["gh", "repo", "view", "--json", "nameWithOwner"])
+        name_with_owner = str(repo_view.get("nameWithOwner") or "")
+        if "/" in name_with_owner:
+            owner, repo = name_with_owner.split("/", 1)
+    if not owner or not repo:
+        raise RuntimeError("Unable to resolve base repository owner/name from PR metadata.")
     number = int(pr["number"])
     return owner, repo, number
+
+
+def parse_repo_from_pr_url(pr_url: str) -> tuple[str | None, str | None]:
+    parsed = urlparse(pr_url)
+    parts = [part for part in parsed.path.split("/") if part]
+    if len(parts) >= 4 and parts[2] == "pull":
+        return parts[0], parts[1]
+    return None, None
 
 
 def gh_api_graphql(
@@ -171,6 +186,9 @@ def fetch_all(owner: str, repo: str, number: int) -> dict[str, Any]:
     conversation_comments: list[dict[str, Any]] = []
     reviews: list[dict[str, Any]] = []
     review_threads: list[dict[str, Any]] = []
+    seen_conversation_comment_ids: set[str] = set()
+    seen_review_ids: set[str] = set()
+    seen_review_thread_ids: set[str] = set()
 
     comments_cursor: str | None = None
     reviews_cursor: str | None = None
@@ -206,9 +224,9 @@ def fetch_all(owner: str, repo: str, number: int) -> dict[str, Any]:
         r = pr["reviews"]
         t = pr["reviewThreads"]
 
-        conversation_comments.extend(c.get("nodes") or [])
-        reviews.extend(r.get("nodes") or [])
-        review_threads.extend(t.get("nodes") or [])
+        extend_unique(conversation_comments, c.get("nodes") or [], seen_conversation_comment_ids)
+        extend_unique(reviews, r.get("nodes") or [], seen_review_ids)
+        extend_unique(review_threads, t.get("nodes") or [], seen_review_thread_ids)
 
         comments_cursor = c["pageInfo"]["endCursor"] if c["pageInfo"]["hasNextPage"] else None
         reviews_cursor = r["pageInfo"]["endCursor"] if r["pageInfo"]["hasNextPage"] else None
@@ -224,6 +242,20 @@ def fetch_all(owner: str, repo: str, number: int) -> dict[str, Any]:
         "reviews": reviews,
         "review_threads": review_threads,
     }
+
+
+def extend_unique(
+    target: list[dict[str, Any]],
+    nodes: list[dict[str, Any]],
+    seen_ids: set[str],
+) -> None:
+    for node in nodes:
+        node_id = str(node.get("id") or "")
+        if node_id and node_id in seen_ids:
+            continue
+        if node_id:
+            seen_ids.add(node_id)
+        target.append(node)
 
 
 def main() -> None:

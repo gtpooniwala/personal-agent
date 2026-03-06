@@ -115,7 +115,19 @@ def main() -> int:
 
     failing = [c for c in checks if is_failing(c)]
     if not failing:
-        print(f"PR #{pr_value}: no failing checks detected.")
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "pr": pr_value,
+                        "results": [],
+                        "summary": "no failing checks detected",
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"PR #{pr_value}: no failing checks detected.")
         return 0
 
     results = []
@@ -138,12 +150,20 @@ def main() -> int:
 
 
 def find_git_root(start: Path) -> Path | None:
-    result = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"],
-        cwd=start,
-        text=True,
-        capture_output=True,
-    )
+    probe_dir = start.expanduser()
+    if not probe_dir.is_dir():
+        probe_dir = probe_dir.parent
+    if not probe_dir.exists() or not probe_dir.is_dir():
+        return None
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=probe_dir,
+            text=True,
+            capture_output=True,
+        )
+    except OSError:
+        return None
     if result.returncode != 0:
         return None
     return Path(result.stdout.strip())

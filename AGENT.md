@@ -28,7 +28,7 @@ Canonical workflow contract for AI coding agents in this repository.
 - `PR Policy / enforce-pr-policy`
 
 ## Required Commands
-- New worktree: `scripts/new_worktree.sh codex <type> <issue> <slug>`
+- New worktree: `scripts/new_worktree.sh <agent:codex|claude> <type> <issue> <slug>`
 - Sync with main: `scripts/sync_main.sh`
 - Sync repo-managed skills into Codex home: `scripts/sync_skills.sh`
 

@@ -145,15 +145,17 @@ jobs:
     steps:
       - name: Validate upstream CI results
         env:
+          DETECT_CHANGES_RESULT: ${{ needs.detect_changes.result }}
           BACKEND_RESULT: ${{ needs.backend_tests.result }}
           FRONTEND_RESULT: ${{ needs.frontend_tests.result }}
           REPO_RESULT: ${{ needs.repo_checks.result }}
         run: |
+          echo "detect-changes: ${DETECT_CHANGES_RESULT}"
           echo "backend-tests: ${BACKEND_RESULT}"
           echo "frontend-tests: ${FRONTEND_RESULT}"
           echo "repo-checks: ${REPO_RESULT}"
 
-          for result in "${BACKEND_RESULT}" "${FRONTEND_RESULT}" "${REPO_RESULT}"; do
+          for result in "${DETECT_CHANGES_RESULT}" "${BACKEND_RESULT}" "${FRONTEND_RESULT}" "${REPO_RESULT}"; do
             if [ "${result}" = "failure" ] || [ "${result}" = "cancelled" ]; then
               echo "Detected failing required CI dependency."
               exit 1
