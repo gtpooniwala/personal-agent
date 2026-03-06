@@ -33,7 +33,7 @@ Workflow:
 ## Migration Track
 - [ ] `todo` Add run lifecycle schema (`runs`, `run_events`, `leases`) ([#15](https://github.com/gtpooniwala/personal-agent/issues/15))
 - [ ] `todo` Implement runtime worker queue with per-session serialization ([#16](https://github.com/gtpooniwala/personal-agent/issues/16))
-- [ ] `todo` Convert chat API to submit-run + status/events endpoints ([#17](https://github.com/gtpooniwala/personal-agent/issues/17))
+- [ ] `todo` Deliver async submission contracts for `/chat` and `/runs` plus status/events endpoints ([#17](https://github.com/gtpooniwala/personal-agent/issues/17))
 - [ ] `todo` Add scheduler/heartbeat for autonomous workflows ([#18](https://github.com/gtpooniwala/personal-agent/issues/18))
 - [ ] `todo` Add runtime evals for lifecycle/retry/session isolation ([#19](https://github.com/gtpooniwala/personal-agent/issues/19))
 - [ ] `todo` Build real LLM/workflow evaluation harness (separate from deterministic repo checks) ([#23](https://github.com/gtpooniwala/personal-agent/issues/23))
@@ -42,6 +42,9 @@ Workflow:
 Execution sequence after #14:
 - #15 and #17 can run in parallel once event/state vocabulary is frozen.
 - #16 should be sequenced after #15 and / or #17 settle the data contract.
+
+Scope confirmation rule:
+- #22 and #23 are listed for visibility but are not auto-included in core migration execution; AI coding agents must ask the user to confirm before implementing either one under this track.
 
 ## Backlog
 - [ ] `todo` Chat naming polish ([#1](https://github.com/gtpooniwala/personal-agent/issues/1))

@@ -38,11 +38,11 @@ flowchart LR
 ### Request Flow
 
 1. User sends a message from the frontend.
-2. `POST /api/v1/runs` submits the request and returns a `run_id`.
+2. `POST /runs` or `POST /chat` submits asynchronous work and returns a `run_id`.
 3. Backend worker processes run steps asynchronously (tool selection, tool execution, synthesis).
-4. Frontend polls `GET /api/v1/runs/{run_id}/status` and `GET /api/v1/runs/{run_id}/events`.
+4. Frontend polls `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events`.
 5. When complete, the final response appears in persisted messages and conversation history.
-6. `POST /api/v1/chat` stays temporarily for local migration continuity with a deprecation warning.
+6. Legacy `POST /api/v1/chat` (synchronous) is deprecated; new behavior uses async `/chat` and `/runs`.
 
 ## Implemented Capabilities
 
@@ -164,9 +164,16 @@ If the provider key is missing, live mode exits as `blocked` and tells you which
 
 ## API Surface
 
-Base URL: `http://127.0.0.1:8000/api/v1`
+Base URL: `http://127.0.0.1:8000`
+
+Route notation:
+- Primary notation in docs: bare routes (`/chat`, `/runs`, ...)
+- Legacy compatibility notation: `/api/v1/...` (older deployments)
 
 Core endpoints:
+- `POST /runs`
+- `GET /runs/{run_id}/status`
+- `GET /runs/{run_id}/events`
 - `POST /chat`
 - `GET /conversations`
 - `POST /conversations`
@@ -226,6 +233,7 @@ Design choices reflected in this implementation:
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [API](docs/API.md)
+- [Runtime Migration Architecture](docs/MIGRATION_RUNTIME_ARCHITECTURE.md)
 - [Feature Overview](docs/FEATURES_OVERVIEW.md)
 - [Development Guide](docs/DEVELOPMENT_GUIDE.md)
 - [Project Status](docs/PROJECT_STATUS.md)

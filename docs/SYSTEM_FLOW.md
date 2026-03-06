@@ -10,7 +10,7 @@ This section reflects the migration target runtime: async run submission with st
 
 ```mermaid
 graph TB
-    A[POST /api/v1/runs] --> B{Persist Run Record}
+    A[POST /runs or POST /chat] --> B{Persist Run Record}
     B --> C[Run Queue]
     C --> D[Dedicated Worker]
     D --> E[Load Conversation Context]
@@ -21,7 +21,7 @@ graph TB
     H --> J[Emit Tool Events]
     J --> F
     F --> K[Persist Results]
-    K --> L[Emit completed/failed events]
+    K --> L[Emit succeeded/failed events]
     M[GET /runs/{run_id}/status] --> N[Expose lifecycle state]
     M --> O[GET /runs/{run_id}/events]
     O --> P[Expose ordered progress stream]
@@ -29,8 +29,9 @@ graph TB
 
 ### Transitional compatibility
 
-- `POST /api/v1/chat` remains temporarily available during migration.
-- It submits through the same run path and returns deprecation notes for callers.
+- `POST /chat` is an active asynchronous conversational submission path.
+- `POST /runs` is an active asynchronous general run submission path.
+- Legacy synchronous `POST /api/v1/chat` is deprecated and should be removed after migration completion.
 
 ### High-Level Request Processing
 

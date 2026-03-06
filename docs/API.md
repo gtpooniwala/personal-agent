@@ -1,9 +1,11 @@
 # API Documentation
 
 ## Base URL
-- **Development**: `http://127.0.0.1:8000/api/v1`
+- **Development host**: `http://127.0.0.1:8000`
 - **Interactive Docs**: `http://127.0.0.1:8000/docs`
 - **OpenAPI Schema**: `http://127.0.0.1:8000/openapi.json`
+- **Primary route notation in this doc**: bare paths (`/chat`, `/runs`, ...)
+- **Legacy route notation**: `/api/v1/...` (older deployments)
 
 ## Authentication
 Currently, the MVP uses a default user system. No authentication is required for API calls.
@@ -52,6 +54,9 @@ Get current run lifecycle status.
 #### GET `/runs/{run_id}/events`
 Get ordered run progress messages for polling UIs and logging.
 
+Contract note: cursor/pagination parameters for this endpoint are intentionally left flexible in this phase.
+Before finalizing the implementation contract, the AI coding agent must confirm details with the user.
+
 **Response:**
 ```json
 {
@@ -65,7 +70,7 @@ Get ordered run progress messages for polling UIs and logging.
     },
     {
       "type": "tool_call",
-      "status": "in_progress",
+      "status": "running",
       "tool": "Calculator",
       "message": "Tool selected and executing",
       "created_at": "2026-03-06T10:00:02Z"
@@ -75,10 +80,10 @@ Get ordered run progress messages for polling UIs and logging.
 ```
 
 #### POST `/chat`
-Temporary transition endpoint (deprecated).
+Asynchronous conversational submission endpoint.
 
-`POST /chat` remains temporarily available for local compatibility while clients migrate.
-It is expected to internally submit a run and return a deprecation warning in response metadata.
+`POST /chat` and `POST /runs` both submit asynchronous work and return a run handle.
+Legacy `POST /api/v1/chat` synchronous behavior is deprecated and should be removed after migration completion.
 
 #### GET `/conversations`
 Get all conversations for the user.
@@ -243,8 +248,8 @@ Health check endpoint.
 ### Run Event
 ```json
 {
-  "type": "started|tool_call|tool_result|failed|completed",
-  "status": "running|succeeded|failed",
+  "type": "started|tool_call|tool_result|retrying|failed|succeeded|cancelled",
+  "status": "queued|running|retrying|succeeded|failed|cancelling|cancelled",
   "message": "string",
   "tool": "optional string",
   "created_at": "ISO-8601 datetime"
@@ -337,7 +342,7 @@ Currently no rate limiting is implemented. For production deployment, consider i
 ### Basic Chat Flow
 ```javascript
 // Start a new conversation
-const runSubmit = await fetch('/api/v1/runs', {
+const runSubmit = await fetch('/runs', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -349,15 +354,15 @@ const runSubmit = await fetch('/api/v1/runs', {
 
 const runData = await runSubmit.json();
 
-let status = await (await fetch(`/api/v1/runs/${runData.run_id}/status`)).json();
+let status = await (await fetch(`/runs/${runData.run_id}/status`)).json();
 while (status.status === 'queued' || status.status === 'running' || status.status === 'retrying') {
   await new Promise(resolve => setTimeout(resolve, 500));
-  status = await (await fetch(`/api/v1/runs/${runData.run_id}/status`)).json();
+  status = await (await fetch(`/runs/${runData.run_id}/status`)).json();
 }
 
 if (status.status === 'succeeded') {
-  const events = await (await fetch(`/api/v1/runs/${runData.run_id}/events`)).json();
-  console.log('Run completed', status, events);
+  const events = await (await fetch(`/runs/${runData.run_id}/events`)).json();
+  console.log('Run succeeded', status, events);
 } else {
   console.error('Run failed', status.error);
 }
@@ -369,7 +374,7 @@ if (status.status === 'succeeded') {
 const formData = new FormData();
 formData.append('file', pdfFile);
 
-const uploadResponse = await fetch('/api/v1/documents/upload', {
+const uploadResponse = await fetch('/documents/upload', {
   method: 'POST',
   body: formData
 });
@@ -377,7 +382,7 @@ const uploadResponse = await fetch('/api/v1/documents/upload', {
 const uploadResult = await uploadResponse.json();
 
 // Query the document
-const queryResponse = await fetch('/api/v1/runs', {
+const queryResponse = await fetch('/runs', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -388,24 +393,24 @@ const queryResponse = await fetch('/api/v1/runs', {
 });
 
 const queryRunData = await queryResponse.json();
-let queryStatus = await (await fetch(`/api/v1/runs/${queryRunData.run_id}/status`)).json();
+let queryStatus = await (await fetch(`/runs/${queryRunData.run_id}/status`)).json();
 while (queryStatus.status === 'queued' || queryStatus.status === 'running' || queryStatus.status === 'retrying') {
   await new Promise(resolve => setTimeout(resolve, 500));
-  queryStatus = await (await fetch(`/api/v1/runs/${queryRunData.run_id}/status`)).json();
+  queryStatus = await (await fetch(`/runs/${queryRunData.run_id}/status`)).json();
 }
 ```
 
 ### Conversation Management
 ```javascript
 // Get all conversations
-const conversations = await fetch('/api/v1/conversations').then(r => r.json());
+const conversations = await fetch('/conversations').then(r => r.json());
 
 // Get specific conversation messages
-const messages = await fetch(`/api/v1/conversations/${convId}/messages`)
+const messages = await fetch(`/conversations/${convId}/messages`)
   .then(r => r.json());
 
 // Generate title for conversation
-const titleResponse = await fetch(`/api/v1/conversations/${convId}/generate-title`, {
+const titleResponse = await fetch(`/conversations/${convId}/generate-title`, {
   method: 'POST'
 });
 ```

@@ -16,9 +16,9 @@ This project implements a sophisticated AI-powered personal assistant ("personal
 ## Long-Running Runtime Migration
 
 The current target architecture moves from synchronous chat responses to a run-based asynchronous model:
-- `POST /api/v1/runs` is the primary execution path.
-- `GET /api/v1/runs/{run_id}/status` and `/events` provide progress visibility.
-- `POST /api/v1/chat` is kept temporarily as a deprecated compatibility shim.
+- `POST /runs` and `POST /chat` are the primary asynchronous execution paths.
+- `GET /runs/{run_id}/status` and `/events` provide progress visibility.
+- Legacy synchronous `POST /api/v1/chat` is deprecated compatibility behavior.
 - Migration issue: [#14](https://github.com/gtpooniwala/personal-agent/issues/14) (design) with implementation split across #15-#19.
 
 ## Orchestrator Agent Prompt (Macro Context)
@@ -45,7 +45,7 @@ The orchestrator agent is responsible for:
 ```text
 personal-agent/
 ├── README.md                  # User documentation and feature overview
-├── AGENT.md                   # This file – agent context, macro instructions, and editing guide
+├── docs/AGENT.md              # This file – agent context, macro instructions, and editing guide
 ├── backend/
 │   ├── orchestrator/
 │   │   ├── core.py            # Core orchestrator logic (main agent brain)
@@ -62,7 +62,7 @@ personal-agent/
 
 - **Orchestrator logic:** Edit `backend/orchestrator/core.py` for main agent flow, context window, and summarisation logic.
 - **Add or update tools:** Implement new tools in `backend/orchestrator/tools/` and register them in `tool_registry.py`.
-- **Documentation:** Update `README.md`, `AGENT.md`, and `docs/features/` for any new features, tools, or changes to agent behavior.
+- **Documentation:** Update `README.md`, `docs/AGENT.md`, and `docs/features/` for any new features, tools, or changes to agent behavior.
 - **Tests:** Add or update tests in `backend/test_comprehensive.py` or `tests/` as needed.
 - **Frontend:** Edit files in `frontend/` for UI/UX changes.
 
@@ -218,11 +218,10 @@ User Request → CoreOrchestrator → Tool Analysis → Delegation Decision
                                         │
                                         ▼
                               ┌─────────────────┐
-                              │   OpenAI APIs   │
+                              │  LLM Providers  │
                               │                 │
-                              │ • GPT-3.5-turbo │
-                              │ • text-embedding│
-                              │   -ada-002      │
+                              │ • Gemini (default) │
+                              │ • OpenAI (optional) │
                               └─────────────────┘
 ```
 
@@ -239,7 +238,7 @@ User Request → CoreOrchestrator → Tool Analysis → Delegation Decision
 │                                                                                 │
 │  STEP 1: Intent Analysis                                                        │
 │  ┌─────────────────────────────────────────────────────────────────────────┐   │
-│  │ GPT-3.5-turbo analyzes user request for:                                 │   │
+│  │ The configured orchestration chat model analyzes user request for:       │   │
 │  │ • Mathematical expressions                                                │   │
 │  │ • Time/date queries                                                       │   │
 │  │ • Document references                                                     │   │
@@ -294,7 +293,7 @@ User Request → CoreOrchestrator → Tool Analysis → Delegation Decision
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                        RESPONSE GENERATION                                     │
 │                                                                                 │
-│  Orchestrator (GPT-3.5-turbo) compiles final response:                         │
+│  Orchestrator (configured chat model) compiles final response:                 │
 │  ┌─────────────────────────────────────────────────────────────────────────┐   │
 │  │ • Integrates tool results into natural language                          │   │
 │  │ • Maintains conversation context and memory                               │   │
@@ -338,15 +337,16 @@ User Request → CoreOrchestrator → Tool Analysis → Delegation Decision
 
 **`backend/api/routes.py`** - API Endpoints
 
-- `POST /api/v1/runs` - Primary asynchronous run submission
-- `GET /api/v1/runs/{run_id}/status` - Run lifecycle status
-- `GET /api/v1/runs/{run_id}/events` - Run progress stream snapshot
-- `POST /api/v1/chat` - Temporary compatibility shim (deprecated)
-- `GET /api/v1/conversations` - List all conversations
-- `POST /api/v1/conversations` - Create new conversation
-- `GET /api/v1/conversations/{id}/messages` - Get conversation history
-- `GET /api/v1/tools` - List available tools
-- `GET /api/v1/health` - Health check
+- `POST /runs` - Asynchronous run submission
+- `POST /chat` - Asynchronous conversational submission
+- `GET /runs/{run_id}/status` - Run lifecycle status
+- `GET /runs/{run_id}/events` - Run progress stream snapshot
+- `GET /conversations` - List all conversations
+- `POST /conversations` - Create new conversation
+- `GET /conversations/{id}/messages` - Get conversation history
+- `GET /tools` - List available tools
+- `GET /health` - Health check
+- Legacy note: `/api/v1/...` route notation is deprecated compatibility notation.
 
 **`backend/api/models.py`** - Pydantic Models
 
@@ -888,10 +888,14 @@ UI Display: Response + professional tool usage display
 
 ### Required Environment Setup
 
-**CRITICAL**: Must use conda environment or system will not work properly.
+Use a supported Python environment (venv or conda) with the project dependencies installed.
 
 ```bash
-# Environment activation - REQUIRED
+# Option A (venv)
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Option B (conda)
 conda activate personalagent
 
 # Environment variables (backend/.env)
@@ -900,15 +904,17 @@ conda activate personalagent
 ### Development Dependencies
 
 ```python
-# backend/requirements.txt
-langchain==0.2.16
-langchain-openai==0.1.25
-langchain-community==0.2.16
+# backend/requirements.txt (see file for full list)
+langchain==0.3.15
+langchain-openai==0.3.7
+langchain-community==0.3.15
+langchain-google-genai==2.0.9
+langgraph==0.2.70
 fastapi==0.111.0
 uvicorn[standard]==0.30.0
 python-dotenv==1.0.1
-pydantic==2.7.2
-pydantic-settings==2.3.0
+pydantic==2.7.4
+pydantic-settings==2.4.0
 sqlalchemy==2.0.30
 aiofiles==23.2.1
 ```
@@ -918,7 +924,7 @@ aiofiles==23.2.1
 1. **Environment Setup**:
 
    ```bash
-   conda activate personalagent
+   source .venv/bin/activate  # or: conda activate personalagent
    cd backend
    ```
 
@@ -997,7 +1003,7 @@ def get_available_tools(self) -> List[BaseTool]:
 ```text
 personal-agent/
 ├── README.md                    # User-facing documentation  
-├── AGENT.md                     # This AI agent technical documentation
+├── docs/AGENT.md                # This AI agent technical documentation
 ├── setup.sh                     # Automated conda environment setup
 ├── docs/                        # Detailed documentation
 │   ├── API.md                  # API documentation
@@ -1023,11 +1029,6 @@ personal-agent/
 │   │       ├── search_documents.py # ✅ RAG-based document search
 │   │       └── gmail.py          # ✅ Gmail integration
 │   │       └── integrations.py    # 🚧 Calendar, Todoist placeholders
-│   ├── agent/                  # Legacy agent implementation (compatibility)
-│   │   ├── __init__.py        # Module initialization
-│   │   ├── core.py            # PersonalAgent class with smart routing
-│   │   ├── memory.py          # Custom SQLite-backed LangChain memory
-│   │   └── tools.py           # Original tool implementations and registry
 │   ├── api/                   # FastAPI routes and models
 │   │   ├── __init__.py        # Module initialization
 │   │   ├── models.py          # Pydantic request/response models
@@ -1057,7 +1058,7 @@ personal-agent/
 - 🎯 **New `orchestrator/`**: Modular architecture with specialized tools
 - ✅ **Implemented Tools**: 5/6 tools production ready
 - 🚧 **Placeholder Tools**: 1/6 tools framework ready
-- 🔄 **Legacy `agent/`**: Backward compatibility maintained
+- 🔄 **Legacy `agent/`**: Removed from active codepaths
 
 ## 🔄 Recent Major Changes (Important for Context)
 

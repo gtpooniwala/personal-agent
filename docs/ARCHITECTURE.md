@@ -20,9 +20,9 @@ User Query → LangGraph Agent → Dynamic Route Decision (Graph-Based)
 
 ## Long-Running Runtime Architecture (Migration Direction)
 
-- **Primary contract**: asynchronous run submission (`POST /api/v1/runs`) plus status/events polling.
+- **Primary contract**: asynchronous run submission (`POST /runs` and `POST /chat`) plus status/events polling.
 - **Execution model**: dedicated worker processing with durable run state and event history.
-- **Compatibility**: `POST /api/v1/chat` is temporary and deprecated during migration.
+- **Compatibility**: legacy synchronous `POST /api/v1/chat` is deprecated; bare-route `/chat` remains active.
 - **Ordering model**: first implementation enforces one active run per conversation/session.
 
 This model decouples request acceptance from execution, enables retries/recovery, and prevents single long tool call from blocking the HTTP request lifecycle.
@@ -110,7 +110,7 @@ This model decouples request acceptance from execution, enables retries/recovery
 - Conversation management with passive maintenance
 - Document upload and management
 - Async runtime submission (`/runs`) with status/events polling
-- Deprecation-safe chat shim endpoint (`/chat`) during migration
+- Async conversational submission endpoint (`/chat`) during migration
 - Health checks and tool listing
 
 **Models (`backend/api/models.py`)**

@@ -29,3 +29,7 @@ Repository workflow contract for Codex.
 - Do not merge if checks fail.
 - CI runs unit tests and deterministic repository checks only.
 - Run LLM/workflow evals locally only when changes can impact LLM/tool-calling behavior or agent workflows; summarize results in the PR.
+
+## Planning Confirmation Rules
+- If docs/issues disagree on scope or ordering (for example, whether `#22`/`#23` belong to the migration execution lane), stop and ask the user to confirm before implementation.
+- If endpoint contract details are intentionally unspecified (for example, event pagination/cursor or cancel contract), ask the user to confirm before closing implementation work.
