@@ -8,7 +8,7 @@ echo "Configuring branch protection for ${REPO} main..."
 gh api -X PUT "repos/${REPO}/branches/main/protection" \
   -H "Accept: application/vnd.github+json" \
   -F "required_status_checks[strict]=true" \
-  -f "required_status_checks[contexts][]=CI / test-and-eval" \
+  -f "required_status_checks[contexts][]=CI / tests-and-repo-checks" \
   -f "required_status_checks[contexts][]=PR Policy / enforce-pr-policy" \
   -F "enforce_admins=true" \
   -F "required_pull_request_reviews[dismiss_stale_reviews]=true" \

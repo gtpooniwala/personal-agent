@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Repository-quality eval runner (no third-party dependencies required)."""
+"""Deterministic repository checks runner (no third-party dependencies required)."""
 
 from __future__ import annotations
 
@@ -10,12 +10,12 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 ROOT = Path(__file__).resolve().parents[1]
-CASES_PATH = ROOT / "tests" / "evals" / "cases.json"
-RESULTS_PATH = ROOT / "tests" / "evals" / "results.json"
+CASES_PATH = ROOT / "tests" / "repo_checks" / "cases.json"
+RESULTS_PATH = ROOT / "tests" / "repo_checks" / "results.json"
 
 
 @dataclass
-class EvalResult:
+class CheckResult:
     case_id: str
     passed: bool
     description: str
@@ -26,7 +26,7 @@ def _read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def run_case(case: Dict[str, Any]) -> EvalResult:
+def run_case(case: Dict[str, Any]) -> CheckResult:
     case_id = case["id"]
     case_type = case["type"]
     description = case.get("description", case_id)
@@ -35,7 +35,7 @@ def run_case(case: Dict[str, Any]) -> EvalResult:
 
     if case_type == "path_absent":
         exists = target.exists() if target else False
-        return EvalResult(
+        return CheckResult(
             case_id=case_id,
             passed=not exists,
             description=description,
@@ -44,21 +44,21 @@ def run_case(case: Dict[str, Any]) -> EvalResult:
 
     if case_type == "contains":
         if not target or not target.exists():
-            return EvalResult(case_id, False, description, f"missing file: {rel_path}")
+            return CheckResult(case_id, False, description, f"missing file: {rel_path}")
         pattern = case["pattern"]
         content = _read_text(target)
         passed = pattern in content
-        return EvalResult(case_id, passed, description, f"pattern {'found' if passed else 'not found'}")
+        return CheckResult(case_id, passed, description, f"pattern {'found' if passed else 'not found'}")
 
     if case_type == "not_contains":
         if not target or not target.exists():
-            return EvalResult(case_id, False, description, f"missing file: {rel_path}")
+            return CheckResult(case_id, False, description, f"missing file: {rel_path}")
         pattern = case["pattern"]
         content = _read_text(target)
         passed = pattern not in content
-        return EvalResult(case_id, passed, description, f"pattern {'absent' if passed else 'present'}")
+        return CheckResult(case_id, passed, description, f"pattern {'absent' if passed else 'present'}")
 
-    return EvalResult(case_id, False, description, f"unsupported case type: {case_type}")
+    return CheckResult(case_id, False, description, f"unsupported case type: {case_type}")
 
 
 def load_cases() -> List[Dict[str, Any]]:
@@ -73,7 +73,7 @@ def main() -> int:
     total = len(results)
     failed = total - passed
 
-    print("Repository Cleanup Eval")
+    print("Repository Checks")
     print("=" * 60)
     for result in results:
         status = "PASS" if result.passed else "FAIL"

@@ -1,6 +1,6 @@
-# Tests And Evals
+# Tests And Repository Checks
 
-This directory contains automated tests and a larger scenario-style evaluation script.
+This directory contains automated tests and deterministic repository checks.
 
 ## Run Unit Tests
 
@@ -14,23 +14,23 @@ Recommended (with `pytest` installed):
 pytest tests -q
 ```
 
-## Run Scenario Eval
+## Run Scenario Test Script
 
-`tests/test_comprehensive.py` is an eval-style script that runs multi-query behavior checks and writes `test_results.json`.
+`tests/test_comprehensive.py` is a scenario-style test script that runs multi-query behavior checks and writes `test_results.json`.
 
 ```bash
 python tests/test_comprehensive.py
 ```
 
-## Run Repository Cleanup Eval
+## Run Repository Checks
 
-`tests/run_eval.py` is a deterministic static eval that checks core production-readiness cleanup invariants.
+`tests/run_repo_checks.py` performs deterministic repository checks for core invariants.
 
 ```bash
-python tests/run_eval.py
+python tests/run_repo_checks.py
 ```
 
-It writes a machine-readable report to `tests/evals/results.json`.
+It writes a machine-readable report to `tests/repo_checks/results.json`.
 
 ## Notes
 

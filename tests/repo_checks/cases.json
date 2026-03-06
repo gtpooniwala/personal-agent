@@ -77,7 +77,7 @@
     "id": "tests_readme_present",
     "type": "contains",
     "path": "tests/README.md",
-    "pattern": "Run Scenario Eval",
-    "description": "Tests README documents the scenario eval workflow"
+    "pattern": "Run Scenario Test Script",
+    "description": "Tests README documents the scenario test workflow"
   }
 ]
