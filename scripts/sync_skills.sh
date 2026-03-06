@@ -45,6 +45,16 @@ if [[ ! -d "${SOURCE_ROOT}" ]]; then
   exit 1
 fi
 
+if [[ -z "${CODEX_HOME_DIR}" || "${CODEX_HOME_DIR}" == "/" ]]; then
+  echo "Refusing to continue because CODEX_HOME resolves to an unsafe path: ${CODEX_HOME_DIR}"
+  exit 1
+fi
+
+if [[ -z "${DEST_ROOT}" || "${DEST_ROOT}" == "/" || "${DEST_ROOT}" == "//" ]]; then
+  echo "Refusing to continue because DEST_ROOT is unsafe: ${DEST_ROOT}"
+  exit 1
+fi
+
 mkdir -p "${DEST_ROOT}"
 
 sync_one() {
@@ -61,6 +71,14 @@ sync_one() {
     echo "[dry-run] sync ${src} -> ${dst}"
     return
   fi
+
+  case "${dst}" in
+    "${DEST_ROOT}/"*) ;;
+    *)
+      echo "Refusing to remove unexpected destination path: ${dst}"
+      exit 1
+      ;;
+  esac
 
   rm -rf "${dst}"
   cp -R "${src}" "${dst}"

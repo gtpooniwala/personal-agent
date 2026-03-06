@@ -4,7 +4,7 @@ description: "Use when a user asks to debug or fix failing GitHub PR checks that
 ---
 
 
-# Gh Pr Checks Plan Fix
+# GitHub PR Checks - Fix Plan
 
 ## Overview
 
@@ -42,8 +42,9 @@ Prereq: authenticate with the standard GitHub CLI once (for example, run `gh aut
      - For each failing check, extract the run id from `detailsUrl` and run:
        - `gh run view <run_id> --json name,workflowName,conclusion,status,url,event,headBranch,headSha`
        - `gh run view <run_id> --log`
-     - If the run log says it is still in progress, fetch job logs directly:
-       - `gh api "/repos/<owner>/<repo>/actions/jobs/<job_id>/logs" > "<path>"`
+     - If the run log says it is still in progress, fetch job logs directly (the endpoint returns a zip archive):
+       - `gh api "/repos/<owner>/<repo>/actions/jobs/<job_id>/logs" --output "job-logs.zip"`
+       - `unzip -p "job-logs.zip" > "<path-to-log-file>"`
 4. Scope non-GitHub Actions checks.
    - If `detailsUrl` is not a GitHub Actions run, label it as external and only report the URL.
    - Do not attempt Buildkite or other providers; keep the workflow lean.

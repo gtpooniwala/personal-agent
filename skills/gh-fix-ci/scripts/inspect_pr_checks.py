@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import re
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 from shutil import which
 from typing import Any, Iterable, Sequence
@@ -373,7 +375,10 @@ def fetch_job_log(job_id: str, repo_root: Path) -> tuple[str, str]:
         message = (stderr or stdout_bytes.decode(errors="replace")).strip()
         return "", message or "gh api job logs failed"
     if is_zip_payload(stdout_bytes):
-        return "", "Job logs returned a zip archive; unable to parse."
+        extracted_log = extract_zip_log_payload(stdout_bytes)
+        if extracted_log:
+            return extracted_log, ""
+        return "", "Job logs returned a zip archive, but no readable text log was extracted."
     return stdout_bytes.decode(errors="replace"), ""
 
 
@@ -424,6 +429,22 @@ def is_zip_payload(payload: bytes) -> bool:
     return payload.startswith(b"PK")
 
 
+def extract_zip_log_payload(payload: bytes) -> str:
+    try:
+        with zipfile.ZipFile(io.BytesIO(payload)) as zip_file:
+            entries = [name for name in zip_file.namelist() if not name.endswith("/")]
+            rendered_entries: list[str] = []
+            for entry_name in entries:
+                with zip_file.open(entry_name, "r") as fh:
+                    entry_text = fh.read().decode(errors="replace").strip()
+                if not entry_text:
+                    continue
+                rendered_entries.append(f"===== {entry_name} =====\n{entry_text}")
+            return "\n\n".join(rendered_entries)
+    except (zipfile.BadZipFile, OSError):
+        return ""
+
+
 def extract_failure_snippet(log_text: str, max_lines: int, context: int) -> str:
     lines = log_text.splitlines()
     if not lines:
@@ -434,7 +455,7 @@ def extract_failure_snippet(log_text: str, max_lines: int, context: int) -> str:
         return "\n".join(lines[-max_lines:])
 
     start = max(0, marker_index - context)
-    end = min(len(lines), marker_index + context)
+    end = min(len(lines), marker_index + context + 1)
     window = lines[start:end]
     if len(window) > max_lines:
         window = window[-max_lines:]
