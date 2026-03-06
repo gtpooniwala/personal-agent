@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import sys
 import unittest
 
 EXIT_SUCCESS = 0
@@ -51,20 +50,22 @@ def main() -> int:
     if args.top_level_dir:
         discover_kwargs["top_level_dir"] = args.top_level_dir
     suite = loader.discover(**discover_kwargs)
+    discovered_count = suite.countTestCases()
 
     runner = unittest.TextTestRunner(verbosity=args.verbosity)
     result = runner.run(suite)
 
-    discovered = result.testsRun
+    tests_run = result.testsRun
     skipped = len(result.skipped)
-    executed = discovered - skipped
+    executed = tests_run - skipped
     failures = len(result.failures)
     errors = len(result.errors)
     unexpected_successes = len(result.unexpectedSuccesses)
 
     print("\nUnit Test Guardrail Summary")
     print("=" * 60)
-    print(f"Discovered: {discovered}")
+    print(f"Discovered: {discovered_count}")
+    print(f"Tests run: {tests_run}")
     print(f"Skipped: {skipped}")
     print(f"Executed (non-skipped): {executed}")
     print(f"Failures: {failures}")
@@ -72,7 +73,7 @@ def main() -> int:
     print(f"Unexpected successes: {unexpected_successes}")
 
     exit_code = determine_exit_code(
-        discovered=discovered,
+        discovered=discovered_count,
         executed=executed,
         successful=result.wasSuccessful(),
     )
