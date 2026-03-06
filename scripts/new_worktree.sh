@@ -43,6 +43,11 @@ if git show-ref --verify --quiet "refs/heads/${BRANCH}"; then
   exit 1
 fi
 
+if git ls-remote --exit-code --heads origin "${BRANCH}" >/dev/null 2>&1; then
+  echo "Remote branch origin/${BRANCH} already exists."
+  exit 1
+fi
+
 mkdir -p .worktrees
 git worktree add "${WT_PATH}" -b "${BRANCH}" origin/main
 echo "Created worktree: ${WT_PATH}"
