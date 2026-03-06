@@ -33,8 +33,9 @@ scripts/sync_main.sh
 ```
 
 ## PR Rules
-- Every PR must link and close an issue using a closing keyword:
-  - `Closes #123` or `Fixes #123`
+- Every PR must reference an issue:
+  - Non-closing references are allowed for partial work: `Refs #123` / `Related to #123`
+  - Use closing keywords only when fully complete: `Closes #123` / `Fixes #123`
 - PRs target `main` only.
 - Rebase branch on latest `origin/main` before push and before PR update.
 - PR branch history must remain linear (no merge commits).

@@ -15,7 +15,7 @@ Canonical workflow contract for AI coding agents in this repository.
    - Claude: `claude/<type>/<issue>-<slug>`
 5. Push feature branches only; do not push feature commits to `main`.
 6. Open PRs targeting `main`.
-7. Reference and close relevant issues from PR descriptions (`Closes #<id>`).
+7. Reference relevant issues from PR descriptions (`Refs #<id>` at minimum); use closing keywords (`Closes/Fixes/Resolves #<id>`) only when the PR fully completes the issue.
 8. Rebase on `origin/main`:
    - before starting work
    - before pushing

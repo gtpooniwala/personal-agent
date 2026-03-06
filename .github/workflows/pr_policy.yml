@@ -23,12 +23,12 @@ jobs:
             exit 1
           }
 
-      - name: Validate issue closing keyword in PR body
+      - name: Validate issue linkage keyword in PR body
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
-          echo "$PR_BODY" | grep -Eiq '(close[sd]?|fix(e[sd])?|resolve[sd]?):?[[:space:]]+#([0-9]+)' || {
-            echo "PR body must include closing keyword, e.g. 'Closes #123'."
+          echo "$PR_BODY" | grep -Eiq '(close[sd]?|fix(e[sd])?|resolve[sd]?|refs?|references?|related[[:space:]]+to|part[[:space:]]+of|addresses?):?[[:space:]]+#([0-9]+)' || {
+            echo "PR body must reference an issue, e.g. 'Closes #123' or 'Refs #123'."
             exit 1
           }
 
