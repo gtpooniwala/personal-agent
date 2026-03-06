@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional, List
 import json
 import logging
 import re
+from backend.observability import observe_operation, update_observation, increment_counter
 
 logger = logging.getLogger(__name__)
 
@@ -195,132 +196,195 @@ Your effectiveness is measured by:
         3. Let the agent analyze and delegate tasks
         4. Track and return the orchestration results
         """
-        try:
-            self._ensure_llm()
-            # Update tool registry with selected documents if provided
-            if selected_documents is not None:
-                self.tool_registry.update_selected_documents(selected_documents)
-                # Force agent re-setup with updated tools
-                self._setup_orchestrator_agent(conversation_id, force_refresh=True)
-            else:
-                # Normal setup
-                self._setup_orchestrator_agent(conversation_id)
-            
-            # Save user message to database
-            db_ops.save_message(conversation_id, "user", user_request)
-
-            # Use condensed conversation history for agent context
-            condensed_history = self.get_condensed_conversation_history(conversation_id)
-            messages = self._build_langgraph_messages(condensed_history)
-            token_usage = None
+        with observe_operation(
+            name="orchestrator.process_request",
+            counter_prefix="orchestrator.process_request",
+            as_type="chain",
+            conversation_id=conversation_id,
+            input_data={
+                "request_chars": len(user_request or ""),
+                "selected_documents_count": len(selected_documents or []),
+            },
+            metadata={"component": "orchestrator"},
+        ) as operation_observation:
             try:
-                config = {"configurable": {"thread_id": conversation_id}}
-                result = self.orchestrator_agent.invoke({"messages": messages}, config=config)
-                orchestration_actions = self._extract_langgraph_actions(result["messages"]) if result and "messages" in result else []
-                tool_results = orchestration_actions if orchestration_actions else []
-                response_agent_tool = self.tool_registry._tools.get("response_agent")
-                if response_agent_tool:
-                    # Use condensed history for response agent as well
-                    conversation_history = self.get_condensed_conversation_history(conversation_id)
-                    response = response_agent_tool._run(
-                        user_query=user_request,
-                        tool_results=tool_results,
-                        conversation_history=conversation_history
-                    )
+                self._ensure_llm()
+                # Update tool registry with selected documents if provided
+                if selected_documents is not None:
+                    self.tool_registry.update_selected_documents(selected_documents)
+                    # Force agent re-setup with updated tools
+                    self._setup_orchestrator_agent(conversation_id, force_refresh=True)
                 else:
-                    ai_messages = [msg for msg in result["messages"] if isinstance(msg, AIMessage)]
-                    if ai_messages:
-                        response = ai_messages[-1].content
-                    else:
-                        response = "I apologize, but I couldn't process your request properly."
+                    # Normal setup
+                    self._setup_orchestrator_agent(conversation_id)
 
-                if result and "messages" in result:
-                    usage = self._extract_usage_metadata(result["messages"])
-                    if usage:
-                        token_usage = usage.get("total_tokens")
+                # Save user message to database
+                db_ops.save_message(conversation_id, "user", user_request)
+
+                # Use condensed conversation history for agent context
+                condensed_history = self.get_condensed_conversation_history(conversation_id)
+                messages = self._build_langgraph_messages(condensed_history)
+                token_usage = None
+                fallback_used = False
+                try:
+                    with observe_operation(
+                        name="orchestrator.langgraph.invoke",
+                        counter_prefix="orchestrator.langgraph.invoke",
+                        as_type="generation",
+                        conversation_id=conversation_id,
+                        input_data={"messages_count": len(messages)},
+                        metadata={"component": "orchestrator"},
+                    ) as invoke_observation:
+                        config = {"configurable": {"thread_id": conversation_id}}
+                        result = self.orchestrator_agent.invoke({"messages": messages}, config=config)
+                        orchestration_actions = self._extract_langgraph_actions(result["messages"]) if result and "messages" in result else []
+                        tool_results = orchestration_actions if orchestration_actions else []
+                        response_agent_tool = self.tool_registry._tools.get("response_agent")
+                        if response_agent_tool:
+                            # Use condensed history for response agent as well
+                            conversation_history = self.get_condensed_conversation_history(conversation_id)
+                            response = response_agent_tool._run(
+                                user_query=user_request,
+                                tool_results=tool_results,
+                                conversation_history=conversation_history
+                            )
+                        else:
+                            ai_messages = [msg for msg in result["messages"] if isinstance(msg, AIMessage)]
+                            if ai_messages:
+                                response = ai_messages[-1].content
+                            else:
+                                response = "I apologize, but I couldn't process your request properly."
+
+                        if result and "messages" in result:
+                            usage = self._extract_usage_metadata(result["messages"])
+                            if usage:
+                                token_usage = usage.get("total_tokens")
+                                update_observation(invoke_observation, usage_details={k: int(v) for k, v in usage.items() if isinstance(v, int)})
+                except Exception as e:
+                    logger.warning(f"LangGraph agent processing failed: {str(e)}")
+                    increment_counter("orchestrator.fallback_total")
+                    fallback_used = True
+                    orchestration_actions = self._run_rule_based_fallback(user_request)
+                    if orchestration_actions:
+                        response_agent_tool = self.tool_registry._tools.get("response_agent")
+                        if response_agent_tool:
+                            conversation_history = self.get_condensed_conversation_history(conversation_id)
+                            response = response_agent_tool._run(
+                                user_query=user_request,
+                                tool_results=orchestration_actions,
+                                conversation_history=conversation_history
+                            )
+                        else:
+                            response = orchestration_actions[-1].get("output", "")
+                    else:
+                        response = await predict_text(self.llm, user_request)
+                        orchestration_actions = []
+
+                for action in orchestration_actions or []:
+                    tool_name = action.get("tool", "unknown")
+                    increment_counter("orchestrator.tool_calls_total")
+                    increment_counter(f"orchestrator.tool_calls.{tool_name}.total")
+                if token_usage:
+                    increment_counter("orchestrator.token_usage_total", amount=int(token_usage))
+
+                update_observation(
+                    operation_observation,
+                    output={
+                        "tool_actions_count": len(orchestration_actions or []),
+                        "token_usage": token_usage,
+                        "fallback_used": fallback_used,
+                    },
+                )
+
+                # Save orchestrator response to database
+                db_ops.save_message(
+                    conversation_id,
+                    "assistant",
+                    response,
+                    agent_actions=json.dumps(orchestration_actions) if orchestration_actions else None,
+                    token_usage=token_usage
+                )
+
+                # Trigger summarisation in the background (do not await)
+                import asyncio
+                asyncio.create_task(self.maybe_summarise_conversation(conversation_id))
+
+                # Return response immediately
+                return {
+                    "response": response,
+                    "conversation_id": conversation_id,
+                    "orchestration_actions": orchestration_actions,
+                    "token_usage": token_usage,
+                }
+
+            except (MissingProviderKeyError, MissingModelDependencyError) as e:
+                logger.warning(f"LLM setup error: {str(e)}")
+                response = str(e)
+                db_ops.save_message(conversation_id, "assistant", response)
+                increment_counter("orchestrator.process_request.handled_error_total")
+                update_observation(
+                    operation_observation,
+                    output={"error": True},
+                    metadata={"error_type": type(e).__name__},
+                    status_message=str(e),
+                )
+                return {
+                    "response": response,
+                    "conversation_id": conversation_id,
+                    "error": True
+                }
             except Exception as e:
-                logger.warning(f"LangGraph agent processing failed: {str(e)}")
-                orchestration_actions = self._run_rule_based_fallback(user_request)
-                if orchestration_actions:
-                    response_agent_tool = self.tool_registry._tools.get("response_agent")
-                    if response_agent_tool:
-                        conversation_history = self.get_condensed_conversation_history(conversation_id)
-                        response = response_agent_tool._run(
-                            user_query=user_request,
-                            tool_results=orchestration_actions,
-                            conversation_history=conversation_history
-                        )
-                    else:
-                        response = orchestration_actions[-1].get("output", "")
-                else:
-                    response = await predict_text(self.llm, user_request)
-                    orchestration_actions = []
-            
-            # Save orchestrator response to database
-            db_ops.save_message(
-                conversation_id, 
-                "assistant", 
-                response,
-                agent_actions=json.dumps(orchestration_actions) if orchestration_actions else None,
-                token_usage=token_usage
-            )
+                logger.error(f"Error in orchestrator processing: {str(e)}")
+                error_response = f"I apologize, but I encountered an error while processing your request: {str(e)}"
 
-            # Trigger summarisation in the background (do not await)
-            import asyncio
-            asyncio.create_task(self.maybe_summarise_conversation(conversation_id))
+                # Save error response
+                db_ops.save_message(conversation_id, "assistant", error_response)
+                increment_counter("orchestrator.process_request.exceptions_total")
+                increment_counter("orchestrator.process_request.handled_error_total")
+                update_observation(
+                    operation_observation,
+                    output={"error": True},
+                    metadata={"error_type": type(e).__name__},
+                    status_message=str(e),
+                )
 
-            # Return response immediately
-            return {
-                "response": response,
-                "conversation_id": conversation_id,
-                "orchestration_actions": orchestration_actions,
-                "token_usage": token_usage,
-            }
-            
-        except (MissingProviderKeyError, MissingModelDependencyError) as e:
-            logger.warning(f"LLM setup error: {str(e)}")
-            response = str(e)
-            db_ops.save_message(conversation_id, "assistant", response)
-            return {
-                "response": response,
-                "conversation_id": conversation_id,
-                "error": True
-            }
-        except Exception as e:
-            logger.error(f"Error in orchestrator processing: {str(e)}")
-            error_response = f"I apologize, but I encountered an error while processing your request: {str(e)}"
-            
-            # Save error response
-            db_ops.save_message(conversation_id, "assistant", error_response)
-            
-            return {
-                "response": error_response,
-                "conversation_id": conversation_id,
-                "error": True
-            }
+                return {
+                    "response": error_response,
+                    "conversation_id": conversation_id,
+                    "error": True
+                }
     
     async def maybe_summarise_conversation(self, conversation_id: str, context_window_tokens: int = 4096, threshold: float = 0.8) -> bool:
         """
         If conversation history exceeds a threshold ratio of the context window, summarise it and save the summary.
         """
-        conversation_history = db_ops.get_conversation_history(conversation_id)
-        # Concatenate all messages for token estimation
-        history_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in conversation_history])
-        # Estimate tokens (very rough: 1 token ≈ 4 chars)
-        token_count = len(history_text) // 4
-        if token_count > int(context_window_tokens * threshold):
-            # Summarise
-            summarisation_agent = self.tool_registry._tools.get("summarisation_agent")
-            if summarisation_agent:
-                try:
-                    summary = await summarisation_agent._arun(history_text)
-                    if summary:
-                        # Save summary as a special message
-                        db_ops.save_message(conversation_id, "system", f"[CONVERSATION SUMMARY]\n{summary}")
-                        return True
-                except Exception as e:
-                    logger.warning(f"Skipping summarisation: {str(e)}")
-        return False
+        with observe_operation(
+            name="orchestrator.maybe_summarise_conversation",
+            counter_prefix="orchestrator.summarisation",
+            as_type="chain",
+            conversation_id=conversation_id,
+            metadata={"component": "orchestrator"},
+        ):
+            conversation_history = db_ops.get_conversation_history(conversation_id)
+            # Concatenate all messages for token estimation
+            history_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in conversation_history])
+            # Estimate tokens (very rough: 1 token ≈ 4 chars)
+            token_count = len(history_text) // 4
+            if token_count > int(context_window_tokens * threshold):
+                # Summarise
+                summarisation_agent = self.tool_registry._tools.get("summarisation_agent")
+                if summarisation_agent:
+                    try:
+                        summary = await summarisation_agent._arun(history_text)
+                        if summary:
+                            # Save summary as a special message
+                            db_ops.save_message(conversation_id, "system", f"[CONVERSATION SUMMARY]\n{summary}")
+                            increment_counter("orchestrator.summarisation.generated_total")
+                            return True
+                    except Exception as e:
+                        increment_counter("orchestrator.summarisation.failures_total")
+                        logger.warning(f"Skipping summarisation: {str(e)}")
+            return False
 
     def _extract_usage_metadata(self, messages: List) -> Optional[Dict[str, Any]]:
         """Extract usage metadata when the provider exposes token counters."""
@@ -356,42 +420,70 @@ Your effectiveness is measured by:
 
         math_expression = self._extract_math_expression(query)
         if math_expression and "calculator" in self.tool_registry._tools:
-            output = self.tool_registry._tools["calculator"]._run(expression=math_expression)
-            actions.append({
-                "tool": "calculator",
-                "input": json.dumps({"expression": math_expression}, ensure_ascii=False),
-                "output": output,
-            })
+            with observe_operation(
+                name="orchestrator.fallback.calculator",
+                counter_prefix="orchestrator.fallback.calculator",
+                as_type="tool",
+                input_data={"expression": math_expression},
+                metadata={"component": "orchestrator", "fallback": True},
+            ):
+                output = self.tool_registry._tools["calculator"]._run(expression=math_expression)
+                actions.append({
+                    "tool": "calculator",
+                    "input": json.dumps({"expression": math_expression}, ensure_ascii=False),
+                    "output": output,
+                })
 
         if any(token in query_lower for token in ("time", "date", "day")) and "current_time" in self.tool_registry._tools:
-            output = self.tool_registry._tools["current_time"]._run(query=query)
-            actions.append({
-                "tool": "current_time",
-                "input": json.dumps({"query": query}, ensure_ascii=False),
-                "output": output,
-            })
+            with observe_operation(
+                name="orchestrator.fallback.current_time",
+                counter_prefix="orchestrator.fallback.current_time",
+                as_type="tool",
+                input_data={"query_chars": len(query)},
+                metadata={"component": "orchestrator", "fallback": True},
+            ):
+                output = self.tool_registry._tools["current_time"]._run(query=query)
+                actions.append({
+                    "tool": "current_time",
+                    "input": json.dumps({"query": query}, ensure_ascii=False),
+                    "output": output,
+                })
 
         document_intent = any(token in query_lower for token in ("document", "uploaded", "file", "contract", "pdf"))
         if document_intent:
             search_tool = self.tool_registry._tools.get("search_documents")
-            if search_tool:
-                output = search_tool._run(query=query, max_results=3)
-            else:
-                output = "No documents are currently selected. Please select one or more documents to enable document search."
-            actions.append({
-                "tool": "search_documents",
-                "input": json.dumps({"query": query, "max_results": 3}, ensure_ascii=False),
-                "output": output,
-            })
+            with observe_operation(
+                name="orchestrator.fallback.search_documents",
+                counter_prefix="orchestrator.fallback.search_documents",
+                as_type="tool",
+                input_data={"query_chars": len(query), "max_results": 3},
+                metadata={"component": "orchestrator", "fallback": True},
+            ):
+                if search_tool:
+                    output = search_tool._run(query=query, max_results=3)
+                else:
+                    output = "No documents are currently selected. Please select one or more documents to enable document search."
+                actions.append({
+                    "tool": "search_documents",
+                    "input": json.dumps({"query": query, "max_results": 3}, ensure_ascii=False),
+                    "output": output,
+                })
 
         internet_intent = any(token in query_lower for token in ("internet", "latest", "news", "headline", "headlines", "search the internet"))
         if internet_intent and "internet_search" in self.tool_registry._tools:
-            output = self.tool_registry._tools["internet_search"]._run(query=query, provider="duckduckgo")
-            actions.append({
-                "tool": "internet_search",
-                "input": json.dumps({"query": query, "provider": "duckduckgo"}, ensure_ascii=False),
-                "output": output,
-            })
+            with observe_operation(
+                name="orchestrator.fallback.internet_search",
+                counter_prefix="orchestrator.fallback.internet_search",
+                as_type="tool",
+                input_data={"query_chars": len(query), "provider": "duckduckgo"},
+                metadata={"component": "orchestrator", "fallback": True},
+            ):
+                output = self.tool_registry._tools["internet_search"]._run(query=query, provider="duckduckgo")
+                actions.append({
+                    "tool": "internet_search",
+                    "input": json.dumps({"query": query, "provider": "duckduckgo"}, ensure_ascii=False),
+                    "output": output,
+                })
 
         return actions if actions else None
 
