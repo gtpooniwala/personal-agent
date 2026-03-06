@@ -1,8 +1,9 @@
 from langchain_core.tools import BaseTool
 from langchain.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 from typing import List, Dict, Any, Optional, Type
+
+from backend.llm import create_chat_model, MissingProviderKeyError, MissingModelDependencyError
 
 class ResponseAgentInput(BaseModel):
     """Input for the Response Agent. Contains all information and tool results needed to craft the final user response.
@@ -35,22 +36,27 @@ class ResponseAgentTool(BaseTool):
         "It does not select or invoke tools itself." \
     )
     args_schema: Type[BaseModel] = ResponseAgentInput
+    _chain: Any = PrivateAttr(default=None)
+    _initialization_error: Optional[str] = PrivateAttr(default=None)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.3)
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are a helpful personal assistant. Given the user's query, the results from all tools used, and optional conversation history, craft a clear, natural, and helpful response for the user. Integrate tool results smoothly, avoid technical jargon, and ensure the answer is easy to understand. Do not decide which tools to use—only synthesize the provided information into a final response. Do not refuse to answer or say 'I don't know' unless absolutely necessary. If you can answer the question directly, do so without relying on the tools."),
-            ("user", "{user_query}"),
-            ("system", "Here is the recent conversation history (if any):\n{conversation_history_str}"),
-            ("assistant", "{tool_results_str}"),
-            ("system", "Now, using all the above information, write a single, clear, natural, and helpful response for the user. Do not echo the user query. Do not mention tool names. Just answer as a helpful assistant.")
-        ])
-        
-        # Use the new RunnableSequence pattern: prompt | llm
-        object.__setattr__(self, "chain", prompt | llm)
+        try:
+            llm = create_chat_model("response_agent", temperature=0.3)
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", "You are a helpful personal assistant. Given the user's query, the results from all tools used, and optional conversation history, craft a clear, natural, and helpful response for the user. Integrate tool results smoothly, avoid technical jargon, and ensure the answer is easy to understand. Do not decide which tools to use—only synthesize the provided information into a final response. Do not refuse to answer or say 'I don't know' unless absolutely necessary. If you can answer the question directly, do so without relying on the tools."),
+                ("user", "{user_query}"),
+                ("system", "Here is the recent conversation history (if any):\n{conversation_history_str}"),
+                ("assistant", "{tool_results_str}"),
+                ("system", "Now, using all the above information, write a single, clear, natural, and helpful response for the user. Do not echo the user query. Do not mention tool names. Just answer as a helpful assistant.")
+            ])
+            self._chain = prompt | llm
+        except (MissingProviderKeyError, MissingModelDependencyError) as exc:
+            self._initialization_error = str(exc)
 
     def _run(self, user_query: str, tool_results: List[Dict[str, Any]], conversation_history: Optional[List[Dict[str, str]]] = None) -> str:
+        if self._initialization_error:
+            return self._initialization_error
         # Prepare tool results as a string for the prompt
         tool_results_str = "\n".join([
             f"[{tr.get('tool', 'tool')}] {tr.get('output', '')}" for tr in tool_results if tr.get('output', '')
@@ -67,5 +73,5 @@ class ResponseAgentTool(BaseTool):
             "tool_results_str": tool_results_str,
             "conversation_history_str": conversation_history_str,
         }
-        response = self.chain.invoke(inputs)
+        response = self._chain.invoke(inputs)
         return response.content if hasattr(response, "content") else str(response)

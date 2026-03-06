@@ -9,10 +9,15 @@ import PyPDF2
 import logging
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from backend.database.models import Document, DocumentChunk
 from backend.database.operations import db_ops
-from backend.config import settings
+from backend.llm import (
+    create_chat_model,
+    create_embeddings_model,
+    predict_text,
+    MissingProviderKeyError,
+    MissingModelDependencyError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,16 +26,19 @@ class DocumentProcessor:
     """Service for processing PDF documents and managing embeddings."""
     
     def __init__(self):
-        self.embeddings = OpenAIEmbeddings(
-            openai_api_key=settings.openai_api_key,
-            model="text-embedding-ada-002"
-        )
-        self.llm = ChatOpenAI(
-            model="gpt-3.5-turbo",
-            temperature=0.1,
-            openai_api_key=settings.openai_api_key,
-            max_tokens=150  # For concise summaries
-        )
+        self.embeddings = None
+        self.llm = None
+        self.initialization_error: Optional[str] = None
+        try:
+            self.embeddings = create_embeddings_model()
+            self.llm = create_chat_model(
+                "document_qa",
+                temperature=0.1,
+                max_tokens=150,  # For concise summaries
+            )
+        except (MissingProviderKeyError, MissingModelDependencyError) as exc:
+            self.initialization_error = str(exc)
+            logger.warning(f"Document processor initialized without embeddings/LLM: {self.initialization_error}")
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200,
@@ -39,6 +47,13 @@ class DocumentProcessor:
         )
         self.upload_dir = Path("data/uploads")
         self.upload_dir.mkdir(parents=True, exist_ok=True)
+
+    def _require_models(self) -> None:
+        if self.embeddings is None or self.llm is None:
+            raise RuntimeError(
+                self.initialization_error
+                or "Document search and processing require a configured LLM provider key."
+            )
     
     async def process_pdf_upload(self, file_content: bytes, filename: str, user_id: str = "default") -> str:
         """
@@ -52,7 +67,9 @@ class DocumentProcessor:
         Returns:
             str: Document ID
         """
+        document_id: Optional[str] = None
         try:
+            self._require_models()
             # Generate unique filename and save file
             file_id = str(uuid.uuid4())
             file_extension = Path(filename).suffix
@@ -87,21 +104,23 @@ class DocumentProcessor:
         except Exception as e:
             logger.error(f"Error processing PDF upload: {str(e)}")
             # Update document status to failed
-            session = db_ops.get_session()
-            try:
-                document = session.query(Document).filter(Document.id == document_id).first()
-                if document:
-                    document.processed = "failed"
-                    session.commit()
-            except:
-                pass
-            finally:
-                session.close()
+            if document_id:
+                session = db_ops.get_session()
+                try:
+                    document = session.query(Document).filter(Document.id == document_id).first()
+                    if document:
+                        document.processed = "failed"
+                        session.commit()
+                except Exception:
+                    pass
+                finally:
+                    session.close()
             raise
     
     async def _process_document_content(self, document_id: str, file_path: Path):
         """Extract text from PDF, generate summary, and create embeddings."""
         try:
+            self._require_models()
             # Extract text from PDF
             text_content = self._extract_pdf_text(file_path)
             
@@ -127,7 +146,7 @@ class DocumentProcessor:
                         chunk_index=i,
                         content=chunk_text,
                         embedding=embedding_bytes,
-                        embedding_model="text-embedding-ada-002"
+                        embedding_model=getattr(self.embeddings, "model", "configured-embedding-model")
                     )
                     session.add(chunk)
                 
@@ -205,8 +224,7 @@ Document content:
 Generate only one clear, informative sentence that captures the essence of this document. Do not include any additional text, quotes, or explanations.
 
 Summary:"""
-
-            summary = await self.llm.apredict(summary_prompt)
+            summary = await predict_text(self.llm, summary_prompt)
             
             # Clean up the summary
             summary = summary.strip().strip('"\'').strip()
@@ -239,6 +257,7 @@ Summary:"""
             List of relevant document chunks with metadata
         """
         try:
+            self._require_models()
             # Generate embedding for query
             query_embedding = await self.embeddings.aembed_query(query)
             
@@ -313,15 +332,9 @@ Summary:"""
             List of relevant document chunks with metadata
         """
         try:
+            self._require_models()
             # Generate embedding for query (synchronous)
-            from openai import OpenAI
-            client = OpenAI(api_key=settings.openai_api_key)
-            
-            response = client.embeddings.create(
-                input=query,
-                model="text-embedding-ada-002"
-            )
-            query_embedding = response.data[0].embedding
+            query_embedding = self.embeddings.embed_query(query)
             
             # Get all document chunks for user
             session = db_ops.get_session()

@@ -1,37 +1,75 @@
-from pydantic_settings import BaseSettings
-from typing import Optional
 import os
+from typing import Optional
+
 import yaml
+from pydantic import AliasChoices, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+ENV_FILE_PATH = os.path.join(PROJECT_ROOT, ".env")
 
 
 class Settings(BaseSettings):
     """Application settings with environment-based configuration."""
-    
-    # MVP settings
-    openai_api_key: str
+
+    model_config = SettingsConfigDict(
+        env_file=ENV_FILE_PATH,
+        case_sensitive=False,
+        # Keep startup resilient when unrelated env vars are present.
+        extra="ignore",
+    )
+
+    # LLM/provider settings
+    gemini_api_key: Optional[str] = None
+    openai_api_key: Optional[str] = None
+
+    # Core application settings
     database_path: str = "data/agent.db"
     log_level: str = "INFO"
-    
+    debug: bool = False
+
     # Future settings with defaults for cloud deployment
     environment: str = "local"
     redis_url: Optional[str] = None
     database_url: Optional[str] = None
-    jwt_secret: Optional[str] = None
-    
+    jwt_secret: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("JWT_SECRET", "SECRET_KEY"),
+    )
+
     # API settings
-    api_host: str = "127.0.0.1"
-    api_port: int = 8000
+    api_host: str = Field(
+        default="127.0.0.1",
+        validation_alias=AliasChoices("API_HOST", "HOST"),
+    )
+    api_port: int = Field(
+        default=8000,
+        validation_alias=AliasChoices("API_PORT", "PORT"),
+    )
     allowed_origins: str = "http://127.0.0.1:8081,http://localhost:8081"
-    
+    frontend_url: Optional[str] = None
+
+    # Optional integration settings
+    gmail_client_id: Optional[str] = None
+    gmail_client_secret: Optional[str] = None
+    todoist_api_token: Optional[str] = None
+    google_calendar_credentials: Optional[str] = None
+
+    # Feature flags
+    enable_internet_search: bool = True
+    enable_document_qa: bool = True
+    enable_gmail_integration: bool = False
+    enable_calendar_integration: bool = False
+
+    # Performance settings
+    max_conversation_history: int = 50
+    conversation_summary_threshold: int = 20
+
     # API keys for web search providers (optional)
     bing_api_key: Optional[str] = None
     google_api_key: Optional[str] = None
     google_cx: Optional[str] = None
     serpapi_key: Optional[str] = None
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
 
 
 # Global settings instance
@@ -49,4 +87,6 @@ def load_llm_config():
 llm_config = load_llm_config()
 
 # Ensure data directory exists
-os.makedirs(os.path.dirname(settings.database_path), exist_ok=True)
+database_dir = os.path.dirname(settings.database_path)
+if database_dir:
+    os.makedirs(database_dir, exist_ok=True)

@@ -1,14 +1,13 @@
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
-from langchain_openai import ChatOpenAI
-from langchain_community.callbacks.manager import get_openai_callback
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-from backend.config import settings
+from langchain_core.messages import HumanMessage, AIMessage
+from backend.llm import create_chat_model, predict_text, MissingProviderKeyError, MissingModelDependencyError
 from backend.orchestrator.tool_registry import ToolRegistry
 from ..database.operations import db_ops
 from typing import Dict, Any, Optional, List
 import json
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -29,20 +28,23 @@ class CoreOrchestrator:
     
     def __init__(self, user_id: str = "default"):
         self.user_id = user_id
-        self.llm = self._setup_llm()
+        self.llm = None
         self.tool_registry = ToolRegistry(user_id)
         self.current_conversation_id = None
         self.current_memory = None
         self.orchestrator_agent = None
     
-    def _setup_llm(self) -> ChatOpenAI:
+    def _setup_llm(self):
         """Setup the language model for the orchestrator."""
-        return ChatOpenAI(
-            model="gpt-3.5-turbo",  # Revert back to GPT-3.5 Turbo
+        return create_chat_model(
+            tool_name="orchestrator",
             temperature=0.3,  # Lower temperature for more focused decision-making
-            openai_api_key=settings.openai_api_key,
             max_tokens=800   # Optimized for orchestration decisions
         )
+
+    def _ensure_llm(self):
+        if self.llm is None:
+            self.llm = self._setup_llm()
     
     def _setup_orchestrator_agent(self, conversation_id: str, force_refresh: bool = False):
         """
@@ -76,33 +78,32 @@ You are an intelligent personal assistant's orchestrator agent. Your purpose is 
 
 ## AGENT BEHAVIOR GUIDELINES
 - Use available tools when appropriate to answer user queries or perform actions.
-- For every user request, your final action must always be to call the `response_agent` tool. The response agent is solely responsible for synthesizing the final user-facing response.
-- Never generate the final response for the user yourself. Do not attempt to answer the user directly, even for general knowledge or conversational queries.
-- Your job is to analyze the user request, decide which tools to use (including document search, calculator, etc.), and pass all relevant tool results to the response agent.
+- Your job is to analyze the user request, decide which tools to use (including document search, calculator, etc.), and provide a direct final response to the user.
 - Avoid asking the user for clarification; always attempt to execute the task to the best of your ability with the information provided.
 - Never explain which tool you will use—just use it.
 - Never guess or use a tool inappropriately; if unsure, do your best with the available information.
 - You can use some tools multiple times if needed, but only if you expect to get new information or perform a different action.
 - For document-related queries, use the `search_documents` tool to find relevant information even if you are not sure which document the answer is in.
-- **You operate in an iterative, cyclical fashion:** After each tool call, you must re-evaluate the current state and decide if another tool/action is needed. Continue this loop until you determine that all necessary actions are complete, then call the `response_agent` tool as your final step. Do not assume a single tool call is sufficient unless you are certain.
-- If you still cant find sufficient information to answer the user query after using all available tools iteratively, inform the user through the response agent that you were unable to find an answer and suggest they try rephrasing their question or using a different tool.
+- **You operate in an iterative, cyclical fashion:** After each tool call, re-evaluate the current state and decide if another tool/action is needed. Continue this loop until all necessary actions are complete, then provide a final response.
+- If you still cant find sufficient information to answer the user query after using all available tools iteratively, clearly tell the user what is missing and suggest they try rephrasing their question or using a different approach.
 
 ## SUCCESS METRICS
 Your effectiveness is measured by:
 1. **Accuracy**: Right tool for the right query
 2. **Efficiency**: No unnecessary tool usage
 3. **Naturalness**: Smooth, conversational responses
-4. **Correct Workflow**: The response agent is always called last to generate the user-facing answer.
+4. **Correct Workflow**: Use tools only when needed and provide a clear final answer.
 """
 
         # If files are available, append document context
         if document_context.get('has_documents', False) and document_context.get('selected_count', 0) > 0:
             system_prompt += f"""
-\n## CONTEXT\nThe following documents have been selected and available to you. Use search_document tool in case you need additional context for this conversation:\n{self._format_document_status(document_context)}"""
+\n## CONTEXT\nThe following documents have been selected and available to you. Use search_documents tool in case you need additional context for this conversation:\n{self._format_document_status(document_context)}"""
 
         # Create memory saver for this conversation
         memory = MemorySaver()
         
+        self._ensure_llm()
         # Create LangGraph ReAct agent with automatic tool binding
         self.orchestrator_agent = create_react_agent(
             model=self.llm,
@@ -154,6 +155,7 @@ Your effectiveness is measured by:
         4. Track and return the orchestration results
         """
         try:
+            self._ensure_llm()
             # Update tool registry with selected documents if provided
             if selected_documents is not None:
                 self.tool_registry.update_selected_documents(selected_documents)
@@ -174,33 +176,53 @@ Your effectiveness is measured by:
                     messages.append(HumanMessage(content=msg['content']))
                 elif msg['role'] == 'assistant':
                     messages.append(AIMessage(content=msg['content']))
-                elif msg['role'] == 'system' and msg['content'].startswith('[CONVERSATION SUMMARY]'):
-                    messages.append(SystemMessage(content=msg['content']))
+                elif msg['role'] == 'system':
+                    # Some LangGraph model integrations reject system messages inside rolling history.
+                    continue
                 # Optionally, handle other system/tool messages here if needed
-            with get_openai_callback() as cb:
-                try:
-                    config = {"configurable": {"thread_id": conversation_id}}
-                    result = self.orchestrator_agent.invoke({"messages": messages}, config=config)
-                    orchestration_actions = self._extract_langgraph_actions(result["messages"]) if result and "messages" in result else []
-                    tool_results = orchestration_actions if orchestration_actions else []
+            token_usage = None
+            total_cost = None
+            try:
+                config = {"configurable": {"thread_id": conversation_id}}
+                result = self.orchestrator_agent.invoke({"messages": messages}, config=config)
+                orchestration_actions = self._extract_langgraph_actions(result["messages"]) if result and "messages" in result else []
+                tool_results = orchestration_actions if orchestration_actions else []
+                response_agent_tool = self.tool_registry._tools.get("response_agent")
+                if response_agent_tool:
+                    # Use condensed history for response agent as well
+                    conversation_history = self.get_condensed_conversation_history(conversation_id)
+                    response = response_agent_tool._run(
+                        user_query=user_request,
+                        tool_results=tool_results,
+                        conversation_history=conversation_history
+                    )
+                else:
+                    ai_messages = [msg for msg in result["messages"] if isinstance(msg, AIMessage)]
+                    if ai_messages:
+                        response = ai_messages[-1].content
+                    else:
+                        response = "I apologize, but I couldn't process your request properly."
+
+                if result and "messages" in result:
+                    usage = self._extract_usage_metadata(result["messages"])
+                    if usage:
+                        token_usage = usage.get("total_tokens")
+            except Exception as e:
+                logger.warning(f"LangGraph agent processing failed: {str(e)}")
+                orchestration_actions = self._run_rule_based_fallback(user_request)
+                if orchestration_actions:
                     response_agent_tool = self.tool_registry._tools.get("response_agent")
                     if response_agent_tool:
-                        # Use condensed history for response agent as well
                         conversation_history = self.get_condensed_conversation_history(conversation_id)
                         response = response_agent_tool._run(
                             user_query=user_request,
-                            tool_results=tool_results,
+                            tool_results=orchestration_actions,
                             conversation_history=conversation_history
                         )
                     else:
-                        ai_messages = [msg for msg in result["messages"] if isinstance(msg, AIMessage)]
-                        if ai_messages:
-                            response = ai_messages[-1].content
-                        else:
-                            response = "I apologize, but I couldn't process your request properly."
-                except Exception as e:
-                    logger.warning(f"LangGraph agent processing failed: {str(e)}")
-                    response = await self.llm.apredict(user_request)
+                        response = orchestration_actions[-1].get("output", "")
+                else:
+                    response = await predict_text(self.llm, user_request)
                     orchestration_actions = []
             
             # Save orchestrator response to database
@@ -209,7 +231,7 @@ Your effectiveness is measured by:
                 "assistant", 
                 response,
                 agent_actions=json.dumps(orchestration_actions) if orchestration_actions else None,
-                token_usage=cb.total_tokens
+                token_usage=token_usage
             )
 
             # Trigger summarisation in the background (do not await)
@@ -221,10 +243,19 @@ Your effectiveness is measured by:
                 "response": response,
                 "conversation_id": conversation_id,
                 "orchestration_actions": orchestration_actions,
-                "token_usage": cb.total_tokens,
-                "cost": cb.total_cost
+                "token_usage": token_usage,
+                "cost": total_cost
             }
             
+        except (MissingProviderKeyError, MissingModelDependencyError) as e:
+            logger.warning(f"LLM setup error: {str(e)}")
+            response = str(e)
+            db_ops.save_message(conversation_id, "assistant", response)
+            return {
+                "response": response,
+                "conversation_id": conversation_id,
+                "error": True
+            }
         except Exception as e:
             logger.error(f"Error in orchestrator processing: {str(e)}")
             error_response = f"I apologize, but I encountered an error while processing your request: {str(e)}"
@@ -251,11 +282,102 @@ Your effectiveness is measured by:
             # Summarise
             summarisation_agent = self.tool_registry._tools.get("summarisation_agent")
             if summarisation_agent:
-                summary = await summarisation_agent._arun(history_text)
-                # Save summary as a special message
-                db_ops.save_message(conversation_id, "system", f"[CONVERSATION SUMMARY]\n{summary}")
-                return True
+                try:
+                    summary = await summarisation_agent._arun(history_text)
+                    if summary:
+                        # Save summary as a special message
+                        db_ops.save_message(conversation_id, "system", f"[CONVERSATION SUMMARY]\n{summary}")
+                        return True
+                except Exception as e:
+                    logger.warning(f"Skipping summarisation: {str(e)}")
         return False
+
+    def _extract_usage_metadata(self, messages: List) -> Optional[Dict[str, Any]]:
+        """Extract usage metadata when the provider exposes token counters."""
+        for message in reversed(messages):
+            usage = getattr(message, "usage_metadata", None)
+            if isinstance(usage, dict):
+                return {
+                    "input_tokens": usage.get("input_tokens"),
+                    "output_tokens": usage.get("output_tokens"),
+                    "total_tokens": usage.get("total_tokens"),
+                }
+            response_metadata = getattr(message, "response_metadata", None)
+            if isinstance(response_metadata, dict):
+                token_usage = response_metadata.get("token_usage")
+                if isinstance(token_usage, dict):
+                    total = token_usage.get("total_tokens")
+                    if total is not None:
+                        return {
+                            "input_tokens": token_usage.get("prompt_tokens"),
+                            "output_tokens": token_usage.get("completion_tokens"),
+                            "total_tokens": total,
+                        }
+        return None
+
+    def _run_rule_based_fallback(self, user_request: str) -> Optional[List[Dict[str, Any]]]:
+        """
+        Deterministic fallback routing when graph execution fails.
+        Keeps common intents functional even if model/tool runtime has transient issues.
+        """
+        actions: List[Dict[str, Any]] = []
+        query = (user_request or "").strip()
+        query_lower = query.lower()
+
+        math_expression = self._extract_math_expression(query)
+        if math_expression and "calculator" in self.tool_registry._tools:
+            output = self.tool_registry._tools["calculator"]._run(expression=math_expression)
+            actions.append({
+                "tool": "calculator",
+                "input": json.dumps({"expression": math_expression}, ensure_ascii=False),
+                "output": output,
+            })
+
+        if any(token in query_lower for token in ("time", "date", "day")) and "current_time" in self.tool_registry._tools:
+            output = self.tool_registry._tools["current_time"]._run(query=query)
+            actions.append({
+                "tool": "current_time",
+                "input": json.dumps({"query": query}, ensure_ascii=False),
+                "output": output,
+            })
+
+        document_intent = any(token in query_lower for token in ("document", "uploaded", "file", "contract", "pdf"))
+        if document_intent:
+            search_tool = self.tool_registry._tools.get("search_documents")
+            if search_tool:
+                output = search_tool._run(query=query, max_results=3)
+            else:
+                output = "No documents are currently selected. Please select one or more documents to enable document search."
+            actions.append({
+                "tool": "search_documents",
+                "input": json.dumps({"query": query, "max_results": 3}, ensure_ascii=False),
+                "output": output,
+            })
+
+        internet_intent = any(token in query_lower for token in ("internet", "latest", "news", "headline", "headlines", "search the internet"))
+        if internet_intent and "internet_search" in self.tool_registry._tools:
+            output = self.tool_registry._tools["internet_search"]._run(query=query, provider="duckduckgo")
+            actions.append({
+                "tool": "internet_search",
+                "input": json.dumps({"query": query, "provider": "duckduckgo"}, ensure_ascii=False),
+                "output": output,
+            })
+
+        return actions if actions else None
+
+    def _extract_math_expression(self, query: str) -> Optional[str]:
+        """Extract likely arithmetic expression from free text user input."""
+        candidates = re.findall(r"[\d\.\s\+\-\*\/\(\)]{3,}", query)
+        for candidate in candidates:
+            expression = candidate.strip()
+            if not expression:
+                continue
+            if not re.search(r"\d", expression):
+                continue
+            if not re.search(r"[\+\-\*\/]", expression):
+                continue
+            return expression
+        return None
 
     def _extract_langgraph_actions(self, messages: List) -> Optional[List[Dict[str, Any]]]:
         """
@@ -338,6 +460,7 @@ Your effectiveness is measured by:
         This is a specialized orchestrator task that doesn't require delegation.
         """
         try:
+            self._ensure_llm()
             # Get conversation history
             messages = db_ops.get_conversation_history(conversation_id)
             
@@ -364,7 +487,7 @@ Generate only the title, no additional text or quotes. The title should be speci
 Title:"""
 
             # Generate title using orchestrator LLM
-            title = await self.llm.apredict(title_prompt)
+            title = await predict_text(self.llm, title_prompt)
             
             # Clean up the title
             title = title.strip().strip('"\'').strip()
@@ -381,6 +504,9 @@ Title:"""
             
             return None
             
+        except (MissingProviderKeyError, MissingModelDependencyError) as e:
+            logger.warning(f"Title generation skipped: {str(e)}")
+            return None
         except Exception as e:
             logger.error(f"Error generating conversation title: {str(e)}")
             return None

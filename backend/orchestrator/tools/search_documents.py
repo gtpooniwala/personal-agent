@@ -105,6 +105,8 @@ class SearchDocumentsTool(BaseTool):
             
             # Import here to avoid circular imports
             from backend.services.document_service import doc_processor
+            if getattr(doc_processor, "initialization_error", None):
+                return doc_processor.initialization_error
             
             # Perform document search with dynamic chunk limit
             selected_docs = self._selected_documents if len(self._selected_documents) > 0 else None
@@ -173,6 +175,8 @@ class SearchDocumentsTool(BaseTool):
                 return "No documents are currently selected. Please select one or more documents to enable document search."
             
             from backend.services.document_service import doc_processor
+            if getattr(doc_processor, "initialization_error", None):
+                return doc_processor.initialization_error
             
             # Perform async document search
             selected_docs = self._selected_documents if len(self._selected_documents) > 0 else None
