@@ -18,12 +18,25 @@ User Query → LangGraph Agent → Dynamic Route Decision (Graph-Based)
 
 **Key Innovation**: Graph-based agent execution with automatic tool binding, enabling natural conversation flow and persistent memory management.
 
+## Long-Running Runtime Architecture (Migration Direction)
+
+- **Primary contract**: asynchronous run submission (`POST /runs` and `POST /chat`) plus status/events polling.
+- **Execution model**: dedicated worker processing with durable run state and event history.
+- **Compatibility**: legacy synchronous `POST /api/v1/chat` is deprecated; bare-route `/chat` remains active.
+- **Ordering model**: first implementation enforces one active run per conversation/session.
+
+This model decouples request acceptance from execution, enables retries/recovery, and prevents single long tool call from blocking the HTTP request lifecycle.
+
+Current vs soon:
+- Current implementation (today): `POST /api/v1/chat` synchronous request lifecycle.
+- Rolling out soon: async `/chat` and `/runs` runtime with status/events polling.
+
 ### 2. Component Architecture
 
 ```text
 ┌─────────────────┐    ┌─────────────────────────────────┐    ┌─────────────────┐
 │   Frontend      │    │         Backend                 │    │   Database      │
-│   (HTML/JS)     │◄──►│      (FastAPI)                  │◄──►│   (SQLite)      │
+│   (Next.js)     │◄──►│      (FastAPI)                  │◄──►│   (SQLite)      │
 │                 │    │                                 │    │                 │
 │ • Chat UI       │    │  ┌─────────────────────────────┐ │    │ • Conversations │
 │ • Tool Display  │    │  │    HYBRID INTELLIGENCE      │ │    │ • Messages      │
@@ -100,7 +113,8 @@ User Query → LangGraph Agent → Dynamic Route Decision (Graph-Based)
 - RESTful API endpoints with full CRUD operations
 - Conversation management with passive maintenance
 - Document upload and management
-- Real-time chat processing
+- Async runtime submission (`/runs`) with status/events polling
+- Async conversational submission endpoint (`/chat`) during migration
 - Health checks and tool listing
 
 **Models (`backend/api/models.py`)**
@@ -132,8 +146,8 @@ User Query → LangGraph Agent → Dynamic Route Decision (Graph-Based)
 
 ### Frontend Architecture
 
-#### Single-Page Application (`frontend/index.html`)
-- **Technology**: Vanilla HTML5, CSS3, JavaScript ES6+
+#### Next.js Application (`frontend/`)
+- **Technology**: Next.js + React
 - **Design**: Responsive layout with sidebar navigation
 - **Features**: 
   - Real-time chat interface
@@ -153,10 +167,12 @@ User Query → LangGraph Agent → Dynamic Route Decision (Graph-Based)
 
 ### 1. Message Processing Flow
 
+Migration-target flow (to be finalized during runtime implementation):
+
 ```text
-User Input → Frontend → API → Agent Processing → Tool Execution → Response
-                                    ↓
-                            Database Storage ← Memory Update
+User Input → Frontend → POST /runs → Worker Queue → Agent Processing → Tool Execution → Persisted Message
+                                   ↓                        ↓
+                          Status/Events API       Database Storage ← Memory Update
 ```
 
 ### 2. Document Q&A Flow
@@ -207,7 +223,8 @@ Load Conversations → Maintenance Check → Title Generation (Async) → Empty 
 
 ### 3. Scalability Considerations
 - SQLite suitable for single-user deployment
-- Async processing for non-blocking operations
+- Dedicated worker runtime for non-blocking operations
+- Run-state persistence for restart-safe behavior
 - Modular design allows easy component scaling
 
 ## Future Architecture Enhancements

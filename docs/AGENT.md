@@ -1,5 +1,9 @@
 # Personal Agent System – Agent Context & Editing Guide
 
+Workflow policy note:
+- Git/worktree/PR process is defined in root [`AGENT.md`](../AGENT.md).
+- This file documents system architecture and implementation context.
+
 ## Project Overview
 
 This project implements a sophisticated AI-powered personal assistant ("personal agent") designed to help users manage tasks, search documents, interact with external services (like Gmail), and maintain efficient, context-aware conversations. The agent uses a modular orchestrator architecture, delegating work to specialized tools and agents, and leverages LangGraph and LangChain for advanced reasoning and tool orchestration.
@@ -12,6 +16,14 @@ This project implements a sophisticated AI-powered personal assistant ("personal
 - Persistent user memory and profile
 - Web interface for chat and document management
 - Extensible with new tools and integrations
+
+## Long-Running Runtime Migration
+
+The current target architecture moves from synchronous chat responses to a run-based asynchronous model:
+- `POST /runs` and `POST /chat` are the primary asynchronous execution paths.
+- `GET /runs/{run_id}/status` and `/events` provide progress visibility.
+- Legacy synchronous `POST /api/v1/chat` is deprecated compatibility behavior.
+- Migration issue: [#14](https://github.com/gtpooniwala/personal-agent/issues/14) (design) with implementation split across #15-#19.
 
 ## Orchestrator Agent Prompt (Macro Context)
 
@@ -37,7 +49,7 @@ The orchestrator agent is responsible for:
 ```text
 personal-agent/
 ├── README.md                  # User documentation and feature overview
-├── AGENT.md                   # This file – agent context, macro instructions, and editing guide
+├── docs/AGENT.md              # This file – agent context, macro instructions, and editing guide
 ├── backend/
 │   ├── orchestrator/
 │   │   ├── core.py            # Core orchestrator logic (main agent brain)
@@ -54,7 +66,7 @@ personal-agent/
 
 - **Orchestrator logic:** Edit `backend/orchestrator/core.py` for main agent flow, context window, and summarisation logic.
 - **Add or update tools:** Implement new tools in `backend/orchestrator/tools/` and register them in `tool_registry.py`.
-- **Documentation:** Update `README.md`, `AGENT.md`, and `docs/features/` for any new features, tools, or changes to agent behavior.
+- **Documentation:** Update `README.md`, `docs/AGENT.md`, and `docs/features/` for any new features, tools, or changes to agent behavior.
 - **Tests:** Add or update tests in `backend/test_comprehensive.py` or `tests/` as needed.
 - **Frontend:** Edit files in `frontend/` for UI/UX changes.
 
@@ -210,11 +222,10 @@ User Request → CoreOrchestrator → Tool Analysis → Delegation Decision
                                         │
                                         ▼
                               ┌─────────────────┐
-                              │   OpenAI APIs   │
+                              │  LLM Providers  │
                               │                 │
-                              │ • GPT-3.5-turbo │
-                              │ • text-embedding│
-                              │   -ada-002      │
+                              │ • Gemini (default) │
+                              │ • OpenAI (optional) │
                               └─────────────────┘
 ```
 
@@ -231,7 +242,7 @@ User Request → CoreOrchestrator → Tool Analysis → Delegation Decision
 │                                                                                 │
 │  STEP 1: Intent Analysis                                                        │
 │  ┌─────────────────────────────────────────────────────────────────────────┐   │
-│  │ GPT-3.5-turbo analyzes user request for:                                 │   │
+│  │ The configured orchestration chat model analyzes user request for:       │   │
 │  │ • Mathematical expressions                                                │   │
 │  │ • Time/date queries                                                       │   │
 │  │ • Document references                                                     │   │
@@ -286,7 +297,7 @@ User Request → CoreOrchestrator → Tool Analysis → Delegation Decision
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                        RESPONSE GENERATION                                     │
 │                                                                                 │
-│  Orchestrator (GPT-3.5-turbo) compiles final response:                         │
+│  Orchestrator (configured chat model) compiles final response:                 │
 │  ┌─────────────────────────────────────────────────────────────────────────┐   │
 │  │ • Integrates tool results into natural language                          │   │
 │  │ • Maintains conversation context and memory                               │   │
@@ -310,54 +321,37 @@ User Request → CoreOrchestrator → Tool Analysis → Delegation Decision
 
 ### Key Components & File Locations
 
-#### Core Agent System (`backend/agent/`)
+#### Core Orchestrator System (`backend/orchestrator/`)
 
-**`backend/agent/core.py`** - **CRITICAL FILE**
+**`backend/orchestrator/core.py`** - **CRITICAL FILE**
 
-- Contains the main `PersonalAgent` class
-- Implements smart routing logic (agent-driven, not hardcoded)
-- Handles conversation management and memory
-- Manages token tracking and cost monitoring
-- **Key Method**: `process_message()` - Always uses agent, falls back to direct LLM only if agent fails
+- LangGraph-backed orchestrator entry point and main request flow (`CoreOrchestrator`)
+- Maintains prompt flow, tool delegation, and response synthesis
+- Current behavior: manages conversation context and LangGraph agent state
+- Planned soon: manage run-aware context boundaries and persistence handoff points
 
-```python
-# Current implementation (simplified)
-async def process_message(self, message: str, conversation_id: str):
-    try:
-        # Always use agent - let it decide when to use tools
-        result = self.agent({"input": message})
-        response = result.get("output", "")
-        intermediate_steps = result.get("intermediate_steps", [])
-    except Exception as e:
-        # Graceful fallback to direct LLM only if agent completely fails
-        llm_result = await self.llm.ainvoke(message)
-        response = getattr(llm_result, "content", str(llm_result))
-        intermediate_steps = []
-```
+**`backend/orchestrator/tools/`** - Tool implementations
 
-**`backend/agent/tools.py`** - Tool Registry & Implementations
+- Tool modules remain in the same domain-specific files (calculator, time, documents, scratchpad, etc.)
 
-- `CalculatorTool`: Mathematical expressions with exponentiation support (`^` → `**`)
-- `CurrentTimeTool`: Date/time queries with natural language processing
-- `ToolRegistry`: Manages available tools for the agent
-- Placeholder tools ready for implementation: Gmail, Calendar, Todoist
+**`backend/orchestrator/tool_registry.py`** - Tool management
 
-**`backend/agent/memory.py`** - Custom SQLite Memory
-
-- Extends LangChain's `ConversationBufferMemory`
-- Provides persistent conversation context across sessions
-- Integrates with database operations for message storage
+- Tool availability and context-sensitive registration
 
 #### API Layer (`backend/api/`)
 
 **`backend/api/routes.py`** - API Endpoints
 
-- `POST /api/v1/chat` - Main chat interface
-- `GET /api/v1/conversations` - List all conversations
-- `POST /api/v1/conversations` - Create new conversation
-- `GET /api/v1/conversations/{id}/messages` - Get conversation history
-- `GET /api/v1/tools` - List available tools
-- `GET /api/v1/health` - Health check
+- `POST /runs` - Asynchronous run submission
+- `POST /chat` - Asynchronous conversational submission
+- `GET /runs/{run_id}/status` - Run lifecycle status
+- `GET /runs/{run_id}/events` - Run progress stream snapshot
+- `GET /conversations` - List all conversations
+- `POST /conversations` - Create new conversation
+- `GET /conversations/{id}/messages` - Get conversation history
+- `GET /tools` - List available tools
+- `GET /health` - Health check
+- Legacy note: `/api/v1/...` route notation is deprecated compatibility notation.
 
 **`backend/api/models.py`** - Pydantic Models
 
@@ -899,10 +893,14 @@ UI Display: Response + professional tool usage display
 
 ### Required Environment Setup
 
-**CRITICAL**: Must use conda environment or system will not work properly.
+Use a supported Python environment (venv or conda) with the project dependencies installed.
 
 ```bash
-# Environment activation - REQUIRED
+# Option A (venv)
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Option B (conda)
 conda activate personalagent
 
 # Environment variables (backend/.env)
@@ -910,18 +908,10 @@ conda activate personalagent
 
 ### Development Dependencies
 
-```python
-# backend/requirements.txt
-langchain==0.2.16
-langchain-openai==0.1.25
-langchain-community==0.2.16
-fastapi==0.111.0
-uvicorn[standard]==0.30.0
-python-dotenv==1.0.1
-pydantic==2.7.2
-pydantic-settings==2.3.0
-sqlalchemy==2.0.30
-aiofiles==23.2.1
+Use the requirements file directly to avoid doc/version drift:
+
+```bash
+pip install -r backend/requirements.txt
 ```
 
 ### Development Workflow
@@ -929,7 +919,7 @@ aiofiles==23.2.1
 1. **Environment Setup**:
 
    ```bash
-   conda activate personalagent
+   source .venv/bin/activate  # or: conda activate personalagent
    cd backend
    ```
 
@@ -1008,7 +998,7 @@ def get_available_tools(self) -> List[BaseTool]:
 ```text
 personal-agent/
 ├── README.md                    # User-facing documentation  
-├── AGENT.md                     # This AI agent technical documentation
+├── docs/AGENT.md                # This AI agent technical documentation
 ├── setup.sh                     # Automated conda environment setup
 ├── docs/                        # Detailed documentation
 │   ├── API.md                  # API documentation
@@ -1034,11 +1024,6 @@ personal-agent/
 │   │       ├── search_documents.py # ✅ RAG-based document search
 │   │       └── gmail.py          # ✅ Gmail integration
 │   │       └── integrations.py    # 🚧 Calendar, Todoist placeholders
-│   ├── agent/                  # Legacy agent implementation (compatibility)
-│   │   ├── __init__.py        # Module initialization
-│   │   ├── core.py            # PersonalAgent class with smart routing
-│   │   ├── memory.py          # Custom SQLite-backed LangChain memory
-│   │   └── tools.py           # Original tool implementations and registry
 │   ├── api/                   # FastAPI routes and models
 │   │   ├── __init__.py        # Module initialization
 │   │   ├── models.py          # Pydantic request/response models
@@ -1068,7 +1053,7 @@ personal-agent/
 - 🎯 **New `orchestrator/`**: Modular architecture with specialized tools
 - ✅ **Implemented Tools**: 5/6 tools production ready
 - 🚧 **Placeholder Tools**: 1/6 tools framework ready
-- 🔄 **Legacy `agent/`**: Backward compatibility maintained
+- 🔄 **Legacy `agent/`**: Removed from active codepaths
 
 ## 🔄 Recent Major Changes (Important for Context)
 

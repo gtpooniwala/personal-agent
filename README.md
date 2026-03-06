@@ -37,12 +37,15 @@ flowchart LR
 
 ### Request Flow
 
+Current runtime path (today):
 1. User sends a message from the frontend.
-2. `POST /api/v1/chat` passes the message and selected document IDs to the orchestrator.
-3. The LangGraph ReAct agent chooses tools based on intent and available context.
-4. Tool outputs are captured as `agent_actions` and persisted with the response.
-5. A response synthesis step generates the final user-facing answer.
-6. Conversation history is periodically summarized when token thresholds are exceeded.
+2. `POST /api/v1/chat` processes the request in-request and returns the assistant response.
+
+Target runtime path (rolling out soon):
+1. `POST /chat` or `POST /runs` submits asynchronous work and returns a `run_id`.
+2. Backend worker processes run steps asynchronously (tool selection, tool execution, synthesis).
+3. Frontend polls `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events`.
+4. Legacy `POST /api/v1/chat` synchronous behavior is deprecated and will be removed.
 
 ## Implemented Capabilities
 
@@ -63,87 +66,89 @@ flowchart LR
 
 - Backend: Python, FastAPI, LangChain, LangGraph, SQLAlchemy
 - LLM/Embeddings: Gemini by default (`gemini-2.5-flash` + `text-embedding-004`), OpenAI optional via config
-- Frontend: Next.js (React), App Router, component-based UI
+- Frontend: Next.js + React
 - Storage: SQLite + local filesystem (`data/`)
 
-### LangChain/LangGraph Migration Baseline
+## LangChain/LangGraph Migration Baseline
 
-Issue tracking: `#22` (`[Migration] Upgrade to latest LangChain/LangGraph stack`).
+Contributor reference for current migration state:
+- Dependency source of truth:
+  - Backend: `backend/requirements.txt`
+  - Frontend: `frontend/package.json`
+- Completed baseline:
+  - LangGraph ReAct orchestration is the active architecture.
+  - Tool routing is centralized in the orchestrator tool registry.
+- Runtime migration status:
+  - Current implementation uses `POST /api/v1/chat` synchronous request lifecycle.
+  - Next target is async `/chat` + `/runs` submission with status/events polling.
 
-- LangChain stack pinned to: `langchain==1.2.10`, `langgraph==1.0.10`
-- Related packages pinned: `langchain-openai==1.1.10`, `langchain-community==0.4.1`, `langchain-text-splitters==1.1.1`, `langgraph-checkpoint==4.0.1`, `langgraph-prebuilt==1.0.8`
-- Related dependency floors adopted in requirements:
-  `openai==2.26.0`, `requests==2.32.5`, `pydantic-settings==2.13.1`
-- Code migrated off removed APIs/import paths:
-  - `langchain.prompts` -> `langchain_core.prompts`
-  - `langchain.text_splitter` -> `langchain_text_splitters`
-  - `langchain.tools.BaseTool` -> `langchain_core.tools.BaseTool`
-  - `apredict()` -> `ainvoke()` patterns
-
-## Quick Start (Manual, Recommended)
+## Quick Start (Docker, Recommended)
 
 ### 1) Prerequisites
 
-- Python 3.11+
+- Docker Desktop (or Docker Engine + Compose plugin)
 - Gemini API key (default provider)
-- Node.js 18.17+
 
-### 2) Install dependencies
+### 2) Configure environment
 
 ```bash
 git clone https://github.com/gtpooniwala/personal-agent.git
 cd personal-agent
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r backend/requirements.txt
-```
-
-### 3) Configure environment
-
-```bash
 cp .env.example .env
 # Edit .env and set GEMINI_API_KEY
 ```
 
-### 4) Run backend
+### 3) Start backend + frontend
 
 ```bash
+docker compose up --build
+```
+
+### 4) Access services
+
+- Frontend: [http://127.0.0.1:3000](http://127.0.0.1:3000)
+- Backend API: [http://127.0.0.1:8000](http://127.0.0.1:8000)
+- Swagger UI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+### 5) Stop services
+
+```bash
+docker compose down
+```
+
+## Debugging Without Docker (Optional)
+
+Use this only when you need local debugging outside containers.
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 18.17+
+
+### Backend (debug)
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
 uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-### 5) Run frontend (new terminal)
+### Frontend (debug, new terminal)
 
 ```bash
 cd frontend
-cp .env.example .env.local
 npm install
 npm run dev
 ```
 
-Open [http://127.0.0.1:3000](http://127.0.0.1:3000).
-
-## Alternative Startup Scripts
+## Alternative Local Scripts
 
 The repo includes:
 - `setup.sh`: conda-based setup
 - `start_server.sh`: macOS Terminal automation (`osascript`) for backend + frontend startup
 
-Use these if your environment matches their assumptions.
-
-## Docker Compose (Backend + Frontend)
-
-Run both services together:
-
-```bash
-cp .env.example .env
-# Set GEMINI_API_KEY and NEXT_PUBLIC_API_BASE_URL in .env
-docker compose up --build
-```
-
-Endpoints:
-- Frontend: [http://127.0.0.1:3000](http://127.0.0.1:3000)
-- Backend API: [http://127.0.0.1:8000/api/v1](http://127.0.0.1:8000/api/v1)
-- API Docs: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+Use these for local debugging if your environment matches their assumptions.
 
 ## Running Tests
 
@@ -196,9 +201,21 @@ If the provider key is missing, live mode exits as `blocked` and tells you which
 
 ## API Surface
 
-Base URL: `http://127.0.0.1:8000/api/v1`
+Base URL: `http://127.0.0.1:8000`
+
+Route notation:
+- Primary notation in docs: bare routes (`/chat`, `/runs`, ...)
+- Legacy compatibility notation: `/api/v1/...` (older deployments)
+- Current mainline implementation still serves routes under `/api/v1`.
+- Bare-route notation is the target runtime contract rolling out next.
 
 Core endpoints:
+- Current implementation:
+  - `POST /api/v1/chat` (legacy synchronous path)
+- Target migration behavior (rolling out soon):
+- `POST /runs`
+- `GET /runs/{run_id}/status`
+- `GET /runs/{run_id}/events`
 - `POST /chat`
 - `GET /conversations`
 - `POST /conversations`
@@ -258,6 +275,7 @@ Design choices reflected in this implementation:
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [API](docs/API.md)
+- [Runtime Migration Architecture](docs/MIGRATION_RUNTIME_ARCHITECTURE.md)
 - [Feature Overview](docs/FEATURES_OVERVIEW.md)
 - [Development Guide](docs/DEVELOPMENT_GUIDE.md)
 - [Project Status](docs/PROJECT_STATUS.md)

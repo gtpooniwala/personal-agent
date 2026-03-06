@@ -4,6 +4,38 @@ This document provides detailed documentation of the system flow, decision logic
 
 ## 🎯 Core System Flow
 
+This section reflects the migration target runtime: async run submission with status/event polling. The legacy direct flow below is preserved for historical context only.
+
+## Long-Running Runtime Flow (Migration)
+
+> TODO: This migration diagram is an in-progress draft and needs a follow-up update during runtime implementation.
+> The status/events edge structure is intentionally left as-is in this docs PR.
+
+```mermaid
+graph TB
+    A[POST /runs or POST /chat] --> B{Persist Run Record}
+    B --> C[Run Queue]
+    C --> D[Dedicated Worker]
+    D --> E[Load Conversation Context]
+    E --> F[LangGraph Orchestrator]
+    F --> G{Tool Required?}
+    G -->|Yes| H[Tool Registry + Tool Execution]
+    G -->|No| I[Response Agent]
+    H --> J[Emit Tool Events]
+    J --> F
+    F --> K[Persist Results]
+    K --> L[Emit succeeded/failed events]
+    M[GET /runs/{run_id}/status] --> N[Expose lifecycle state]
+    M --> O[GET /runs/{run_id}/events]
+    O --> P[Expose ordered progress stream]
+```
+
+### Transitional compatibility
+
+- `POST /chat` is an active asynchronous conversational submission path.
+- `POST /runs` is an active asynchronous general run submission path.
+- Legacy synchronous `POST /api/v1/chat` is deprecated and should be removed after migration completion.
+
 ### High-Level Request Processing
 
 ```mermaid
