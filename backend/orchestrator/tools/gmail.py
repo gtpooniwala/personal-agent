@@ -42,9 +42,10 @@ def get_gmail_readiness(enable_gmail_integration: bool) -> Tuple[bool, List[str]
     """
     Determine whether Gmail integration should be exposed to the orchestrator.
     """
-    reasons = []
     if not enable_gmail_integration:
-        reasons.append("feature_flag_disabled")
+        return False, ["feature_flag_disabled"]
+
+    reasons = []
     if not _gmail_dependencies_installed():
         reasons.append("dependencies_missing")
     if not os.path.exists(_get_credentials_path()):
@@ -111,8 +112,23 @@ class GmailReadTool(BaseTool):
                 flow = InstalledAppFlow.from_client_secrets_file(credentials_path, GMAIL_SCOPES)
                 creds = flow.run_local_server(port=0)
             # Save the credentials for next run
-            with open(token_path, "wb") as token:
-                pickle.dump(creds, token)
+            token_dir = os.path.dirname(token_path)
+            if token_dir and not os.path.exists(token_dir):
+                try:
+                    os.makedirs(token_dir, exist_ok=True)
+                except OSError:
+                    return (
+                        f"Failed to create directory for Gmail token at '{token_dir}'. "
+                        "Check GMAIL_TOKEN_PATH and ensure the directory is writable."
+                    )
+            try:
+                with open(token_path, "wb") as token:
+                    pickle.dump(creds, token)
+            except OSError:
+                return (
+                    f"Failed to save Gmail OAuth token to '{token_path}'. "
+                    "Check GMAIL_TOKEN_PATH and ensure the path is writable."
+                )
         # Build Gmail API service
         service = build("gmail", "v1", credentials=creds)
 

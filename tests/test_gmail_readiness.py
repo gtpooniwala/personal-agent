@@ -7,12 +7,13 @@ from backend.orchestrator.tools.gmail import get_gmail_readiness
 
 class TestGmailReadiness(unittest.TestCase):
     def test_not_ready_when_feature_flag_disabled(self):
-        with patch("backend.orchestrator.tools.gmail._gmail_dependencies_installed", return_value=True), \
-             patch("backend.orchestrator.tools.gmail._get_credentials_path", return_value="/tmp/creds.json"), \
-             patch("backend.orchestrator.tools.gmail.os.path.exists", return_value=True):
+        with patch("backend.orchestrator.tools.gmail._gmail_dependencies_installed") as deps_mock, \
+             patch("backend.orchestrator.tools.gmail.os.path.exists") as exists_mock:
             ready, reasons = get_gmail_readiness(enable_gmail_integration=False)
         self.assertFalse(ready)
-        self.assertIn("feature_flag_disabled", reasons)
+        self.assertEqual(reasons, ["feature_flag_disabled"])
+        deps_mock.assert_not_called()
+        exists_mock.assert_not_called()
 
     def test_not_ready_when_dependencies_missing(self):
         with patch("backend.orchestrator.tools.gmail._gmail_dependencies_installed", return_value=False), \
