@@ -7,6 +7,7 @@ GITHUB_ACTIONS_APP_ID=15368
 echo "Configuring branch protection for ${REPO} main..."
 
 PAYLOAD_FILE="$(mktemp)"
+trap 'rm -f "${PAYLOAD_FILE}"' EXIT
 cat > "${PAYLOAD_FILE}" <<EOF
 {
   "required_status_checks": {
@@ -36,8 +37,6 @@ EOF
 gh api -X PUT "repos/${REPO}/branches/main/protection" \
   -H "Accept: application/vnd.github+json" \
   --input "${PAYLOAD_FILE}"
-
-rm -f "${PAYLOAD_FILE}"
 
 echo "Configuring merge strategy (squash-only) for ${REPO}..."
 
