@@ -30,7 +30,7 @@ python tests/test_comprehensive.py
 python tests/run_repo_checks.py
 ```
 
-It writes a machine-readable report to `tests/repo_checks/results.json`.
+It writes a machine-readable report to `tests/repo_checks/results.json` (local artifact, gitignored).
 
 ## Run LLM/Workflow Evals
 

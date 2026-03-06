@@ -36,9 +36,21 @@ class TestCalculatorTool(unittest.TestCase):
         result = self.tool._run("2 * (3 + 4)")
         self.assertIn("14", result)
 
+    def test_calculator_supports_exponentiation(self):
+        result = self.tool._run("2**8")
+        self.assertIn("256", result)
+
     def test_calculator_handles_division_by_zero(self):
         result = self.tool._run("10 / 0")
         self.assertIn("Division by zero", result)
+
+    def test_calculator_rejects_unsupported_operator(self):
+        result = self.tool._run("5 // 2")
+        self.assertIn("Error calculating", result)
+
+    def test_calculator_rejects_exponent_above_safety_limit(self):
+        result = self.tool._run("2**1000")
+        self.assertIn("safe limit", result)
 
     def test_calculator_input_validation_blocks_non_math(self):
         with self.assertRaises(ValueError):

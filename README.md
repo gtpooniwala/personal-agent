@@ -174,11 +174,8 @@ python tests/run_repo_checks.py
 
 These checks run in CI because they are deterministic and fast.
 
-Latest baseline (run on **March 4, 2026**):
-- Cases: `12`
-- Passed: `12`
-- Failed: `0`
-- Report: `tests/repo_checks/results.json`
+Local report artifact:
+- Report: `tests/repo_checks/results.json` (gitignored)
 
 ## Running LLM/Workflow Evals
 
