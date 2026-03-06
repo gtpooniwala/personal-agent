@@ -48,11 +48,19 @@ class DocumentProcessor:
         self.upload_dir = Path("data/uploads")
         self.upload_dir.mkdir(parents=True, exist_ok=True)
 
-    def _require_models(self) -> None:
-        if self.embeddings is None or self.llm is None:
+    def _require_embeddings_model(self) -> None:
+        if self.embeddings is None:
             raise RuntimeError(
                 self.initialization_error
-                or "Document search and processing require a configured LLM provider key."
+                or "Document search requires configured embeddings."
+            )
+
+    def _require_processing_models(self) -> None:
+        self._require_embeddings_model()
+        if self.llm is None:
+            raise RuntimeError(
+                self.initialization_error
+                or "Document processing requires a configured chat model."
             )
     
     async def process_pdf_upload(self, file_content: bytes, filename: str, user_id: str = "default") -> str:
@@ -69,7 +77,7 @@ class DocumentProcessor:
         """
         document_id: Optional[str] = None
         try:
-            self._require_models()
+            self._require_processing_models()
             # Generate unique filename and save file
             file_id = str(uuid.uuid4())
             file_extension = Path(filename).suffix
@@ -120,7 +128,7 @@ class DocumentProcessor:
     async def _process_document_content(self, document_id: str, file_path: Path):
         """Extract text from PDF, generate summary, and create embeddings."""
         try:
-            self._require_models()
+            self._require_processing_models()
             # Extract text from PDF
             text_content = self._extract_pdf_text(file_path)
             
@@ -257,7 +265,7 @@ Summary:"""
             List of relevant document chunks with metadata
         """
         try:
-            self._require_models()
+            self._require_embeddings_model()
             # Generate embedding for query
             query_embedding = await self.embeddings.aembed_query(query)
             
@@ -332,7 +340,7 @@ Summary:"""
             List of relevant document chunks with metadata
         """
         try:
-            self._require_models()
+            self._require_embeddings_model()
             # Generate embedding for query (synchronous)
             query_embedding = self.embeddings.embed_query(query)
             

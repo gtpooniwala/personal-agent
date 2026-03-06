@@ -122,7 +122,6 @@ def _safe_eval_math(expression: str) -> Optional[float]:
         ast.Mult,
         ast.Div,
         ast.Mod,
-        ast.Pow,
         ast.USub,
         ast.UAdd,
         ast.Constant,
@@ -156,8 +155,6 @@ def _safe_eval_math(expression: str) -> Optional[float]:
                 return left / right
             if isinstance(node.op, ast.Mod):
                 return left % right
-            if isinstance(node.op, ast.Pow):
-                return left ** right
             raise ValueError("Unsupported binary operator")
         raise ValueError("Unsupported expression")
 
@@ -178,7 +175,13 @@ def _mock_execute_turn(message: str, selected_documents: Optional[List[str]]) ->
     response_parts: List[str] = []
 
     doc_query = any(token in lower for token in ("document", "uploaded", "file", "contract", "pdf"))
-    internet_query = any(token in lower for token in ("internet", "latest", "news", "headline", "search"))
+    internet_query = (
+        any(token in lower for token in ("internet", "online", "news", "headline", "headlines"))
+        or any(
+            phrase in lower
+            for phrase in ("search the internet", "internet search", "search the web", "web search")
+        )
+    )
     time_query = "time" in lower
     greeting_query = any(token in lower for token in ("hello", "hi", "hey"))
     math_expression = _contains_math_expression(message)
