@@ -18,6 +18,11 @@ Routing conventions:
 
 ## Authentication
 Implemented now: no auth; single default-user behavior.
+All endpoints execute with full privileges for the single default user.
+
+Security constraint: do not bind this API to non-loopback interfaces or expose it behind a reverse proxy without adding authentication/authorization (for example, FastAPI auth dependencies, an authenticating reverse proxy, or VPN-restricted access).
+
+Production/shared deployment requirement: before exposing this service beyond strictly local trusted use on `127.0.0.1`, add authentication/authorization and restrict access appropriately.
 
 ## Endpoint Matrix
 
@@ -91,7 +96,7 @@ Response body:
 ```json
 {
   "status": "healthy",
-  "timestamp": "2026-03-06T10:00:00Z",
+  "timestamp": "2026-03-06T10:00:00",
   "version": "1.0.0"
 }
 ```
