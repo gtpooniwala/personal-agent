@@ -17,7 +17,7 @@ The assistant can:
 
 ```mermaid
 flowchart LR
-    UI["Frontend (Vanilla JS SPA)"] --> API["FastAPI API Layer"]
+    UI["Frontend (Next.js App Router)"] --> API["FastAPI API Layer"]
     API --> ORCH["LangGraph ReAct Orchestrator"]
     ORCH --> REG["Tool Registry"]
     ORCH --> LLM["Gemini Chat Model (Default)"]
@@ -63,7 +63,7 @@ flowchart LR
 
 - Backend: Python, FastAPI, LangChain, LangGraph, SQLAlchemy
 - LLM/Embeddings: Gemini by default (`gemini-2.5-flash` + `text-embedding-004`), OpenAI optional via config
-- Frontend: HTML/CSS + modular ES6 JavaScript
+- Frontend: Next.js (React), App Router, component-based UI
 - Storage: SQLite + local filesystem (`data/`)
 
 ### LangChain/LangGraph Migration Baseline
@@ -86,6 +86,7 @@ Issue tracking: `#22` (`[Migration] Upgrade to latest LangChain/LangGraph stack`
 
 - Python 3.11+
 - Gemini API key (default provider)
+- Node.js 18.17+
 
 ### 2) Install dependencies
 
@@ -114,10 +115,12 @@ uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 
 ```bash
 cd frontend
-python3 -m http.server 8081
+cp .env.example .env.local
+npm install
+npm run dev
 ```
 
-Open [http://127.0.0.1:8081](http://127.0.0.1:8081).
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000).
 
 ## Alternative Startup Scripts
 
@@ -126,6 +129,21 @@ The repo includes:
 - `start_server.sh`: macOS Terminal automation (`osascript`) for backend + frontend startup
 
 Use these if your environment matches their assumptions.
+
+## Docker Compose (Backend + Frontend)
+
+Run both services together:
+
+```bash
+cp .env.example .env
+# Set GEMINI_API_KEY and NEXT_PUBLIC_API_BASE_URL in .env
+docker compose up --build
+```
+
+Endpoints:
+- Frontend: [http://127.0.0.1:3000](http://127.0.0.1:3000)
+- Backend API: [http://127.0.0.1:8000/api/v1](http://127.0.0.1:8000/api/v1)
+- API Docs: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
 ## Running Tests
 
@@ -207,7 +225,7 @@ personal-agent/
 │   ├── services/              # Document processing + retrieval
 │   ├── database/              # SQLAlchemy models + operations
 │   └── main.py                # API entrypoint
-├── frontend/                  # Static SPA (HTML/CSS/JS)
+├── frontend/                  # Next.js frontend app
 ├── tests/                     # Unit/integration-style tests
 ├── docs/                      # Extended architecture + feature docs
 └── data/                      # Local runtime data (DB, uploads, profiles, scratchpad)

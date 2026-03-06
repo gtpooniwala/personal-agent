@@ -10,6 +10,19 @@ if ! command -v conda &> /dev/null; then
     exit 1
 fi
 
+# Check Node.js/npm prerequisites for frontend
+if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
+    echo "❌ Error: Node.js and npm are required but not installed or not in PATH"
+    echo "Please install Node.js 18.17+"
+    exit 1
+fi
+
+if ! node -e "const [major, minor] = process.versions.node.split('.').map(Number); process.exit(major > 18 || (major === 18 && minor >= 17) ? 0 : 1)"; then
+    echo "❌ Error: Node.js 18.17+ is required for the Next.js frontend."
+    echo "Detected: $(node -v)"
+    exit 1
+fi
+
 # Check if personalagent environment exists
 if ! conda env list | grep -q "personalagent"; then
     echo "❌ Error: conda environment 'personalagent' not found"
@@ -26,24 +39,24 @@ PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 # Open backend server in new Terminal window
 osascript <<END
   tell application "Terminal"
-    do script "cd $PROJECT_ROOT; source ~/.zshrc; conda activate personalagent; uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
+    do script "cd \"$PROJECT_ROOT\"; source ~/.zshrc; conda activate personalagent; uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
     activate
   end tell
 END
 
 echo "✅ Backend server started in a new Terminal window."
 
-# Open frontend static server in new Terminal window
+# Open frontend Next.js dev server in new Terminal window
 osascript <<END
   tell application "Terminal"
-    do script "cd $PROJECT_ROOT/frontend; python3 -m http.server 8081"
+    do script "cd \"$PROJECT_ROOT/frontend\"; if [ ! -d node_modules ]; then npm install || exit 1; fi; npm run dev || exit 1"
     activate
   end tell
 END
 
-echo "✅ Frontend static server started in a new Terminal window."
+echo "✅ Frontend Next.js server started in a new Terminal window."
 
 echo "========================================"
 echo "Backend running at: http://localhost:8000"
-echo "Frontend running at: http://localhost:8081"
+echo "Frontend running at: http://localhost:3000"
 echo "Press Ctrl+C in the respective Terminal windows to stop the servers."
