@@ -2,31 +2,30 @@
 
 Comprehensive documentation for the Personal Agent MVP - an intelligent AI assistant powered by LangGraph orchestrator architecture.
 
-## � Documentation Index
+## Documentation Index
 
 ### 🏗️ **Core Architecture**
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) - System architecture and design patterns
-- [`../AGENT.md`](../AGENT.md) - AI coding agent workflow contract
+- [`MIGRATION_RUNTIME_ARCHITECTURE.md`](MIGRATION_RUNTIME_ARCHITECTURE.md) - Async run model migration contract and sequencing
 - [`SYSTEM_FLOW.md`](SYSTEM_FLOW.md) - Detailed system flow, logic, and decision-making processes
 - [`FEATURES_OVERVIEW.md`](FEATURES_OVERVIEW.md) - Comprehensive overview of all implemented features
 
 ### 🚀 **Setup & Development**
 - [`SETUP.md`](SETUP.md) - Installation and setup instructions
 - [`DEVELOPMENT_GUIDE.md`](DEVELOPMENT_GUIDE.md) - Development workflow and guidelines
+- [`../AGENT.md`](../AGENT.md) - AI coding agent workflow contract
 - [`ENGINEERING_WORKFLOW.md`](ENGINEERING_WORKFLOW.md) - Branch/worktree/PR/merge policy for Codex + Claude
 - [`API.md`](API.md) - API reference and endpoint documentation
 - [`TESTING.md`](TESTING.md) - Testing framework and guidelines
 
 ### 🗂️ **Execution Tracking**
-- [`PROJECT_STATUS.md`](PROJECT_STATUS.md) - Current implementation status and confidence snapshot
 - [`WORKBOARD.md`](WORKBOARD.md) - AI execution board (`Now` / `Next` / `Later` / `Done`)
 - [`ROADMAP.md`](ROADMAP.md) - Sequenced improvement and feature roadmap
-- [`SUGGESTED_CHANGES.md`](SUGGESTED_CHANGES.md) - Pre-issue backlog of suggested fixes and feature ideas
 - GitHub issue tracker: [Repository Issues](https://github.com/gtpooniwala/personal-agent/issues)
 
 ### 🔧 **Features & Tools**
 - [`features/`](features/) - Detailed documentation for each system feature
-  - [Conversation Summarization](features/conversation_summarisation.md)
+  - [Conversation Summarization](features/CONVERSATION_SUMMARISATION.md)
   - [Document Q&A System](features/DOCUMENT_UPLOAD_SYSTEM.md)
   - [User Profile System](features/USER_PROFILE_SYSTEM.md)
   - [Gmail Integration](features/GMAIL_TOOL.md)
@@ -48,7 +47,7 @@ Comprehensive documentation for the Personal Agent MVP - an intelligent AI assis
 
 ### For Developers
 - **Getting Started**: [`SETUP.md`](SETUP.md) → [`DEVELOPMENT_GUIDE.md`](DEVELOPMENT_GUIDE.md)
-- **Architecture Deep Dive**: [`ARCHITECTURE.md`](ARCHITECTURE.md) → [`../AGENT.md`](../AGENT.md)
+- **Architecture Deep Dive**: [`ARCHITECTURE.md`](ARCHITECTURE.md) → [`MIGRATION_RUNTIME_ARCHITECTURE.md`](MIGRATION_RUNTIME_ARCHITECTURE.md)
 - **Adding Features**: [`FEATURE_TEMPLATE.md`](FEATURE_TEMPLATE.md) → [`features/`](features/)
 
 ### For Users

@@ -173,7 +173,7 @@
 ### ✅ Complete Documentation
 - `README.md` - Main project documentation
 - `AGENT.md` - AI coding agent workflow contract
-- `docs/features/conversation_summarisation.md` - Summarization system
+- `docs/features/CONVERSATION_SUMMARISATION.md` - Summarization system
 - `docs/features/GMAIL_TOOL.md` - Gmail integration documentation
 - `docs/features/RESPONSE_AGENT_SYSTEM.md` - Response agent documentation
 - `docs/ARCHITECTURE.md` - System architecture overview
