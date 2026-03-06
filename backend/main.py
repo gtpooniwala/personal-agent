@@ -3,14 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from backend.api import router
 from backend.config import settings
+from backend.observability import configure_logging, langfuse_manager, push_context
 import logging
 import uvicorn
+from time import perf_counter
+import uuid
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, settings.log_level.upper()),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+# Configure structured logging
+configure_logging(settings.log_level)
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +21,13 @@ async def lifespan(app: FastAPI):
     logger.info("Personal Agent API starting up...")
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Database path: {settings.database_path}")
+    langfuse_manager.initialize()
     
     yield
     
     # Shutdown
     logger.info("Personal Agent API shutting down...")
+    langfuse_manager.shutdown()
 
 # Create FastAPI app
 app = FastAPI(
@@ -47,6 +49,43 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def request_context_middleware(request, call_next):
+    """Attach request-scoped context and standardized request logs."""
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    start = perf_counter()
+
+    with push_context(request_id=request_id, route=request.url.path):
+        try:
+            response = await call_next(request)
+        except Exception:
+            latency_ms = int((perf_counter() - start) * 1000)
+            logger.exception(
+                "Request failed",
+                extra={
+                    "event": "http.request.failed",
+                    "method": request.method,
+                    "path": request.url.path,
+                    "latency_ms": latency_ms,
+                },
+            )
+            raise
+
+        latency_ms = int((perf_counter() - start) * 1000)
+        response.headers["X-Request-ID"] = request_id
+        logger.info(
+            "Request completed",
+            extra={
+                "event": "http.request.completed",
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "latency_ms": latency_ms,
+            },
+        )
+        return response
 
 # Include API routes
 app.include_router(router, prefix="/api/v1")

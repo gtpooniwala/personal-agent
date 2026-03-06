@@ -22,6 +22,14 @@ class Settings(BaseSettings):
     # LLM/provider settings
     gemini_api_key: Optional[str] = None
     openai_api_key: Optional[str] = None
+    langfuse_public_key: Optional[str] = None
+    langfuse_secret_key: Optional[str] = None
+    langfuse_base_url: Optional[str] = None
+    langfuse_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("LANGFUSE_ENABLED", "LANGFUSE_TRACING_ENABLED"),
+    )
+    langfuse_sample_rate: float = 1.0
 
     # Core application settings
     database_path: str = "data/agent.db"
