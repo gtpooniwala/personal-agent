@@ -166,6 +166,19 @@ class TestDatabaseOperations(unittest.TestCase):
         self.assertEqual(history[1]["content"], "Second message")
         self.assertEqual(history[2]["content"], "Third message")
 
+    def test_runtime_counter_increment_and_query(self):
+        """Runtime counters should increment and be retrievable by prefix."""
+        key = "api.chat.requests_total"
+        first = self.db_ops.increment_runtime_counter(key, amount=1)
+        second = self.db_ops.increment_runtime_counter(key, amount=2)
+
+        self.assertEqual(first, 1)
+        self.assertEqual(second, 3)
+
+        counters = self.db_ops.get_runtime_counters(prefix="api.chat")
+        self.assertIn(key, counters)
+        self.assertEqual(counters[key], 3)
+
 
 if __name__ == '__main__':
     unittest.main()

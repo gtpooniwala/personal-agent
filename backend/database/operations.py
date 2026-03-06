@@ -1,6 +1,6 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
-from backend.database.models import Base, Conversation, Message, MemoryStore
+from backend.database.models import Base, Conversation, Message, MemoryStore, RuntimeCounter
 from backend.config import settings
 from typing import List, Optional, Dict, Any
 import json
@@ -237,6 +237,52 @@ class DatabaseOperations:
             session.delete(conversation)
             session.commit()
             return True
+        finally:
+            session.close()
+
+    def increment_runtime_counter(self, key: str, amount: int = 1) -> int:
+        """Increment and return a runtime counter."""
+        if amount < 0:
+            raise ValueError("Counter increment amount must be non-negative")
+
+        session = self.get_session()
+        try:
+            now = datetime.now(timezone.utc)
+            session.execute(
+                text(
+                    """
+                    INSERT INTO runtime_counters ("key", value, updated_at)
+                    VALUES (:key, :amount, :updated_at)
+                    ON CONFLICT("key")
+                    DO UPDATE SET
+                        value = runtime_counters.value + :amount,
+                        updated_at = :updated_at
+                    """
+                ),
+                {
+                    "key": key,
+                    "amount": amount,
+                    "updated_at": now,
+                },
+            )
+            session.commit()
+            value = session.execute(
+                text('SELECT value FROM runtime_counters WHERE "key" = :key'),
+                {"key": key},
+            ).scalar_one()
+            return int(value)
+        finally:
+            session.close()
+
+    def get_runtime_counters(self, prefix: Optional[str] = None) -> Dict[str, int]:
+        """Return runtime counters optionally filtered by key prefix."""
+        session = self.get_session()
+        try:
+            query = session.query(RuntimeCounter)
+            if prefix:
+                query = query.filter(RuntimeCounter.key.like(f"{prefix}%"))
+            rows = query.order_by(RuntimeCounter.key.asc()).all()
+            return {row.key: row.value for row in rows}
         finally:
             session.close()
 
