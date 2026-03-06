@@ -48,6 +48,10 @@ class TestCalculatorTool(unittest.TestCase):
         result = self.tool._run("10 / 0")
         self.assertIn("Division by zero", result)
 
+    def test_calculator_preserves_division_float_output(self):
+        result = self.tool._run("6 / 2")
+        self.assertIn("3.0", result)
+
     def test_calculator_rejects_unsupported_operator(self):
         result = self.tool._run("5 // 2")
         self.assertIn("Error calculating", result)

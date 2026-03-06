@@ -162,10 +162,9 @@ Examples: "2**8", "15*7", "200*0.25", "(15+5)/4" """
         try:
             # Pydantic has already validated the expression
             result = _safe_eval_expression(expression)
-            rendered = int(result) if float(result).is_integer() else result
-            
-            logger.info(f"Calculator tool executed: {expression} = {rendered}")
-            return f"The result is: {rendered}"
+
+            logger.info(f"Calculator tool executed: {expression} = {result}")
+            return f"The result is: {result}"
             
         except ZeroDivisionError:
             return "Error: Division by zero is not allowed."
