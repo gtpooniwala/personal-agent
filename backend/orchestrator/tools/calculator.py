@@ -1,9 +1,91 @@
+import ast
+import logging
+import math
+from typing import Type
+
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field, field_validator
-from typing import Type
-import logging
 
 logger = logging.getLogger(__name__)
+
+MAX_SAFE_EXPONENT = 100
+MAX_AST_NODES = 64
+ALLOWED_AST_NODES = (
+    ast.Expression,
+    ast.BinOp,
+    ast.UnaryOp,
+    ast.Add,
+    ast.Sub,
+    ast.Mult,
+    ast.Div,
+    ast.Pow,
+    ast.USub,
+    ast.UAdd,
+    ast.Constant,
+    ast.Load,
+)
+
+
+def _safe_eval_expression(expression: str) -> float:
+    """Safely evaluate arithmetic-only expressions."""
+    parsed = ast.parse(expression, mode="eval")
+    nodes = list(ast.walk(parsed))
+
+    if len(nodes) > MAX_AST_NODES:
+        raise ValueError("Expression is too complex.")
+
+    for node in nodes:
+        if not isinstance(node, ALLOWED_AST_NODES):
+            raise ValueError(f"Unsupported syntax: {type(node).__name__}")
+
+    def _validate_number(value: object) -> int | float:
+        if type(value) not in (int, float):
+            raise ValueError("Expression produced a non-real result.")
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ValueError("Expression produced a non-finite result.")
+        return value
+
+    def _eval(node: ast.AST) -> int | float:
+        if isinstance(node, ast.Expression):
+            return _eval(node.body)
+
+        if isinstance(node, ast.Constant):
+            if type(node.value) not in (int, float):
+                raise ValueError("Only numeric literals are allowed.")
+            return node.value
+
+        if isinstance(node, ast.UnaryOp):
+            operand = _eval(node.operand)
+            if isinstance(node.op, ast.UAdd):
+                return _validate_number(+operand)
+            if isinstance(node.op, ast.USub):
+                return _validate_number(-operand)
+            raise ValueError("Unsupported unary operator.")
+
+        if isinstance(node, ast.BinOp):
+            left = _eval(node.left)
+            right = _eval(node.right)
+
+            if isinstance(node.op, ast.Add):
+                return _validate_number(left + right)
+            if isinstance(node.op, ast.Sub):
+                return _validate_number(left - right)
+            if isinstance(node.op, ast.Mult):
+                return _validate_number(left * right)
+            if isinstance(node.op, ast.Div):
+                return _validate_number(left / right)
+            if isinstance(node.op, ast.Pow):
+                if abs(right) > MAX_SAFE_EXPONENT:
+                    raise ValueError(
+                        f"Exponent magnitude exceeds safe limit ({MAX_SAFE_EXPONENT})."
+                    )
+                return _validate_number(left**right)
+
+            raise ValueError("Unsupported binary operator.")
+
+        raise ValueError("Unsupported expression.")
+
+    return _validate_number(_eval(parsed))
 
 
 class CalculatorInput(BaseModel):
@@ -28,7 +110,9 @@ class CalculatorInput(BaseModel):
         v = v.strip()
         if not v:
             raise ValueError("Expression cannot be empty")
-        
+        if len(v) > 256:
+            raise ValueError("Expression is too long")
+
         # Only allow safe mathematical characters
         allowed_chars = set('0123456789+-*/.() ')
         if not all(c in allowed_chars for c in v):
@@ -77,8 +161,8 @@ Examples: "2**8", "15*7", "200*0.25", "(15+5)/4" """
         """
         try:
             # Pydantic has already validated the expression
-            result = eval(expression)
-            
+            result = _safe_eval_expression(expression)
+
             logger.info(f"Calculator tool executed: {expression} = {result}")
             return f"The result is: {result}"
             

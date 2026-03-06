@@ -144,6 +144,7 @@ test_results.json
 backend/test_results.json
 tests/llm_evals/results/*.json
 !tests/llm_evals/results/.gitkeep
+tests/repo_checks/results.json
 .DS_Store
 
 # Temporary files and local artifacts
