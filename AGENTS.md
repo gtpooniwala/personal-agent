@@ -2,6 +2,9 @@
 
 Repository workflow contract for Codex.
 
+Canonical source of truth: `AGENT.md` at repository root.
+If this file and `AGENT.md` diverge, follow `AGENT.md` and then reconcile this file.
+
 ## Mandatory Git Process
 1. Never commit directly to `main`.
 2. Always create a dedicated branch and worktree for each feature/fix.

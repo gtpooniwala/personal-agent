@@ -1,5 +1,9 @@
 # Personal Agent System – Agent Context & Editing Guide
 
+Workflow policy note:
+- Git/worktree/PR process is defined in root [`AGENT.md`](../AGENT.md).
+- This file documents system architecture and implementation context.
+
 ## Project Overview
 
 This project implements a sophisticated AI-powered personal assistant ("personal agent") designed to help users manage tasks, search documents, interact with external services (like Gmail), and maintain efficient, context-aware conversations. The agent uses a modular orchestrator architecture, delegating work to specialized tools and agents, and leverages LangGraph and LangChain for advanced reasoning and tool orchestration.
