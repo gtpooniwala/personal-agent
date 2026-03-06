@@ -33,9 +33,7 @@ if ! [[ "$SLUG" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
   exit 1
 fi
 
-git fetch origin
-git checkout main
-git pull --rebase origin main
+git fetch origin main
 
 BRANCH="${AGENT}/${TYPE}/${ISSUE}-${SLUG}"
 WT_PATH=".worktrees/${AGENT}-${TYPE}-${ISSUE}-${SLUG}"

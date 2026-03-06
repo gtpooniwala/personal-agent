@@ -8,7 +8,7 @@ if [ "$BRANCH" = "main" ]; then
   exit 1
 fi
 
-git fetch origin
+git fetch origin main
 git rebase origin/main
 
 echo "Rebased ${BRANCH} onto origin/main"
