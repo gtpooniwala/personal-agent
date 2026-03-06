@@ -82,6 +82,22 @@
         ],
         "overall_must_not_call": ["search_documents"],
         "by_mode": {
+          "live": {
+            "per_turn": [
+              {
+                "response_contains": [
+                  "25"
+                ]
+              },
+              {
+                "response_contains_any": [
+                  "am",
+                  "pm",
+                  "time"
+                ]
+              }
+            ]
+          },
           "mock": {
             "per_turn": [
               {
