@@ -96,6 +96,54 @@
           }
         ]
       }
+    },
+    {
+      "id": "document_search_selected_docs",
+      "description": "Document-specific queries with selected docs should route to search_documents only.",
+      "turns": [
+        {
+          "message": "Search my uploaded contract for termination details.",
+          "selected_documents": [
+            "doc-123"
+          ]
+        }
+      ],
+      "expected": {
+        "per_turn": [
+          {
+            "must_call": [
+              "search_documents"
+            ],
+            "must_not_call": [
+              "internet_search"
+            ],
+            "response_contains": [
+              "selected documents"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "calculator_rejects_unsupported_expression",
+      "description": "Unsafe/unsupported math syntax should not be evaluated.",
+      "turns": [
+        {
+          "message": "What is 2 ** 512?"
+        }
+      ],
+      "expected": {
+        "per_turn": [
+          {
+            "must_call": [
+              "calculator"
+            ],
+            "response_contains": [
+              "could not evaluate that expression safely"
+            ]
+          }
+        ]
+      }
     }
   ]
 }
