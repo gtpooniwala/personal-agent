@@ -55,6 +55,7 @@ export default function HomePage() {
   const latestMessagesRequestRef = useRef(0);
   const uploadRunRef = useRef(0);
   const uploadResetTimerRef = useRef(null);
+  const uploadingRef = useRef(false);
 
   const loadTools = useCallback(async () => {
     try {
@@ -279,10 +280,17 @@ export default function HomePage() {
 
   const uploadFiles = useCallback(
     async (files) => {
+      if (uploadingRef.current) {
+        setDocumentError("Upload already in progress.");
+        return;
+      }
+
       const pdfFiles = files.filter((file) => file.type === "application/pdf");
 
       if (pdfFiles.length === 0) {
         setDocumentError("Please select PDF files only.");
+        setUploading(false);
+        setUploadProgress(0);
         return;
       }
 
@@ -380,6 +388,10 @@ export default function HomePage() {
   useEffect(() => {
     activeConversationIdRef.current = currentConversationId;
   }, [currentConversationId]);
+
+  useEffect(() => {
+    uploadingRef.current = uploading;
+  }, [uploading]);
 
   useEffect(() => {
     void loadConversationMessages(currentConversationId);
