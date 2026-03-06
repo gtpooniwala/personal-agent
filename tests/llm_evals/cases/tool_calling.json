@@ -125,11 +125,11 @@
       }
     },
     {
-      "id": "calculator_rejects_unsupported_expression",
-      "description": "Unsafe/unsupported math syntax should not be evaluated.",
+      "id": "calculator_exponentiation",
+      "description": "Exponentiation queries should route to calculator and produce numeric output.",
       "turns": [
         {
-          "message": "What is 2 ** 512?"
+          "message": "What is 2 ** 8?"
         }
       ],
       "expected": {
@@ -139,7 +139,7 @@
               "calculator"
             ],
             "response_contains": [
-              "could not evaluate that expression safely"
+              "256"
             ]
           }
         ]

@@ -122,6 +122,7 @@ def _safe_eval_math(expression: str) -> Optional[float]:
         ast.Mult,
         ast.Div,
         ast.Mod,
+        ast.Pow,
         ast.USub,
         ast.UAdd,
         ast.Constant,
@@ -155,6 +156,8 @@ def _safe_eval_math(expression: str) -> Optional[float]:
                 return left / right
             if isinstance(node.op, ast.Mod):
                 return left % right
+            if isinstance(node.op, ast.Pow):
+                return left**right
             raise ValueError("Unsupported binary operator")
         raise ValueError("Unsupported expression")
 

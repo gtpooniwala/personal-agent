@@ -51,6 +51,14 @@ class TestLangchainMigrationSource(unittest.TestCase):
 
     def test_requirements_match_issue_22_targets(self):
         requirements = (ROOT / "backend/requirements.txt").read_text(encoding="utf-8")
+        parsed_pins = {}
+        for raw_line in requirements.splitlines():
+            line = raw_line.split("#", 1)[0].strip()
+            if not line or "==" not in line:
+                continue
+            package, version = [part.strip() for part in line.split("==", 1)]
+            parsed_pins[package] = version
+
         expected_versions = {
             "langchain": "1.2.10",
             "langgraph": "1.0.10",
@@ -71,10 +79,11 @@ class TestLangchainMigrationSource(unittest.TestCase):
             "pypdf": "6.7.5",
         }
         for package, version in expected_versions.items():
-            self.assertIn(
-                f"{package}=={version}",
-                requirements,
-                f"Missing or incorrect version pin for {package}",
+            self.assertIn(package, parsed_pins, f"Missing version pin for {package}")
+            self.assertEqual(
+                version,
+                parsed_pins[package],
+                f"Incorrect version pin for {package}",
             )
 
 
