@@ -181,7 +181,6 @@ Your effectiveness is measured by:
                     continue
                 # Optionally, handle other system/tool messages here if needed
             token_usage = None
-            total_cost = None
             try:
                 config = {"configurable": {"thread_id": conversation_id}}
                 result = self.orchestrator_agent.invoke({"messages": messages}, config=config)
@@ -244,7 +243,6 @@ Your effectiveness is measured by:
                 "conversation_id": conversation_id,
                 "orchestration_actions": orchestration_actions,
                 "token_usage": token_usage,
-                "cost": total_cost
             }
             
         except (MissingProviderKeyError, MissingModelDependencyError) as e:
