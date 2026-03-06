@@ -1,0 +1,84 @@
+{
+  "schema_version": "1.0",
+  "suite": "workflow",
+  "description": "Multi-step and fallback workflow behavior checks.",
+  "cases": [
+    {
+      "id": "multi_tool_single_turn",
+      "description": "Combined requests should trigger multiple relevant tools.",
+      "turns": [
+        {
+          "message": "What is 9 * 7 and what time is it?"
+        }
+      ],
+      "expected": {
+        "per_turn": [
+          {
+            "must_call": [
+              "calculator",
+              "current_time"
+            ],
+            "response_contains": [
+              "63",
+              "time"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "document_fallback_without_selection",
+      "description": "Document queries without selected docs should return clear fallback guidance.",
+      "turns": [
+        {
+          "message": "What does my uploaded contract say about termination?",
+          "selected_documents": []
+        }
+      ],
+      "expected": {
+        "per_turn": [
+          {
+            "response_contains": [
+              "no documents are currently selected"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iterative_math_then_time",
+      "description": "Workflow should stay coherent over multiple turns in one conversation.",
+      "turns": [
+        {
+          "message": "Calculate 100 / 4"
+        },
+        {
+          "message": "Now what time is it?"
+        }
+      ],
+      "expected": {
+        "per_turn": [
+          {
+            "must_call": [
+              "calculator"
+            ],
+            "response_contains": [
+              "25"
+            ]
+          },
+          {
+            "must_call": [
+              "current_time"
+            ],
+            "response_contains": [
+              "time"
+            ]
+          }
+        ],
+        "overall_must_not_call": [
+          "search_documents"
+        ]
+      }
+    }
+  ]
+}

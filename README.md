@@ -20,7 +20,7 @@ flowchart LR
     UI["Frontend (Vanilla JS SPA)"] --> API["FastAPI API Layer"]
     API --> ORCH["LangGraph ReAct Orchestrator"]
     ORCH --> REG["Tool Registry"]
-    ORCH --> LLM["OpenAI Chat Model"]
+    ORCH --> LLM["Gemini Chat Model (Default)"]
 
     REG --> CALC["Calculator"]
     REG --> TIME["Current Time"]
@@ -62,7 +62,7 @@ flowchart LR
 ## Stack
 
 - Backend: Python, FastAPI, LangChain, LangGraph, SQLAlchemy
-- LLM/Embeddings: OpenAI (`gpt-3.5-turbo` currently in code paths, `text-embedding-ada-002` for document embeddings)
+- LLM/Embeddings: Gemini by default (`gemini-2.5-flash` + `text-embedding-004`), OpenAI optional via config
 - Frontend: HTML/CSS + modular ES6 JavaScript
 - Storage: SQLite + local filesystem (`data/`)
 
@@ -71,7 +71,7 @@ flowchart LR
 ### 1) Prerequisites
 
 - Python 3.11+
-- OpenAI API key
+- Gemini API key (default provider)
 
 ### 2) Install dependencies
 
@@ -87,7 +87,7 @@ pip install -r backend/requirements.txt
 
 ```bash
 cp .env.example .env
-# Edit .env and set OPENAI_API_KEY
+# Edit .env and set GEMINI_API_KEY
 ```
 
 ### 4) Run backend
@@ -146,6 +146,21 @@ Latest baseline (run on **March 4, 2026**):
 ## Running LLM/Workflow Evals
 
 LLM/workflow evals should be run locally when changes affect model prompts, tool-calling behavior, or orchestration flow.
+
+Deterministic harness run:
+
+```bash
+python tests/run_llm_evals.py --mode mock
+```
+
+Live orchestrator/model run:
+
+```bash
+python tests/run_llm_evals.py --mode live
+```
+
+Reports are written to `tests/llm_evals/results/latest.json` and timestamped report files.
+If the provider key is missing, live mode exits as `blocked` and tells you which key to configure.
 
 ## API Surface
 

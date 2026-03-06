@@ -6,6 +6,7 @@ services:
     ports:
       - "8000:8000"
     environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - DATABASE_PATH=/app/data/personal_agent.db
       - HOST=0.0.0.0

@@ -1,0 +1,101 @@
+{
+  "schema_version": "1.0",
+  "suite": "tool_calling",
+  "description": "Single-turn tool routing behavior checks.",
+  "cases": [
+    {
+      "id": "calculator_basic",
+      "description": "Math queries should route to calculator.",
+      "turns": [
+        {
+          "message": "What is 15 + 27?"
+        }
+      ],
+      "expected": {
+        "per_turn": [
+          {
+            "must_call": [
+              "calculator"
+            ],
+            "must_not_call": [
+              "current_time",
+              "internet_search"
+            ],
+            "response_contains": [
+              "42"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "current_time_basic",
+      "description": "Time queries should use current_time.",
+      "turns": [
+        {
+          "message": "What time is it right now?"
+        }
+      ],
+      "expected": {
+        "per_turn": [
+          {
+            "must_call": [
+              "current_time"
+            ],
+            "must_not_call": [
+              "calculator"
+            ],
+            "response_contains": [
+              "time"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "greeting_no_tools",
+      "description": "Simple greetings should avoid unnecessary tools.",
+      "turns": [
+        {
+          "message": "Hello there"
+        }
+      ],
+      "expected": {
+        "per_turn": [
+          {
+            "must_not_call": [
+              "calculator",
+              "current_time",
+              "internet_search",
+              "search_documents"
+            ],
+            "response_contains": [
+              "hello"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "internet_search_routing",
+      "description": "Queries about latest news should route to internet_search.",
+      "turns": [
+        {
+          "message": "Search the internet for today's top AI news headlines."
+        }
+      ],
+      "expected": {
+        "per_turn": [
+          {
+            "must_call": [
+              "internet_search"
+            ],
+            "response_contains": [
+              "search"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

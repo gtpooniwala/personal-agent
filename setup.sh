@@ -31,8 +31,8 @@ pip install -r backend/requirements.txt
 if [ ! -f ".env" ]; then
     echo "⚙️  Creating environment configuration..."
     cp .env.example .env
-    echo "📝 Please edit .env and add your OpenAI API key:"
-    echo "   OPENAI_API_KEY=your_api_key_here"
+    echo "📝 Please edit .env and add your Gemini API key:"
+    echo "   GEMINI_API_KEY=your_api_key_here"
     echo ""
 fi
 
@@ -43,7 +43,7 @@ mkdir -p backend/data
 echo "✅ Setup complete!"
 echo ""
 echo "📋 Next steps:"
-echo "1. Edit .env and add your OpenAI API key"
+echo "1. Edit .env and add your Gemini API key"
 echo "2. Activate the conda environment: conda activate personalagent"
 echo "3. Start the backend: uvicorn backend.main:app --reload"
 echo "4. Start the frontend: cd frontend && python3 -m http.server 8081"

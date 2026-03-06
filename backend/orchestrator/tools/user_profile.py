@@ -2,9 +2,8 @@ from pydantic import BaseModel, Field, PrivateAttr
 from typing import Literal, Optional, Dict, Any
 import os
 import json
-from backend.config import settings
-from langchain_openai import ChatOpenAI
 from langchain.tools import BaseTool
+from backend.llm import create_chat_model, MissingProviderKeyError, MissingModelDependencyError
 
 # Use BASE_DIR from environment or fallback to project root
 BASE_DIR = os.environ.get("BASE_DIR")
@@ -53,21 +52,27 @@ class UserProfileTool(BaseTool):
     args_schema: type = UserProfileInput
     _user_id: str = PrivateAttr()
     _llm: Any = PrivateAttr()
+    _initialization_error: Optional[str] = PrivateAttr(default=None)
 
     def __init__(self, user_id: str = "default"):
         super().__init__()
         self._user_id = user_id
-        self._llm = ChatOpenAI(
-            model="gpt-3.5-turbo",
-            temperature=0.2,
-            openai_api_key=settings.openai_api_key,
-            max_tokens=600
-        )
+        self._llm = None
+        try:
+            self._llm = create_chat_model(
+                "user_profile",
+                temperature=0.2,
+                max_tokens=600,
+            )
+        except (MissingProviderKeyError, MissingModelDependencyError) as exc:
+            self._initialization_error = str(exc)
 
     def _run(self, action: str, instruction: Optional[str] = None, user_prompt: Optional[str] = None) -> dict:
         if action == "read":
             return load_user_profile(self._user_id)
         elif action == "update":
+            if self._initialization_error:
+                return {"error": self._initialization_error}
             current_profile = load_user_profile(self._user_id)
             updated_profile = self._merge_profile_with_llm(current_profile, instruction, user_prompt)
             save_user_profile(self._user_id, updated_profile)

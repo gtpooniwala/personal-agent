@@ -32,6 +32,25 @@ python tests/run_repo_checks.py
 
 It writes a machine-readable report to `tests/repo_checks/results.json`.
 
+## Run LLM/Workflow Evals
+
+`tests/run_llm_evals.py` runs model/workflow eval suites (separate from repo checks).
+
+Deterministic mock mode:
+
+```bash
+python tests/run_llm_evals.py --mode mock
+```
+
+Live orchestrator/model mode:
+
+```bash
+python tests/run_llm_evals.py --mode live
+```
+
+It writes machine-readable reports to `tests/llm_evals/results/`.
+If the provider key is missing, live mode exits with a clear `blocked` message explaining which API key to set.
+
 ## Notes
 
 - Some tests require project dependencies from `backend/requirements.txt`.
