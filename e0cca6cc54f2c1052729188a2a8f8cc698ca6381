@@ -1,0 +1,35 @@
+tests/test_scheduler_service.py
+  b4ea0a21b31453c6 165,167
+backend/api/scheduler_routes.py
+  b4ea0a21b31453c6 58-63
+backend/runtime/heartbeat.py
+  b4ea0a21b31453c6 15
+backend/database/operations.py
+  b4ea0a21b31453c6 27-29,749
+backend/database/models.py
+  b4ea0a21b31453c6 223
+tests/test_scheduled_task_db_ops.py
+  b4ea0a21b31453c6 32
+tests/test_api_scheduler_routes.py
+  b4ea0a21b31453c6 19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "e0cca6cc54f2c1052729188a2a8f8cc698ca6381",
+  "prompts": {
+    "b4ea0a21b31453c6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b347bf76-e4ba-49c6-a96e-4ef3eff13f66",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 16,
+      "total_deletions": 23,
+      "accepted_lines": 16,
+      "overriden_lines": 0
+    }
+  }
+}
