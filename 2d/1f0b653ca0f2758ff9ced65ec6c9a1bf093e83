@@ -1,0 +1,25 @@
+backend/database/operations.py
+  5e59a067350fcf36 22-25,278
+backend/api/routes.py
+  5e59a067350fcf36 16,28-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "2d1f0b653ca0f2758ff9ced65ec6c9a1bf093e83",
+  "prompts": {
+    "5e59a067350fcf36": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d3ec59b2-a1df-463e-a077-85da012d2259",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 12,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    }
+  }
+}
