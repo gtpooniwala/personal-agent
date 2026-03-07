@@ -1,14 +1,21 @@
+import asyncio
+import json
+import logging
+import re
+from typing import Dict, Any, Optional, List
+
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.messages import HumanMessage, AIMessage
 from backend.llm import create_chat_model, predict_text, MissingProviderKeyError, MissingModelDependencyError
 from backend.orchestrator.tool_registry import ToolRegistry
 from ..database.operations import db_ops
-from typing import Dict, Any, Optional, List
-import json
-import logging
-import re
+from backend.config import agent_config
 from backend.observability import observe_operation, update_observation, increment_counter
+
+_NAMING_CFG = agent_config.get("conversation_naming", {})
+_TITLE_MAX_LENGTH: int = _NAMING_CFG.get("title_max_length", 50)
+_TITLE_CONTEXT_MESSAGES: int = _NAMING_CFG.get("context_messages", 6)
 
 logger = logging.getLogger(__name__)
 
@@ -578,27 +585,32 @@ Your effectiveness is measured by:
     async def generate_conversation_title(self, conversation_id: str) -> Optional[str]:
         """
         Generate a conversation title using the orchestrator's LLM.
-        
-        This is a specialized orchestrator task that doesn't require delegation.
+
+        Runs all database I/O in a thread so the event loop is never blocked.
+        Returns the generated title string, or None if generation was skipped or failed.
         """
         try:
             self._ensure_llm()
-            # Get conversation history
-            messages = db_ops.get_conversation_history(conversation_id)
-            
-            if len(messages) < 2:  # Need at least user message and assistant response
+
+            # Skip if the conversation already has a real title (idempotency guard).
+            already_titled = not await asyncio.to_thread(
+                db_ops.is_conversation_untitled, conversation_id
+            )
+            if already_titled:
                 return None
-            
-            # Take first few messages for context (limit to avoid token overflow)
-            relevant_messages = messages[:6]  # First 3 exchanges
-            
-            # Build context for title generation
+
+            messages = await asyncio.to_thread(
+                db_ops.get_conversation_history, conversation_id
+            )
+            if not messages:
+                return None
+
+            relevant_messages = messages[:_TITLE_CONTEXT_MESSAGES]
             conversation_context = "\n".join([
                 f"{msg['role'].capitalize()}: {msg['content']}"
                 for msg in relevant_messages
             ])
-            
-            # Create title generation prompt
+
             title_prompt = f"""Based on the following conversation, generate a concise, descriptive title (maximum 5 words) that captures the main topic or purpose of the conversation.
 
 Conversation:
@@ -608,24 +620,21 @@ Generate only the title, no additional text or quotes. The title should be speci
 
 Title:"""
 
-            # Generate title using orchestrator LLM
             title = await predict_text(self.llm, title_prompt)
-            
-            # Clean up the title
             title = title.strip().strip('"\'').strip()
-            
-            # Ensure reasonable length
-            if len(title) > 50:
-                title = title[:47] + "..."
-            
-            # Update conversation title in database
+
+            if len(title) > _TITLE_MAX_LENGTH:
+                title = title[:_TITLE_MAX_LENGTH - 3] + "..."
+
             if title:
-                db_ops.update_conversation_title(conversation_id, title)
-                logger.info(f"Orchestrator generated title for conversation {conversation_id}: {title}")
+                await asyncio.to_thread(
+                    db_ops.update_conversation_title, conversation_id, title
+                )
+                logger.info(f"Generated title for conversation {conversation_id}: {title}")
                 return title
-            
+
             return None
-            
+
         except (MissingProviderKeyError, MissingModelDependencyError) as e:
             logger.warning(f"Title generation skipped: {str(e)}")
             return None

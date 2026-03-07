@@ -7,7 +7,7 @@ from backend.api.models import (
     TitleGenerationResponse
 )
 from backend.services.document_service import doc_processor
-from backend.config import settings
+from backend.config import settings, agent_config
 from typing import List
 from datetime import datetime, timedelta
 import asyncio
@@ -19,6 +19,15 @@ from backend.observability import observe_operation, update_observation, increme
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+_NAMING_CFG = agent_config.get("conversation_naming", {})
+_NAMING_DELAY_MINUTES: int = _NAMING_CFG.get("delay_minutes", 5)
+_NAMING_RETRY_DELAY_MINUTES: int = _NAMING_CFG.get("retry_delay_minutes", 2)
+_NAMING_MAX_RETRIES: int = _NAMING_CFG.get("max_retries", 3)
+
+# Patterns that identify a conversation with an auto-generated (non-user) title.
+# Must stay in sync with DatabaseOperations.is_conversation_untitled.
+_UNTITLED_PREFIXES = ("Conversation ", "New Conversation", "Chat ")
 
 
 def _average(total: int, count: int) -> float | None:
@@ -34,7 +43,7 @@ def _percentage(numerator: int, denominator: int) -> float | None:
 
 # Async task functions for conversation maintenance
 async def async_generate_title(conversation_id: str):
-    """Asynchronously generate title for a conversation."""
+    """Asynchronously generate a title with automatic retry on empty result or failure."""
     with observe_operation(
         name="maintenance.generate_title",
         counter_prefix="maintenance.generate_title",
@@ -42,16 +51,35 @@ async def async_generate_title(conversation_id: str):
         conversation_id=conversation_id,
         metadata={"component": "maintenance"},
     ):
-        try:
-            logger.info(f"Starting async title generation for conversation: {conversation_id}")
-            title = await orchestrator.generate_conversation_title(conversation_id)
-            if title:
-                logger.info(f"Successfully generated title for {conversation_id}: {title}")
-            else:
-                logger.warning(f"Title generation returned empty result for {conversation_id}")
-        except Exception as e:
-            logger.error(f"Failed to generate title for conversation {conversation_id}: {str(e)}")
-            raise
+        for attempt in range(1, _NAMING_MAX_RETRIES + 1):
+            try:
+                logger.info(
+                    f"Title generation attempt {attempt}/{_NAMING_MAX_RETRIES} "
+                    f"for conversation {conversation_id}"
+                )
+                title = await orchestrator.generate_conversation_title(conversation_id)
+                if title:
+                    logger.info(f"Generated title for {conversation_id}: {title}")
+                    return
+                logger.warning(
+                    f"Attempt {attempt}: title generation returned empty for {conversation_id}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Attempt {attempt}: title generation failed for {conversation_id}: {e}"
+                )
+
+            if attempt < _NAMING_MAX_RETRIES:
+                still_untitled = await asyncio.to_thread(
+                    db_ops.is_conversation_untitled, conversation_id
+                )
+                if not still_untitled:
+                    return
+                logger.info(
+                    f"Retrying title generation in {_NAMING_RETRY_DELAY_MINUTES}m "
+                    f"(next attempt {attempt + 1}/{_NAMING_MAX_RETRIES})"
+                )
+                await asyncio.sleep(_NAMING_RETRY_DELAY_MINUTES * 60)
 
 async def async_delete_empty_conversation(conversation_id: str):
     """Asynchronously delete an empty old conversation."""
@@ -88,10 +116,10 @@ def check_conversation_maintenance(conversations: List[dict]) -> None:
         if created_at.tzinfo:
             created_at = created_at.replace(tzinfo=None)
         
-        # Check for title generation (≥1 message, >5 minutes old, "New Conversation" title)
-        if (message_count >= 1 and 
-            title == "New Conversation" and 
-            (now - updated_at) > timedelta(minutes=5)):
+        # Check for title generation (≥1 message, inactive ≥ delay, untitled)
+        if (message_count >= 1 and
+            any(title.startswith(p) for p in _UNTITLED_PREFIXES) and
+            (now - updated_at) > timedelta(minutes=_NAMING_DELAY_MINUTES)):
             
             logger.info(f"Scheduling title generation for conversation {conversation_id} "
                        f"(messages: {message_count}, age: {now - updated_at})")

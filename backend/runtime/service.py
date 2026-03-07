@@ -395,3 +395,20 @@ class RuntimeService:
             message="Run completed successfully",
         )
         increment_counter("runtime.runs.succeeded_total")
+
+        # Event-driven title generation: fire immediately after each successful run,
+        # non-blocking. The orchestrator guards against re-naming already-titled
+        # conversations, so this is safe to call on every run.
+        task = asyncio.create_task(self._maybe_generate_title(conversation_id))
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+
+    async def _maybe_generate_title(self, conversation_id: str) -> None:
+        """Generate a conversation title if it still has an auto-generated placeholder."""
+        try:
+            await self._orchestrator.generate_conversation_title(conversation_id)
+        except Exception:
+            logger.exception(
+                "Background title generation failed",
+                extra={"event": "runtime.title_generation_failed", "conversation_id": conversation_id},
+            )
