@@ -1,19 +1,4 @@
-import { formatRelativeTime, truncateText } from "@/lib/formatters";
-
-function formatRunStatusLabel(status) {
-  switch (status) {
-    case "queued":
-      return "Queued";
-    case "running":
-      return "Running";
-    case "retrying":
-      return "Retrying";
-    case "failed":
-      return "Failed";
-    default:
-      return "";
-  }
-}
+import { formatRelativeTime, formatRunStatusLabel, truncateText } from "@/lib/formatters";
 
 export default function ConversationList({
   conversations,

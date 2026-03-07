@@ -45,8 +45,30 @@ function isEditableElement(node) {
   );
 }
 
+function isInteractiveElement(node) {
+  if (!(node instanceof HTMLElement)) {
+    return false;
+  }
+
+  return Boolean(
+    node.closest(
+      [
+        "button",
+        "a",
+        "summary",
+        "[role='button']",
+        "[role='link']",
+        "[role='tab']",
+        "[role='checkbox']",
+        "[role='menuitem']",
+      ].join(", "),
+    ),
+  );
+}
+
 function buildRunEventsUrl(runId, afterCursor) {
   const params = new URLSearchParams();
+  params.set("limit", String(MAX_VISIBLE_RUN_EVENTS));
   if (afterCursor) {
     params.set("after", afterCursor);
   }
@@ -397,14 +419,23 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
 
       for (let attempt = 0; attempt < RUN_POLL_MAX_ATTEMPTS; attempt += 1) {
         try {
-          const [nextStatus, eventsPayload] = await Promise.all([
+          const [statusResult, eventsResult] = await Promise.allSettled([
             runtimeApiCall(`/runs/${runId}/status`),
             runtimeApiCall(buildRunEventsUrl(runId, latestEventsCursor)),
           ]);
 
-          status = nextStatus;
-          const nextEvents = Array.isArray(eventsPayload?.events) ? eventsPayload.events : [];
-          latestEventsCursor = eventsPayload?.next_after || latestEventsCursor;
+          if (statusResult.status !== "fulfilled") {
+            throw statusResult.reason || new Error("Run status request failed");
+          }
+
+          status = statusResult.value;
+          let nextEvents = [];
+
+          if (eventsResult.status === "fulfilled") {
+            const eventsPayload = eventsResult.value;
+            nextEvents = Array.isArray(eventsPayload?.events) ? eventsPayload.events : [];
+            latestEventsCursor = eventsPayload?.next_after || latestEventsCursor;
+          }
 
           updateRunState(requestConversationId, (previousRunState) => {
             const mergedEvents = mergeRunEvents(previousRunState.events, nextEvents);
@@ -664,7 +695,9 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
         event.ctrlKey ||
         event.altKey ||
         event.key.length !== 1 ||
-        isEditableElement(event.target)
+        event.key === " " ||
+        isEditableElement(event.target) ||
+        isInteractiveElement(event.target)
       ) {
         return;
       }

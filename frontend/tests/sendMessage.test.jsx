@@ -73,6 +73,24 @@ describe('initial render state', () => {
       expect(screen.getByRole('textbox')).toHaveFocus();
     });
   });
+
+  test('does not steal printable keys from interactive controls', async () => {
+    const user = userEvent.setup();
+    setupApiMocks({ conversations: [] });
+
+    await act(async () => {
+      render(<HomePage />);
+    });
+
+    const focusComposerButton = await screen.findByRole('button', { name: /focus composer/i });
+    focusComposerButton.focus();
+    expect(focusComposerButton).toHaveFocus();
+
+    await user.keyboard('a');
+
+    expect(screen.getByRole('textbox')).toHaveValue('');
+    expect(focusComposerButton).toHaveFocus();
+  });
 });
 
 describe('sendMessage first-message flow', () => {

@@ -1,26 +1,5 @@
-import { formatRelativeTime, truncateText } from "@/lib/formatters";
+import { formatRelativeTime, formatRunStatusLabel, truncateText } from "@/lib/formatters";
 import WorkspaceViewTabs from "@/components/WorkspaceViewTabs";
-
-function formatRunLabel(status) {
-  switch (status) {
-    case "queued":
-      return "Queued";
-    case "running":
-      return "Running";
-    case "retrying":
-      return "Retrying";
-    case "succeeded":
-      return "Completed";
-    case "failed":
-      return "Failed";
-    case "cancelling":
-      return "Cancelling";
-    case "cancelled":
-      return "Cancelled";
-    default:
-      return "Idle";
-  }
-}
 
 function describeRunEvent(event) {
   if (!event) {
@@ -31,7 +10,7 @@ function describeRunEvent(event) {
     return `Used ${event.tool}`;
   }
 
-  return event.message || formatRunLabel(event.status);
+  return event.message || formatRunStatusLabel(event.status) || "Idle";
 }
 
 function StatCard({ label, value, hint }) {
@@ -76,7 +55,7 @@ export default function ActivityDashboard({
         />
         <StatCard
           label="Run status"
-          value={formatRunLabel(activeRun?.status)}
+          value={formatRunStatusLabel(activeRun?.status) || "Idle"}
           hint={latestEvent ? describeRunEvent(latestEvent) : "No recent run for this conversation."}
         />
         <StatCard

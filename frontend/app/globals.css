@@ -382,8 +382,10 @@ button {
 
 .context-chip.run-status.running,
 .context-chip.run-status.retrying,
+.context-chip.run-status.cancelling,
 .status-pill.running,
-.status-pill.retrying {
+.status-pill.retrying,
+.status-pill.cancelling {
   border-color: rgba(42, 215, 184, 0.28);
   color: #072433;
   background: linear-gradient(112deg, var(--brand-primary), var(--brand-secondary));
