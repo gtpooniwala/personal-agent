@@ -59,21 +59,30 @@ class TestRunLLMEvalsMockRouting(unittest.TestCase):
         self.assertIn("gmail_read_latest", extended_case_ids)
 
     def test_live_eval_env_requires_dedicated_postgres_test_database(self):
-        with patch.dict(os.environ, {}, clear=True):
-            _, error = self.harness._resolve_live_eval_database_url()
-        self.assertIn("EVAL_DATABASE_URL or TEST_DATABASE_URL", error)
+        with patch.object(self.harness, "DOTENV_PATH", Path("/tmp/nonexistent-live-eval.env")):
+            with patch.dict(os.environ, {}, clear=True):
+                _, error = self.harness._resolve_live_eval_database_url()
+            self.assertIn("EVAL_DATABASE_URL or TEST_DATABASE_URL", error)
 
-        with patch.dict(os.environ, {"EVAL_DATABASE_URL": "sqlite:////tmp/evals.db"}, clear=True):
-            _, error = self.harness._resolve_live_eval_database_url()
-        self.assertEqual(error, "Live eval database must use PostgreSQL.")
+            with patch.dict(os.environ, {"EVAL_DATABASE_URL": "sqlite:////tmp/evals.db"}, clear=True):
+                _, error = self.harness._resolve_live_eval_database_url()
+            self.assertEqual(error, "Live eval database must use PostgreSQL.")
 
-        with patch.dict(
-            os.environ,
-            {"EVAL_DATABASE_URL": "postgresql+psycopg://user:pass@127.0.0.1:5432/personal_agent"},
-            clear=True,
-        ):
-            _, error = self.harness._resolve_live_eval_database_url()
-        self.assertEqual(error, "Live eval database must target a dedicated PostgreSQL *_test database.")
+            with patch.dict(
+                os.environ,
+                {"EVAL_DATABASE_URL": "postgresql+psycopg://user:pass@127.0.0.1:5432/personal_agent"},
+                clear=True,
+            ):
+                _, error = self.harness._resolve_live_eval_database_url()
+            self.assertEqual(error, "EVAL_DATABASE_URL must target a dedicated PostgreSQL *_eval or *_test database.")
+
+            with patch.dict(
+                os.environ,
+                {"TEST_DATABASE_URL": "postgresql+psycopg://user:pass@127.0.0.1:5432/personal_agent"},
+                clear=True,
+            ):
+                _, error = self.harness._resolve_live_eval_database_url()
+            self.assertEqual(error, "TEST_DATABASE_URL must target a dedicated PostgreSQL *_test database when used for live evals.")
 
     def test_live_eval_env_sets_database_url_from_eval_db(self):
         test_url = "postgresql+psycopg://user:pass@127.0.0.1:5432/personal_agent_test"
@@ -81,6 +90,13 @@ class TestRunLLMEvalsMockRouting(unittest.TestCase):
             error = self.harness._configure_live_eval_environment()
             self.assertIsNone(error)
             self.assertEqual(os.environ["DATABASE_URL"], test_url)
+
+    def test_live_eval_env_accepts_eval_suffix(self):
+        eval_url = "postgresql+psycopg://user:pass@127.0.0.1:5432/personal_agent_eval"
+        with patch.dict(os.environ, {"EVAL_DATABASE_URL": eval_url}, clear=True):
+            error = self.harness._configure_live_eval_environment()
+            self.assertIsNone(error)
+            self.assertEqual(os.environ["DATABASE_URL"], eval_url)
 
     def test_live_eval_env_reads_eval_db_from_dotenv(self):
         test_url = "postgresql+psycopg://user:pass@127.0.0.1:5432/personal_agent_test"
@@ -92,6 +108,13 @@ class TestRunLLMEvalsMockRouting(unittest.TestCase):
                     error = self.harness._configure_live_eval_environment()
                     self.assertIsNone(error)
                     self.assertEqual(os.environ["DATABASE_URL"], test_url)
+
+    def test_live_eval_database_connectivity_returns_blocking_message(self):
+        test_url = "postgresql+psycopg://user:pass@127.0.0.1:5432/personal_agent_eval"
+        with patch.dict(os.environ, {"EVAL_DATABASE_URL": test_url}, clear=True):
+            with patch.object(self.harness, "create_engine", side_effect=RuntimeError("db down")):
+                error = self.harness._check_live_eval_database_connectivity()
+        self.assertEqual(error, "Live eval database is not reachable: db down")
 
 
 if __name__ == "__main__":

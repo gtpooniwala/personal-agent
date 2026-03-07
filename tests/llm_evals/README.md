@@ -19,7 +19,7 @@ python tests/run_llm_evals.py --mode live --set core
 Live mode requirements:
 
 - `GEMINI_API_KEY` (or equivalent configured provider key)
-- `EVAL_DATABASE_URL` or `TEST_DATABASE_URL` pointing to a dedicated PostgreSQL `*_test` database
+- `EVAL_DATABASE_URL` pointing to a dedicated PostgreSQL `*_eval` or `*_test` database, or `TEST_DATABASE_URL` pointing to a dedicated PostgreSQL `*_test` database
 
 If either prerequisite is missing, live mode exits as `blocked` with setup instructions.
 

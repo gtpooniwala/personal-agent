@@ -18,6 +18,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
+from sqlalchemy import create_engine, text
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -102,17 +104,22 @@ def _env_or_file(name: str) -> Optional[str]:
 
 def _resolve_live_eval_database_url() -> Tuple[Optional[str], Optional[str]]:
     """Return an isolated Postgres URL for live evals or a blocking message."""
-    database_url = (_env_or_file("EVAL_DATABASE_URL") or _env_or_file("TEST_DATABASE_URL") or "").strip()
+    eval_database_url = (_env_or_file("EVAL_DATABASE_URL") or "").strip()
+    test_database_url = (_env_or_file("TEST_DATABASE_URL") or "").strip()
+    database_url = eval_database_url or test_database_url
     if not database_url:
         return None, (
             "Live evals require EVAL_DATABASE_URL or TEST_DATABASE_URL to point to a dedicated "
-            "PostgreSQL *_test database."
+            "PostgreSQL *_eval or *_test database."
         )
     if not database_url.startswith("postgresql"):
         return None, "Live eval database must use PostgreSQL."
     database_name = database_url.rsplit("/", 1)[-1]
-    if not database_name.endswith("_test"):
-        return None, "Live eval database must target a dedicated PostgreSQL *_test database."
+    if eval_database_url:
+        if not (database_name.endswith("_eval") or database_name.endswith("_test")):
+            return None, "EVAL_DATABASE_URL must target a dedicated PostgreSQL *_eval or *_test database."
+    elif not database_name.endswith("_test"):
+        return None, "TEST_DATABASE_URL must target a dedicated PostgreSQL *_test database when used for live evals."
     return database_url, None
 
 
@@ -122,6 +129,23 @@ def _configure_live_eval_environment() -> Optional[str]:
     if error:
         return error
     os.environ["DATABASE_URL"] = str(database_url)
+    return None
+
+
+def _check_live_eval_database_connectivity() -> Optional[str]:
+    """Return a blocking message if the configured live eval database is unreachable."""
+    database_url, error = _resolve_live_eval_database_url()
+    if error:
+        return error
+    try:
+        engine = create_engine(str(database_url), pool_pre_ping=True)
+        try:
+            with engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+        finally:
+            engine.dispose()
+    except Exception as exc:
+        return f"Live eval database is not reachable: {exc}"
     return None
 
 
@@ -553,6 +577,9 @@ def check_live_prerequisites() -> Optional[str]:
     env_error = _configure_live_eval_environment()
     if env_error:
         return env_error
+    db_error = _check_live_eval_database_connectivity()
+    if db_error:
+        return db_error
 
     try:
         from backend.llm import create_chat_model, MissingProviderKeyError, MissingModelDependencyError
