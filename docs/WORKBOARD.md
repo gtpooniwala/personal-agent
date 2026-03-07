@@ -21,8 +21,8 @@ Workflow:
 ## Now (Parallel Tracks)
 
 ### Frontend Correctness (Sequential)
-- [ ] `todo` Fix Gmail auth flow and dependency packaging ([#40](https://github.com/gtpooniwala/personal-agent/issues/40))
-- [ ] `todo` Prevent cross-conversation message race on send ([#31](https://github.com/gtpooniwala/personal-agent/issues/31))
+- [x] `done` Fix Gmail auth flow and dependency packaging ([#40](https://github.com/gtpooniwala/personal-agent/issues/40))
+- [x] `done` Prevent cross-conversation message race on send ([#31](https://github.com/gtpooniwala/personal-agent/issues/31))
 - [ ] `todo` Guard Enter key send during IME composition ([#30](https://github.com/gtpooniwala/personal-agent/issues/30))
 
 ### Runtime Quality (Parallel)
