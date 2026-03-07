@@ -248,15 +248,17 @@ export default function HomePage() {
       }
 
       let status = null;
-      let switchedConversation = false;
 
       for (let attempt = 0; attempt < RUN_POLL_MAX_ATTEMPTS; attempt += 1) {
-        if (activeConversationIdRef.current !== requestConversationId) {
-          switchedConversation = true;
-          break;
+        try {
+          status = await runtimeApiCall(`/runs/${runId}/status`);
+        } catch {
+          if (attempt === RUN_POLL_MAX_ATTEMPTS - 1) {
+            throw new Error("Run status polling failed");
+          }
+          await new Promise((resolve) => setTimeout(resolve, RUN_POLL_INTERVAL_MS));
+          continue;
         }
-
-        status = await runtimeApiCall(`/runs/${runId}/status`);
 
         if (!RUN_IN_PROGRESS_STATUSES.has(status?.status)) {
           break;
@@ -265,7 +267,7 @@ export default function HomePage() {
         await new Promise((resolve) => setTimeout(resolve, RUN_POLL_INTERVAL_MS));
       }
 
-      if (switchedConversation) {
+      if (activeConversationIdRef.current !== requestConversationId) {
         return;
       }
 

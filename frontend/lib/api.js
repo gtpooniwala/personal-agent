@@ -42,7 +42,7 @@ function extractErrorMessage(response, payload) {
 }
 
 async function callApi(baseUrl, endpoint, options = {}, missingBaseMessage) {
-  if (!baseUrl) {
+  if (baseUrl === undefined || baseUrl === null) {
     throw new Error(missingBaseMessage);
   }
 

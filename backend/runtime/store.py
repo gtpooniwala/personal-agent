@@ -183,7 +183,12 @@ class InMemoryRunStore(RunStore):
         if overflow <= 0:
             return
 
-        stale_run_ids = list(self._runs.keys())[:overflow]
+        # Only prune terminal runs to avoid deleting active executions
+        terminal_statuses = {"succeeded", "failed", "cancelled"}
+        stale_run_ids = [
+            run_id for run_id in list(self._runs.keys())
+            if self._runs[run_id].status in terminal_statuses
+        ][:overflow]
         for stale_run_id in stale_run_ids:
             self._runs.pop(stale_run_id, None)
             self._events.pop(stale_run_id, None)
