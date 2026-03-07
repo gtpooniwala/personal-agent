@@ -1,0 +1,23 @@
+tests/run_runtime_evals.py
+  2bce926970b44e5a 60,70,159
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "8c26e476a972bf54082883cb357da23cb8c94fa8",
+  "prompts": {
+    "2bce926970b44e5a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "12ad78be-509a-47d3-9a13-bff99e407de5",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 2,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
