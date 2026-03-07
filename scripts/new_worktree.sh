@@ -37,6 +37,7 @@ git fetch origin main
 
 BRANCH="${AGENT}/${TYPE}/${ISSUE}-${SLUG}"
 WT_PATH=".worktrees/${AGENT}-${TYPE}-${ISSUE}-${SLUG}"
+RELATIVE_ROOT="../.."
 
 if git show-ref --verify --quiet "refs/heads/${BRANCH}"; then
   echo "Branch ${BRANCH} already exists."
@@ -51,9 +52,24 @@ fi
 mkdir -p .worktrees
 git worktree add "${WT_PATH}" -b "${BRANCH}" origin/main
 
-if [ -f ".env" ] && [ ! -e "${WT_PATH}/.env" ] && [ ! -L "${WT_PATH}/.env" ]; then
-  ln -s ../../.env "${WT_PATH}/.env"
-fi
+credential_candidates=(
+  ".env"
+  ".env.local"
+  ".env.development.local"
+  ".env.test.local"
+  ".env.production.local"
+  ".npmrc"
+  ".pypirc"
+  ".netrc"
+  "backend/data/gmail/client_secret.json"
+)
+
+for credential_file in "${credential_candidates[@]}"; do
+  if [ -f "${credential_file}" ] && [ ! -e "${WT_PATH}/${credential_file}" ] && [ ! -L "${WT_PATH}/${credential_file}" ]; then
+    mkdir -p "$(dirname "${WT_PATH}/${credential_file}")"
+    ln -s "${RELATIVE_ROOT}/${credential_file}" "${WT_PATH}/${credential_file}"
+  fi
+done
 
 echo "Created worktree: ${WT_PATH}"
 echo "Branch: ${BRANCH}"
