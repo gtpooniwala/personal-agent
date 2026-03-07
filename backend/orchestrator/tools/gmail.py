@@ -103,7 +103,7 @@ class GmailReadTool(BaseTool):
             from googleapiclient.discovery import build
             from googleapiclient.errors import HttpError
         except ImportError as e:
-            return f"Failed to import Gmail dependencies: {str(e)}. Please check your installation."
+            return f"Failed to import Gmail dependencies: {e}. Please check your installation."
 
         creds = None
         # Load token if it exists
@@ -112,7 +112,7 @@ class GmailReadTool(BaseTool):
                 with open(token_path, "rb") as token:
                     creds = pickle.load(token)
             except Exception as e:
-                return f"Failed to read existing token at '{token_path}': {str(e)}. Please delete it and authenticate again."
+                return f"Failed to read existing token at '{token_path}': {e}. Please delete it and authenticate again."
 
         # If no valid creds, do OAuth flow
         if not creds or not creds.valid:
@@ -120,9 +120,9 @@ class GmailReadTool(BaseTool):
                 try:
                     creds.refresh(Request())
                 except RefreshError as e:
-                    return f"Gmail auth expired and refresh failed: {str(e)}. Please delete '{token_path}' and re-authenticate."
+                    return f"Gmail auth expired and refresh failed: {e}. Please delete '{token_path}' and re-authenticate."
                 except Exception as e:
-                    return f"Unexpected error refreshing Gmail token: {str(e)}. Please delete '{token_path}' and try again."
+                    return f"Unexpected error refreshing Gmail token: {e}. Please delete '{token_path}' and try again."
             else:
                 try:
                     flow = InstalledAppFlow.from_client_secrets_file(
@@ -130,7 +130,7 @@ class GmailReadTool(BaseTool):
                     )
                     creds = flow.run_local_server(port=0)
                 except Exception as e:
-                    return f"Failed to run OAuth flow: {str(e)}. Please verify your client_secret.json."
+                    return f"Failed to run OAuth flow: {e}. Please verify your client_secret.json."
 
             # Save the credentials for next run
             token_dir = os.path.dirname(token_path)
@@ -138,18 +138,18 @@ class GmailReadTool(BaseTool):
                 try:
                     os.makedirs(token_dir, exist_ok=True)
                 except OSError as e:
-                    return f"Failed to create directory for Gmail token at '{token_dir}': {str(e)}."
+                    return f"Failed to create directory for Gmail token at '{token_dir}': {e}."
             try:
                 with open(token_path, "wb") as token:
                     pickle.dump(creds, token)
             except OSError as e:
-                return f"Failed to save Gmail OAuth token to '{token_path}': {str(e)}."
+                return f"Failed to save Gmail OAuth token to '{token_path}': {e}."
 
         # Build Gmail API service
         try:
             service = build("gmail", "v1", credentials=creds)
         except Exception as e:
-            return f"Failed to build Gmail service: {str(e)}."
+            return f"Failed to build Gmail service: {e}."
 
         # Support search query, max_results, and label_ids
         query = kwargs.get("query", None)  # Gmail search string
@@ -164,9 +164,9 @@ class GmailReadTool(BaseTool):
                 .execute()
             )
         except HttpError as e:
-            return f"Gmail API error during message search: {str(e)}."
+            return f"Gmail API error during message search: {e}."
         except Exception as e:
-            return f"Unexpected error during message search: {str(e)}."
+            return f"Unexpected error during message search: {e}."
 
         messages = results.get("messages", [])
         if not messages:
@@ -187,13 +187,9 @@ class GmailReadTool(BaseTool):
                     .execute()
                 )
             except HttpError as e:
-                return (
-                    f"Gmail API error during message retrieval for {msg_id}: {str(e)}."
-                )
+                return f"Gmail API error during message retrieval for {msg_id}: {e}."
             except Exception as e:
-                return (
-                    f"Unexpected error during message retrieval for {msg_id}: {str(e)}."
-                )
+                return f"Unexpected error during message retrieval for {msg_id}: {e}."
 
             headers = {h["name"]: h["value"] for h in msg["payload"].get("headers", [])}
             snippet = msg.get("snippet", "")

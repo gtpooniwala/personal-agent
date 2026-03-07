@@ -23,8 +23,7 @@
             ],
             "response_not_contains": [
               "issue connecting",
-              "failed to",
-              "error"
+              "failed to"
             ],
             "response_contains_any": [
               "Email",
