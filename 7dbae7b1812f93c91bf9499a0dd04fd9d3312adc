@@ -1,0 +1,27 @@
+README.md
+  7791b05fb80d9935 43-44,68,70,77-81
+docs/WORKBOARD.md
+  7791b05fb80d9935 3,26-28,32-34
+docs/ROADMAP.md
+  7791b05fb80d9935 3,8,11-12,55-56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "7dbae7b1812f93c91bf9499a0dd04fd9d3312adc",
+  "prompts": {
+    "7791b05fb80d9935": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d452a737-6c23-4aec-92c8-df4d19ddbf6e",
+        "model": "claude-haiku-4-5-20251001"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 23,
+      "total_deletions": 25,
+      "accepted_lines": 23,
+      "overriden_lines": 0
+    }
+  }
+}
