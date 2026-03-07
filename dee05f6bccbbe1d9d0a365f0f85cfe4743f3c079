@@ -1,0 +1,35 @@
+backend/database/operations.py
+  b4ea0a21b31453c6 738
+backend/api/state.py
+  b4ea0a21b31453c6 13
+tests/test_scheduler_service.py
+  b4ea0a21b31453c6 119,127
+backend/runtime/scheduler.py
+  b4ea0a21b31453c6 100,117-118,124,132
+backend/runtime/heartbeat.py
+  b4ea0a21b31453c6 15
+backend/api/scheduler_routes.py
+  b4ea0a21b31453c6 7,58-60,62
+tests/test_api_scheduler_routes.py
+  b4ea0a21b31453c6 10,202-234
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "dee05f6bccbbe1d9d0a365f0f85cfe4743f3c079",
+  "prompts": {
+    "b4ea0a21b31453c6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b347bf76-e4ba-49c6-a96e-4ef3eff13f66",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 79,
+      "total_deletions": 43,
+      "accepted_lines": 49,
+      "overriden_lines": 0
+    }
+  }
+}
