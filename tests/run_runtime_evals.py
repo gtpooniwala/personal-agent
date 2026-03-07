@@ -395,13 +395,23 @@ async def _case_session_isolation_same_session_blocked() -> Tuple[bool, List[str
 
     with patch("backend.database.operations.db_ops", mock_db_ops):
         sub1 = await service.submit_run(RuntimeRequest("hello 1", "conv-shared"))
-        sub2 = await service.submit_run(RuntimeRequest("hello 2", "conv-shared"))
-
         run1_id = sub1["run_id"]
+
+        # Wait until run1 has acquired the lease (status transitions to running)
+        # before submitting run2. Without this, asyncio may schedule run2's background
+        # task before run1's, letting run2 win the lease and inverting the assertions.
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            s = await service.get_run_status(run1_id)
+            if s["status"] not in {"queued"}:
+                break
+            await asyncio.sleep(0.01)
+
+        sub2 = await service.submit_run(RuntimeRequest("hello 2", "conv-shared"))
         run2_id = sub2["run_id"]
 
         # Wait for run 2 to exhaust its lease acquisition retries and fail
-        # (_acquire_lease_with_retry sleeps 0.5s + 1.0s = 1.5s total before returning None)
+        # (backoff policy in _acquire_lease_with_retry determines how long this takes)
         status2 = await _wait_terminal(service, run2_id, timeout=10.0)
 
         # Now let run 1 proceed and complete
