@@ -61,3 +61,24 @@ export function truncateText(text, maxLength) {
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength - 1)}…`;
 }
+
+export function formatRunStatusLabel(status) {
+  switch (status) {
+    case "queued":
+      return "Queued";
+    case "running":
+      return "Running";
+    case "retrying":
+      return "Retrying";
+    case "succeeded":
+      return "Completed";
+    case "failed":
+      return "Failed";
+    case "cancelling":
+      return "Cancelling";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      return "";
+  }
+}

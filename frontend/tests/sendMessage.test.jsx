@@ -17,10 +17,15 @@ const CONVERSATIONS = [
   { id: 'conv-b', title: 'Conv B', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
 ];
 
-function setupApiMocks({ runtimeChatResponse = async () => ({ run_id: 'run-1' }) } = {}) {
-  apiCall.mockImplementation(async (path) => {
+function setupApiMocks({
+  runtimeChatResponse = async () => ({ run_id: 'run-1' }),
+  conversations = CONVERSATIONS,
+  createdConversationId = 'conv-new',
+} = {}) {
+  apiCall.mockImplementation(async (path, options = {}) => {
     if (path === '/tools') return [];
-    if (path === '/conversations') return CONVERSATIONS;
+    if (path === '/conversations' && options.method === 'POST') return { id: createdConversationId };
+    if (path === '/conversations') return conversations;
     if (path.includes('/messages')) return [];
     if (path === '/documents') return { documents: [] };
     return {};
@@ -29,6 +34,7 @@ function setupApiMocks({ runtimeChatResponse = async () => ({ run_id: 'run-1' })
   runtimeApiCall.mockImplementation((path) => {
     if (path === '/chat') return runtimeChatResponse();
     if (path.includes('/status')) return Promise.resolve({ status: 'succeeded' });
+    if (path.includes('/events')) return Promise.resolve({ events: [], next_after: null });
     return Promise.resolve({});
   });
 }
@@ -55,34 +61,94 @@ describe('initial render state', () => {
     // isSending must be false (not null === null).
     expect(screen.getByRole('button', { name: /^send$/i })).not.toBeDisabled();
   });
-});
 
-describe('sendMessage error path', () => {
-  test('shows error when no conversation exists and user tries to send', async () => {
-    const user = userEvent.setup();
-
-    apiCall.mockImplementation(async (path) => {
-      if (path === '/conversations') return [];  // no conversations
-      if (path === '/tools') return [];
-      if (path === '/documents') return { documents: [] };
-      return {};
-    });
-    runtimeApiCall.mockResolvedValue({});
+  test('focuses the composer after initial render', async () => {
+    setupApiMocks();
 
     await act(async () => {
       render(<HomePage />);
     });
 
-    // Wait for load to settle (no conversations)
+    await waitFor(() => {
+      expect(screen.getByRole('textbox')).toHaveFocus();
+    });
+  });
+
+  test('does not steal printable keys from interactive controls', async () => {
+    const user = userEvent.setup();
+    setupApiMocks({ conversations: [] });
+
+    await act(async () => {
+      render(<HomePage />);
+    });
+
+    const focusComposerButton = await screen.findByRole('button', { name: /focus composer/i });
+    focusComposerButton.focus();
+    expect(focusComposerButton).toHaveFocus();
+
+    await user.keyboard('a');
+
+    expect(screen.getByRole('textbox')).toHaveValue('');
+    expect(focusComposerButton).toHaveFocus();
+  });
+});
+
+describe('sendMessage first-message flow', () => {
+  test('creates a conversation automatically when none exists', async () => {
+    const user = userEvent.setup();
+    let createdConversation = false;
+
+    apiCall.mockImplementation(async (path, options = {}) => {
+      if (path === '/tools') return [];
+      if (path === '/conversations' && options.method === 'POST') {
+        createdConversation = true;
+        return { id: 'conv-new' };
+      }
+      if (path === '/conversations') {
+        return createdConversation
+          ? [{ id: 'conv-new', title: 'Conv New', updated_at: new Date().toISOString() }]
+          : [];
+      }
+      if (path.includes('/messages')) return [];
+      if (path === '/documents') return { documents: [] };
+      return {};
+    });
+    runtimeApiCall.mockImplementation(async (path) => {
+      if (path === '/chat') return { run_id: 'run-1' };
+      if (path.includes('/status')) return { status: 'succeeded' };
+      if (path.includes('/events')) return { events: [], next_after: null };
+      return {};
+    });
+
+    await act(async () => {
+      render(<HomePage />);
+    });
+
     await waitFor(() => screen.getByText('No conversations yet.'));
 
     const input = screen.getByRole('textbox');
     await user.type(input, 'hello');
     await user.click(screen.getByRole('button', { name: /^send$/i }));
 
-    // Should show the "no conversation" error, not silently no-op
     await waitFor(() => {
-      expect(screen.getByText('Create a conversation before sending a message.')).toBeInTheDocument();
+      expect(apiCall).toHaveBeenCalledWith(
+        '/conversations',
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(runtimeApiCall).toHaveBeenCalledWith(
+        '/chat',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            message: 'hello',
+            conversation_id: 'conv-new',
+            selected_documents: [],
+          }),
+        }),
+      );
     });
   });
 });
@@ -104,8 +170,8 @@ describe('sendMessage conversation scoping (issue #31)', () => {
 
     // Wait for both conversations to appear
     await waitFor(() => {
-      expect(screen.getByText('Conv A')).toBeInTheDocument();
-      expect(screen.getByText('Conv B')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Conv A/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Conv B/i })).toBeInTheDocument();
     });
 
     // Type a message (conv-a is active by default)
@@ -121,7 +187,7 @@ describe('sendMessage conversation scoping (issue #31)', () => {
     });
 
     // Switch to conv-b
-    await user.click(screen.getByText('Conv B'));
+    await user.click(screen.getByRole('button', { name: /Conv B/i }));
 
     // Conv-b's send button must NOT be disabled
     await waitFor(() => {
@@ -138,7 +204,7 @@ describe('sendMessage conversation scoping (issue #31)', () => {
       render(<HomePage />);
     });
 
-    await waitFor(() => screen.getByText('Conv A'));
+    await waitFor(() => screen.getByRole('button', { name: /Conv A/i }));
 
     const input = screen.getByRole('textbox');
     await user.type(input, 'hello');
@@ -167,6 +233,9 @@ describe('sendMessage conversation scoping (issue #31)', () => {
         await statusPromise;
         return { status: 'succeeded' };
       }
+      if (path.includes('/events')) {
+        return { events: [], next_after: null };
+      }
       return {};
     });
 
@@ -175,8 +244,8 @@ describe('sendMessage conversation scoping (issue #31)', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Conv A')).toBeInTheDocument();
-      expect(screen.getByText('Conv B')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Conv A/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Conv B/i })).toBeInTheDocument();
     });
 
     const input = screen.getByRole('textbox');
@@ -188,13 +257,13 @@ describe('sendMessage conversation scoping (issue #31)', () => {
       expect(screen.getByRole('button', { name: /sending/i })).toBeDisabled();
     });
 
-    await user.click(screen.getByText('Conv B'));
+    await user.click(screen.getByRole('button', { name: /Conv B/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /^send$/i })).not.toBeDisabled();
     });
 
-    await user.click(screen.getByText('Conv A'));
+    await user.click(screen.getByRole('button', { name: /Conv A/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /sending/i })).toBeDisabled();

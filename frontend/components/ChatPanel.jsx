@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { formatRelativeTime } from "@/lib/formatters";
+import WorkspaceViewTabs from "@/components/WorkspaceViewTabs";
 
 function AgentActions({ actions }) {
   if (!actions || actions.length === 0) {
@@ -6,19 +8,28 @@ function AgentActions({ actions }) {
   }
 
   return (
-    <div className="agent-actions">
-      {actions.map((action, idx) => (
-        <article key={`${action.tool}-${idx}`} className="agent-action">
-          <p className="action-tool">🔧 {action.tool}</p>
-          <p>
-            <span className="action-label">Input:</span> <code>{String(action.input ?? "")}</code>
-          </p>
-          <p>
-            <span className="action-label">Output:</span> <code>{String(action.output ?? "")}</code>
-          </p>
-        </article>
-      ))}
-    </div>
+    <details className="agent-actions">
+      <summary className="agent-actions-summary">
+        Tool activity
+        <span className="agent-actions-count">
+          {actions.length} step{actions.length === 1 ? "" : "s"}
+        </span>
+      </summary>
+
+      <div className="agent-actions-body">
+        {actions.map((action, idx) => (
+          <article key={`${action.tool}-${idx}`} className="agent-action">
+            <p className="action-tool">🔧 {action.tool}</p>
+            <p>
+              <span className="action-label">Input:</span> <code>{String(action.input ?? "")}</code>
+            </p>
+            <p>
+              <span className="action-label">Output:</span> <code>{String(action.output ?? "")}</code>
+            </p>
+          </article>
+        ))}
+      </div>
+    </details>
   );
 }
 
@@ -46,26 +57,40 @@ function ChatBubble({ message }) {
 }
 
 export default function ChatPanel({
-  tools,
+  currentView,
+  currentConversationId,
   messages,
+  currentConversationTitle,
   isLoadingMessages,
   chatError,
   messageInput,
   isSending,
   onChangeMessage,
   onSendMessage,
+  onFocusComposer,
+  messageInputRef,
 }) {
-  const toolsText =
-    tools.length > 0 ? `Available tools: ${tools.map((tool) => tool.name).join(", ")}` : "Loading tools...";
+  useEffect(() => {
+    const input = messageInputRef?.current;
+    if (!input) {
+      return;
+    }
+
+    input.style.height = "0px";
+    input.style.height = `${Math.min(input.scrollHeight, 180)}px`;
+  }, [messageInput, messageInputRef]);
 
   return (
     <section className="chat-shell">
       <header className="app-header">
         <div>
+          <WorkspaceViewTabs currentView={currentView} currentConversationId={currentConversationId} />
           <p className="eyebrow">Personal Agent</p>
           <h1>Assistant Workspace</h1>
+          <p className="header-subtitle">
+            {currentConversationTitle || "Start typing to open a fresh conversation."}
+          </p>
         </div>
-        <p className="tools-info">{toolsText}</p>
       </header>
 
       <main className="chat-stream" id="chat-container">
@@ -74,10 +99,13 @@ export default function ChatPanel({
         {!isLoadingMessages && messages.length === 0 && (
           <section className="empty-state" aria-live="polite">
             <h3>Welcome to your Personal Agent</h3>
-            <p>Start a conversation below. Ask questions, run tools, or query your uploaded PDFs.</p>
+            <p>Start typing below. Your first message will create a conversation automatically.</p>
             <div className="hint-card">
-              <strong>Tip:</strong> Upload PDF documents in the right panel and select them for RAG answers.
+              <strong>Tip:</strong> The composer stays ready when the page opens, when you return to the tab, and after the agent replies.
             </div>
+            <button type="button" className="secondary-button empty-state-button" onClick={onFocusComposer}>
+              Focus composer
+            </button>
           </section>
         )}
 
@@ -87,18 +115,19 @@ export default function ChatPanel({
       </main>
 
       <footer className="chat-input-row">
-        <input
-          type="text"
+        <textarea
+          ref={messageInputRef}
           value={messageInput}
           className="chat-input"
-          placeholder="Type your message here..."
+          rows={1}
+          placeholder="Message your agent..."
           onChange={(event) => onChangeMessage(event.target.value)}
           onKeyDown={(event) => {
             if (event.nativeEvent.isComposing || event.keyCode === 229) {
               return;
             }
 
-            if (event.key === "Enter") {
+            if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
               onSendMessage();
             }

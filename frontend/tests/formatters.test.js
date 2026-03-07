@@ -1,4 +1,4 @@
-import { formatFileSize, formatRelativeTime, truncateText } from '@/lib/formatters';
+import { formatFileSize, formatRelativeTime, formatRunStatusLabel, truncateText } from '@/lib/formatters';
 
 describe('formatFileSize', () => {
   test('formats zero/invalid bytes as 0 B', () => {
@@ -43,5 +43,18 @@ describe('formatRelativeTime', () => {
   test('handles missing and invalid inputs', () => {
     expect(formatRelativeTime('')).toBe('Unknown time');
     expect(formatRelativeTime('not-a-date')).toBe('Invalid date');
+  });
+});
+
+describe('formatRunStatusLabel', () => {
+  test('formats known run statuses', () => {
+    expect(formatRunStatusLabel('queued')).toBe('Queued');
+    expect(formatRunStatusLabel('succeeded')).toBe('Completed');
+    expect(formatRunStatusLabel('cancelling')).toBe('Cancelling');
+  });
+
+  test('returns empty string for unknown status', () => {
+    expect(formatRunStatusLabel('')).toBe('');
+    expect(formatRunStatusLabel('weird-status')).toBe('');
   });
 });

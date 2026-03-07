@@ -4,14 +4,18 @@ import userEvent from '@testing-library/user-event';
 import ChatPanel from '@/components/ChatPanel';
 
 const defaultProps = {
-  tools: [],
+  currentView: 'chat',
+  currentConversationId: 'conv-a',
   messages: [],
+  currentConversationTitle: '',
   isLoadingMessages: false,
   chatError: '',
   messageInput: 'hello',
   isSending: false,
   onChangeMessage: jest.fn(),
   onSendMessage: jest.fn(),
+  onFocusComposer: jest.fn(),
+  messageInputRef: { current: null },
 };
 
 beforeEach(() => {
@@ -47,5 +51,48 @@ describe('ChatPanel IME composition guard (issue #30)', () => {
     await userEvent.click(input);
     await userEvent.keyboard('a');
     expect(defaultProps.onSendMessage).not.toHaveBeenCalled();
+  });
+
+  test('Shift+Enter does not call onSendMessage', async () => {
+    render(<ChatPanel {...defaultProps} />);
+    const input = screen.getByRole('textbox');
+    await userEvent.click(input);
+    await userEvent.keyboard('{Shift>}{Enter}{/Shift}');
+    expect(defaultProps.onSendMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('ChatPanel tool activity disclosure', () => {
+  test('tool details are collapsed by default and expand on demand', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ChatPanel
+        {...defaultProps}
+        messages={[
+          {
+            id: 'assistant-1',
+            role: 'assistant',
+            content: 'Done',
+            timestamp: new Date().toISOString(),
+            agent_actions: [
+              {
+                tool: 'calculator',
+                input: '2 + 2',
+                output: '4',
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Tool activity')).toBeInTheDocument();
+    expect(screen.getByText(/Input:/i)).not.toBeVisible();
+
+    await user.click(screen.getByText('Tool activity'));
+
+    expect(screen.getByText(/Input:/i)).toBeVisible();
+    expect(screen.getByText(/Output:/i)).toBeVisible();
   });
 });

@@ -1,8 +1,9 @@
-import { formatRelativeTime, truncateText } from "@/lib/formatters";
+import { formatRelativeTime, formatRunStatusLabel, truncateText } from "@/lib/formatters";
 
 export default function ConversationList({
   conversations,
   currentConversationId,
+  runStateByConversation,
   isLoading,
   error,
   isCollapsed,
@@ -12,14 +13,16 @@ export default function ConversationList({
 }) {
   return (
     <aside className={`panel panel-left ${isCollapsed ? "collapsed" : ""}`}>
-      <button
-        className="collapse-button"
-        type="button"
-        onClick={onToggleCollapse}
-        aria-label={isCollapsed ? "Expand conversations" : "Collapse conversations"}
-      >
-        {isCollapsed ? "⮞" : "⮜"}
-      </button>
+      {!isCollapsed ? (
+        <button
+          className="collapse-button"
+          type="button"
+          onClick={onToggleCollapse}
+          aria-label="Collapse conversations"
+        >
+          ⮜
+        </button>
+      ) : null}
 
       {!isCollapsed && (
         <>
@@ -43,6 +46,8 @@ export default function ConversationList({
               !error &&
               conversations.map((conversation) => {
                 const isActive = conversation.id === currentConversationId;
+                const runState = runStateByConversation?.[conversation.id];
+                const runLabel = formatRunStatusLabel(runState?.status);
 
                 return (
                   <button
@@ -52,8 +57,13 @@ export default function ConversationList({
                     onClick={() => onSelectConversation(conversation.id)}
                   >
                     <span className="conversation-title">{truncateText(conversation.title, 45)}</span>
-                    <span className="conversation-date">
-                      {formatRelativeTime(conversation.updated_at)}
+                    <span className="conversation-meta-row">
+                      <span className="conversation-date">
+                        {formatRelativeTime(conversation.updated_at)}
+                      </span>
+                      {runLabel && (
+                        <span className={`conversation-status ${runState.status}`}>{runLabel}</span>
+                      )}
                     </span>
                   </button>
                 );

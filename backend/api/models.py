@@ -162,3 +162,39 @@ class ScheduledTaskResponse(BaseModel):
     last_run_id: Optional[str] = Field(None, description="Run ID from last dispatch")
     created_at: str = Field(..., description="Creation timestamp")
     updated_at: str = Field(..., description="Last update timestamp")
+
+
+class ObservabilityRunSummary(BaseModel):
+    """Compact run summary for observability dashboards."""
+
+    id: str = Field(..., description="Run ID")
+    conversation_id: str = Field(..., description="Conversation ID")
+    status: str = Field(..., description="Run status")
+    attempt_count: int = Field(..., description="Number of execution attempts")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
+    started_at: Optional[str] = Field(None, description="Run start timestamp")
+    completed_at: Optional[str] = Field(None, description="Completion timestamp")
+    error: Optional[str] = Field(None, description="Failure details if present")
+
+
+class ObservabilitySummaryResponse(BaseModel):
+    """Summary payload for the frontend metrics page."""
+
+    generated_at: str = Field(..., description="Response generation timestamp")
+    latest_counter_update: Optional[str] = Field(
+        None,
+        description="Latest runtime counter update timestamp",
+    )
+    langfuse_enabled: bool = Field(..., description="Whether Langfuse export is active")
+    langfuse_base_url: str = Field(..., description="Configured Langfuse base URL")
+    totals: Dict[str, int] = Field(..., description="High-level record counts")
+    runtime: Dict[str, Optional[float]] = Field(..., description="Runtime metrics snapshot")
+    orchestration: Dict[str, Optional[float]] = Field(..., description="Orchestration metrics snapshot")
+    api: Dict[str, Optional[float]] = Field(..., description="API request metrics snapshot")
+    tool_usage: Dict[str, int] = Field(default_factory=dict, description="Tool call counts by tool")
+    run_status_counts: Dict[str, int] = Field(default_factory=dict, description="Run counts grouped by status")
+    recent_runs: List[ObservabilityRunSummary] = Field(
+        default_factory=list,
+        description="Most recently updated runs",
+    )
