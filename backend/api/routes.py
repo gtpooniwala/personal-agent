@@ -117,7 +117,7 @@ def check_conversation_maintenance(conversations: List[dict]) -> None:
         
         # Check for title generation (≥1 message, inactive ≥ delay, untitled)
         if (message_count >= 1 and
-            any(title.startswith(p) for p in _UNTITLED_PREFIXES) and
+            title and any(title.startswith(p) for p in _UNTITLED_PREFIXES) and
             (now - updated_at) > timedelta(minutes=_NAMING_DELAY_MINUTES)):
             
             logger.info(f"Scheduling title generation for conversation {conversation_id} "
