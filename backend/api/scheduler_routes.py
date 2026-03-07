@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from backend.api.models import ScheduledTaskCreate, ScheduledTaskResponse, ScheduledTaskUpdate
 from backend.database.operations import db_ops
-from backend.runtime.scheduler import _next_run_at
+from backend.runtime.scheduler import compute_next_run_at
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +37,16 @@ def _task_response(task: dict) -> ScheduledTaskResponse:
     )
 
 
+def _handle_db_integrity_error(exc: IntegrityError, field_name: str, verb: str) -> None:
+    orig = str(getattr(exc, "orig", exc)).lower()
+    if "unique" in orig:
+        raise HTTPException(status_code=409, detail=f"A scheduled task named {field_name!r} already exists")
+    raise HTTPException(
+        status_code=422,
+        detail=f"Unable to {verb} scheduled task due to database constraint",
+    )
+
+
 @scheduler_router.get("", response_model=List[ScheduledTaskResponse])
 def list_tasks():
     tasks = db_ops.list_scheduled_tasks()
@@ -46,7 +56,7 @@ def list_tasks():
 @scheduler_router.post("", response_model=ScheduledTaskResponse, status_code=201)
 def create_task(body: ScheduledTaskCreate):
     _validate_cron(body.cron_expr)
-    next_run = _next_run_at(body.cron_expr)
+    next_run = compute_next_run_at(body.cron_expr)
     try:
         task = db_ops.create_scheduled_task(
             name=body.name,
@@ -56,11 +66,7 @@ def create_task(body: ScheduledTaskCreate):
             next_run_at=next_run,
         )
     except IntegrityError as exc:
-        orig = str(getattr(exc, "orig", exc)).lower()
-        if "unique" in orig:
-            raise HTTPException(status_code=409, detail=f"A scheduled task named {body.name!r} already exists")
-        logger.exception("Integrity constraint violation creating scheduled task")
-        raise HTTPException(status_code=422, detail="Database constraint violation")
+        _handle_db_integrity_error(exc, body.name, "create")
     except Exception:
         logger.exception("Failed to create scheduled task")
         raise HTTPException(status_code=500, detail="Failed to create scheduled task")
@@ -80,13 +86,17 @@ def update_task(task_id: str, body: ScheduledTaskUpdate):
     updates = body.model_dump(exclude_none=True)
     if "cron_expr" in updates:
         _validate_cron(updates["cron_expr"])
-        updates["next_run_at"] = _next_run_at(updates["cron_expr"])
+        updates["next_run_at"] = compute_next_run_at(updates["cron_expr"])
     if not updates:
         task = db_ops.get_scheduled_task(task_id)
         if not task:
             raise HTTPException(status_code=404, detail="Scheduled task not found")
         return _task_response(task)
-    task = db_ops.update_scheduled_task(task_id, **updates)
+    try:
+        task = db_ops.update_scheduled_task(task_id, **updates)
+    except IntegrityError as exc:
+        name = updates.get("name") if "name" in updates else task_id
+        _handle_db_integrity_error(exc, name, "update")
     if not task:
         raise HTTPException(status_code=404, detail="Scheduled task not found")
     return _task_response(task)

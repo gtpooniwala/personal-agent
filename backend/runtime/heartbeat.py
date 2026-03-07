@@ -12,8 +12,9 @@ ORPHAN_ERROR_MESSAGE = "Run abandoned: process crashed or lease expired"
 class HeartbeatService:
     """Background service that detects orphaned runs and marks them failed."""
 
-    def __init__(self, poll_interval_seconds: int = 60, db_ops=None):
+    def __init__(self, poll_interval_seconds: int = 60, db_ops=None, run_store=None):
         self._db_ops = db_ops
+        self._run_store = run_store
         self._poll_interval = poll_interval_seconds
         self._task: Optional[asyncio.Task] = None
 
@@ -69,6 +70,20 @@ class HeartbeatService:
 
         for run in orphans:
             run_id = str(run["id"])
+            run_status = (run.get("status") or "").lower()
+            if run_status not in {"running", "retrying"}:
+                continue
+
+            current = db.get_run(run_id)
+            if not current:
+                continue
+            if (current.get("status") or "").lower() not in {"running", "retrying"}:
+                logger.info(
+                    "Skipping terminal run in orphan sweep",
+                    extra={"event": "heartbeat.orphan_skip", "run_id": run_id},
+                )
+                continue
+
             try:
                 db.update_run(run_id=run_id, status=RUN_STATUS_FAILED, error=ORPHAN_ERROR_MESSAGE)
                 db.append_run_event(

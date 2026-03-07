@@ -13,8 +13,12 @@ sys.path.insert(0, project_root)
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "")
 
-AVAILABLE = bool(TEST_DATABASE_URL)
-SKIP_REASON = "TEST_DATABASE_URL not set — skipping DB integration tests"
+AVAILABLE = bool(
+    TEST_DATABASE_URL
+    and TEST_DATABASE_URL.startswith("postgresql")
+    and TEST_DATABASE_URL.rsplit("/", 1)[-1].endswith("_test")
+)
+SKIP_REASON = "TEST_DATABASE_URL must target a dedicated PostgreSQL *_test database"
 
 if AVAILABLE:
     try:
@@ -122,14 +126,15 @@ class TestScheduledTaskDbOps(unittest.TestCase):
         )
         now = _utcnow()
         new_next = now + timedelta(hours=1)
+        run = self.db.create_run(conversation_id=self.conversation_id, status="completed")
         updated = self.db.advance_scheduled_task(
             task["id"],
             last_run_at=now,
-            last_run_id="run-test-123",
+            last_run_id=run["id"],
             next_run_at=new_next,
         )
         self.assertIsNotNone(updated)
-        self.assertEqual(updated["last_run_id"], "run-test-123")
+        self.assertEqual(updated["last_run_id"], run["id"])
 
     def test_update_scheduled_task(self):
         name = self._unique_name("-update")

@@ -178,6 +178,18 @@ class TestSchedulerRoutes(unittest.TestCase):
             resp = client.patch("/scheduler/tasks/missing", json={"enabled": True})
         self.assertEqual(resp.status_code, 404)
 
+    def test_patch_task_duplicate_name_returns_409(self):
+        db = self._mock_db()
+        db.update_scheduled_task.side_effect = IntegrityError("statement", "params", Exception("unique"))
+        with patch.object(scheduler_routes_module, "db_ops", db):
+            from backend.api.scheduler_routes import scheduler_router
+            app = FastAPI()
+            app.include_router(scheduler_router)
+            client = TestClient(app, raise_server_exceptions=False)
+            resp = client.patch("/scheduler/tasks/task-1", json={"name": "duplicate-task"})
+        self.assertEqual(resp.status_code, 409)
+        self.assertIn("already exists", resp.json()["detail"])
+
     def test_delete_task_not_found(self):
         db = self._mock_db(delete_scheduled_task=False)
         with patch.object(scheduler_routes_module, "db_ops", db):

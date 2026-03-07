@@ -2,30 +2,29 @@
 
 Uses injected fake db_ops so no real database is required.
 """
-import asyncio
-import os
 import sys
 import unittest
+import os
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-AVAILABLE = True
-IMPORT_ERROR = ""
-
-try:
-    from backend.runtime.heartbeat import HeartbeatService, ORPHAN_ERROR_MESSAGE
-    from backend.runtime.contracts import RUN_STATUS_FAILED, RUN_EVENT_FAILED
-except (ImportError, ModuleNotFoundError) as exc:
-    AVAILABLE = False
-    IMPORT_ERROR = str(exc)
+from backend.runtime.heartbeat import HeartbeatService, ORPHAN_ERROR_MESSAGE
+from backend.runtime.contracts import RUN_STATUS_FAILED, RUN_EVENT_FAILED
 
 
 class FakeDbOps:
     """Minimal db_ops stand-in for heartbeat sweep tests."""
 
-    def __init__(self, orphans=None):
+    def __init__(self, orphans=None, runs=None):
         self._orphans = list(orphans or [])
+        seed_runs = list(runs or [])
+        if runs is None:
+            seed_runs = list(orphans or [])
+            for run in seed_runs:
+                if "status" not in run:
+                    run["status"] = "running"
+        self._runs = {str(r["id"]): r for r in seed_runs}
         self.updated = []
         self.events = []
 
@@ -43,13 +42,14 @@ class FakeDbOps:
             "message": message,
         })
 
+    def get_run(self, run_id):
+        return self._runs.get(run_id)
+
 
 class ErrorDbOps:
     def find_orphaned_runs(self):
         raise RuntimeError("db down")
 
-
-@unittest.skipUnless(AVAILABLE, f"HeartbeatService unavailable: {IMPORT_ERROR}")
 class TestHeartbeatService(unittest.IsolatedAsyncioTestCase):
     async def test_sweep_marks_orphaned_runs_failed(self):
         orphans = [{"id": "run-1", "conversation_id": "conv-1", "status": "running"}]
@@ -90,6 +90,19 @@ class TestHeartbeatService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(fake_db.updated), 2)
         run_ids = {u["run_id"] for u in fake_db.updated}
         self.assertEqual(run_ids, {"run-1", "run-2"})
+
+    async def test_sweep_skips_terminal_runs(self):
+        orphans = [{"id": "run-1", "conversation_id": "conv-1", "status": "running"}]
+        fake_db = FakeDbOps(
+            orphans=orphans,
+            runs=[{"id": "run-1", "status": "completed"}],
+        )
+        service = HeartbeatService(poll_interval_seconds=9999, db_ops=fake_db)
+
+        await service._sweep()
+
+        self.assertEqual(fake_db.updated, [])
+        self.assertEqual(fake_db.events, [])
 
     async def test_start_stop_lifecycle(self):
         service = HeartbeatService(poll_interval_seconds=9999, db_ops=FakeDbOps())

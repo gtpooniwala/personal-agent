@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 logger = logging.getLogger(__name__)
 
 
-def _next_run_at(cron_expr: str, now: Optional[datetime] = None) -> datetime:
+def compute_next_run_at(cron_expr: str, now: Optional[datetime] = None) -> datetime:
     from croniter import croniter
 
     base = now or datetime.now(timezone.utc)
@@ -17,6 +17,9 @@ def _next_run_at(cron_expr: str, now: Optional[datetime] = None) -> datetime:
     naive_base = base.replace(tzinfo=None)
     nxt = croniter(cron_expr, naive_base).get_next(datetime)
     return nxt.replace(tzinfo=timezone.utc)
+
+
+_next_run_at = compute_next_run_at
 
 
 class _SchedulerRequest:
@@ -68,6 +71,7 @@ class SchedulerService:
                 break
             except Exception:
                 logger.exception("SchedulerService tick error", extra={"event": "scheduler.tick_error"})
+                await asyncio.sleep(self._poll_interval)
 
     async def _tick(self) -> None:
         db = self._get_db_ops()
@@ -117,9 +121,8 @@ class SchedulerService:
                 )
 
             # Always advance next_run_at to prevent tight re-dispatch loop on failure.
-            # run_id is None when dispatch failed — stored as NULL, not empty string.
             try:
-                next_run = _next_run_at(str(task["cron_expr"]), now)
+                next_run = compute_next_run_at(str(task["cron_expr"]), now)
                 db.advance_scheduled_task(
                     task_id,
                     last_run_at=now,
@@ -132,4 +135,10 @@ class SchedulerService:
                     extra={"event": "scheduler.task_advance_error", "task_id": task_id},
                 )
         finally:
-            db.release_lease(lease_key, owner_id)
+            try:
+                db.release_lease(lease_key, owner_id)
+            except Exception:
+                logger.exception(
+                    "Failed to release dispatch lease",
+                    extra={"event": "scheduler.lease_release_error", "task_id": task_id},
+                )

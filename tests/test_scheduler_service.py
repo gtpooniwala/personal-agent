@@ -15,7 +15,7 @@ AVAILABLE = True
 IMPORT_ERROR = ""
 
 try:
-    from backend.runtime.scheduler import SchedulerService, _next_run_at
+    from backend.runtime.scheduler import SchedulerService, compute_next_run_at
 except (ImportError, ModuleNotFoundError) as exc:
     AVAILABLE = False
     IMPORT_ERROR = str(exc)
@@ -50,6 +50,8 @@ class FakeDbOps:
         return {"lease_key": lease_key, "owner_id": owner_id}
 
     def release_lease(self, lease_key, owner_id):
+        if self.leases.get(lease_key) != owner_id:
+            return False
         self.leases.pop(lease_key, None)
         return True
 
@@ -145,25 +147,32 @@ class TestSchedulerService(unittest.IsolatedAsyncioTestCase):
         service, _, _ = self._make_service()
         await service.stop()  # no-op
 
+    def test_release_lease_checks_owner(self):
+        fake_db = FakeDbOps()
+        fake_db.leases["scheduled_task:owned"] = "owner-a"
+        fake_db.release_lease("scheduled_task:owned", owner_id="owner-b")
+
+        self.assertEqual(fake_db.leases["scheduled_task:owned"], "owner-a")
+
 
 @unittest.skipUnless(AVAILABLE, f"SchedulerService unavailable: {IMPORT_ERROR}")
 class TestNextRunAt(unittest.TestCase):
     def test_returns_future_datetime_with_timezone(self):
         now = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
-        nxt = _next_run_at("0 * * * *", now=now)
+        nxt = compute_next_run_at("0 * * * *", now=now)
         self.assertIsInstance(nxt, datetime)
         self.assertIsNotNone(nxt.tzinfo)
         self.assertGreater(nxt, now)
 
     def test_every_minute_cron_fires_60s_later(self):
         now = datetime(2024, 6, 15, 10, 30, 0, tzinfo=timezone.utc)
-        nxt = _next_run_at("* * * * *", now=now)
+        nxt = compute_next_run_at("* * * * *", now=now)
         delta = (nxt - now).total_seconds()
         self.assertAlmostEqual(delta, 60, delta=1)
 
     def test_no_now_uses_current_time(self):
         before = datetime.now(timezone.utc)
-        nxt = _next_run_at("* * * * *")
+        nxt = compute_next_run_at("* * * * *")
         self.assertGreater(nxt, before)
 
 
