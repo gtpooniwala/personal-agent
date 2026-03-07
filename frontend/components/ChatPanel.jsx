@@ -1,38 +1,6 @@
 import { useEffect } from "react";
 import { formatRelativeTime } from "@/lib/formatters";
-
-function formatRunLabel(status) {
-  switch (status) {
-    case "queued":
-      return "Queued";
-    case "running":
-      return "Running";
-    case "retrying":
-      return "Retrying";
-    case "succeeded":
-      return "Completed";
-    case "failed":
-      return "Failed";
-    case "cancelling":
-      return "Cancelling";
-    case "cancelled":
-      return "Cancelled";
-    default:
-      return "Ready";
-  }
-}
-
-function describeRunEvent(event) {
-  if (!event) {
-    return "Ready for your next prompt";
-  }
-
-  if (event.type === "tool_result" && event.tool) {
-    return `Used ${event.tool}`;
-  }
-
-  return event.message || formatRunLabel(event.status);
-}
+import WorkspaceViewTabs from "@/components/WorkspaceViewTabs";
 
 function AgentActions({ actions }) {
   if (!actions || actions.length === 0) {
@@ -89,11 +57,10 @@ function ChatBubble({ message }) {
 }
 
 export default function ChatPanel({
-  tools,
+  currentView,
+  currentConversationId,
   messages,
   currentConversationTitle,
-  activeRun,
-  selectedDocumentCount,
   isLoadingMessages,
   chatError,
   messageInput,
@@ -113,20 +80,11 @@ export default function ChatPanel({
     input.style.height = `${Math.min(input.scrollHeight, 180)}px`;
   }, [messageInput, messageInputRef]);
 
-  const toolCountLabel =
-    tools.length > 0 ? `${tools.length} tool${tools.length === 1 ? "" : "s"} available` : "Loading tools";
-  const documentCountLabel =
-    selectedDocumentCount > 0
-      ? `${selectedDocumentCount} document${selectedDocumentCount === 1 ? "" : "s"} selected`
-      : "No documents selected";
-  const runStatusLabel = formatRunLabel(activeRun?.status);
-  const latestRunLabel = activeRun?.latestEvent ? describeRunEvent(activeRun.latestEvent) : "Ready";
-  const visibleRunEvents = activeRun?.events?.slice(-4) || [];
-
   return (
     <section className="chat-shell">
       <header className="app-header">
         <div>
+          <WorkspaceViewTabs currentView={currentView} currentConversationId={currentConversationId} />
           <p className="eyebrow">Personal Agent</p>
           <h1>Assistant Workspace</h1>
           <p className="header-subtitle">
@@ -135,36 +93,7 @@ export default function ChatPanel({
         </div>
       </header>
 
-      <section className="active-context-bar" aria-live="polite">
-        <span className={`context-chip run-status ${activeRun?.status || "idle"}`}>
-          {runStatusLabel}
-        </span>
-        <span className="context-chip">{latestRunLabel}</span>
-        <span className="context-chip">{documentCountLabel}</span>
-        <span className="context-chip">{toolCountLabel}</span>
-      </section>
-
       <main className="chat-stream" id="chat-container">
-        {activeRun && (
-          <section className="run-status-card" aria-live="polite">
-            <div className="run-status-heading">
-              <strong>Agent status</strong>
-              <span className={`status-pill ${activeRun.status}`}>{runStatusLabel}</span>
-            </div>
-            <p className="run-status-copy">{activeRun.error || latestRunLabel}</p>
-            {visibleRunEvents.length > 0 && (
-              <ol className="run-event-list">
-                {visibleRunEvents.map((event) => (
-                  <li key={event.event_id}>
-                    <span className={`event-dot ${event.status || "idle"}`} />
-                    <span>{describeRunEvent(event)}</span>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </section>
-        )}
-
         {isLoadingMessages && <p className="panel-note">Loading messages...</p>}
 
         {!isLoadingMessages && messages.length === 0 && (

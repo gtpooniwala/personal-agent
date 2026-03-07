@@ -4,11 +4,10 @@ import userEvent from '@testing-library/user-event';
 import ChatPanel from '@/components/ChatPanel';
 
 const defaultProps = {
-  tools: [],
+  currentView: 'chat',
+  currentConversationId: 'conv-a',
   messages: [],
   currentConversationTitle: '',
-  activeRun: null,
-  selectedDocumentCount: 0,
   isLoadingMessages: false,
   chatError: '',
   messageInput: 'hello',
