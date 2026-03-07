@@ -54,16 +54,6 @@ class FailingOrchestrator:
         }
 
 
-class ExceptionOrchestrator:
-    """Raises an exception when processing a request."""
-    def create_conversation(self):
-        return "conv-generated"
-
-    async def process_request(self, user_request, conversation_id, selected_documents=None):
-        await asyncio.sleep(0)
-        raise RuntimeError("Orchestrator error")
-
-
 @unittest.skipUnless(
     RUNTIME_SERVICE_TESTS_AVAILABLE,
     f"Runtime service test dependencies unavailable: {RUNTIME_SERVICE_IMPORT_ERROR}",
@@ -99,15 +89,19 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
 
         NOTE: This test uses InMemoryRunStore which doesn't implement lease-based serialization.
         The test validates basic failure semantics, but actual serialization is verified in
-        integration tests with DbRunStore (requires database setup).
+        integration tests with DbRunStore (requires database setup). This test ensures the
+        service handles concurrent submissions gracefully.
         """
-        # Slow orchestrator to ensure runs execute concurrently
-        class SlowOrchestrator:
+        # Orchestrator that blocks to ensure concurrent execution
+        blocking_event = asyncio.Event()
+
+        class BlockingOrchestrator:
             def create_conversation(self):
                 return "conv-generated"
 
             async def process_request(self, user_request, conversation_id, selected_documents=None):
-                await asyncio.sleep(0.05)  # 50ms to allow concurrent execution
+                # First request blocks, second can proceed
+                await blocking_event.wait()
                 return {
                     "response": "ok",
                     "conversation_id": conversation_id,
@@ -115,15 +109,21 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
                     "token_usage": 4,
                 }
 
-        service = RuntimeService(orchestrator=SlowOrchestrator(), run_store=InMemoryRunStore())
+        service = RuntimeService(orchestrator=BlockingOrchestrator(), run_store=InMemoryRunStore())
 
-        # Submit first run
+        # Submit first run (will block waiting for event)
         submitted1 = await service.submit_run(RuntimeRequest(message="hello", conversation_id="shared-conv", selected_documents=[]))
         run_id1 = submitted1["run_id"]
 
-        # Immediately submit second run to same conversation (before first completes)
+        # Give first task time to reach orchestrator
+        await asyncio.sleep(0.01)
+
+        # Submit second run to same conversation while first is blocked
         submitted2 = await service.submit_run(RuntimeRequest(message="hello again", conversation_id="shared-conv", selected_documents=[]))
         run_id2 = submitted2["run_id"]
+
+        # Unblock the orchestrator
+        blocking_event.set()
 
         # Wait for both to complete
         status1 = await self._wait_for_terminal(service, run_id1)

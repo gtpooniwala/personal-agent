@@ -170,6 +170,17 @@ class RuntimeService:
                                 message=f"Retrying after error: {type(exc).__name__}",
                             )
 
+                # Update observation with final run status
+                try:
+                    final_run = self._run_store.get_run(run_id)
+                    update_observation(
+                        observation,
+                        output={"status": final_run.status, "run_id": run_id},
+                        status_message=final_run.error if final_run.status == RUN_STATUS_FAILED else None,
+                    )
+                except RunNotFoundError:
+                    logger.warning("Run disappeared before updating final observation", extra={"event": "runtime.run_missing", "run_id": run_id})
+
             except RunNotFoundError:
                 logger.warning("Run disappeared during execution", extra={"event": "runtime.run_missing", "run_id": run_id})
             except Exception as exc:
