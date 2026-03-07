@@ -1,0 +1,25 @@
+backend/api/routes.py
+  5e59a067350fcf36 71-75
+backend/orchestrator/core.py
+  5e59a067350fcf36 637-639,641-644
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "d6748557ff102cd82e9bee6d67e7afc08b990be9",
+  "prompts": {
+    "5e59a067350fcf36": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d3ec59b2-a1df-463e-a077-85da012d2259",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 5,
+      "accepted_lines": 12,
+      "overriden_lines": 0
+    }
+  }
+}
