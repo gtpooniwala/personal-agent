@@ -13,7 +13,7 @@ RUNTIME_SERVICE_IMPORT_ERROR = ""
 try:
     from backend.runtime.service import RuntimeService
     from backend.runtime.store import InMemoryRunStore
-except Exception as exc:
+except (ImportError, ModuleNotFoundError) as exc:
     RUNTIME_SERVICE_TESTS_AVAILABLE = False
     RUNTIME_SERVICE_IMPORT_ERROR = str(exc)
 
