@@ -1,0 +1,27 @@
+frontend/app/page.js
+  0edeb85fc174ebfd 253-260,270
+backend/runtime/store.py
+  0edeb85fc174ebfd 186-191
+frontend/lib/api.js
+  0edeb85fc174ebfd 45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "ef8f56f165d7f9d625d7485e03170867446869e0",
+  "prompts": {
+    "0edeb85fc174ebfd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ec815729-2ef0-438e-92f6-c89e6342a538",
+        "model": "claude-haiku-4-5-20251001"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 16,
+      "total_deletions": 9,
+      "accepted_lines": 16,
+      "overriden_lines": 0
+    }
+  }
+}
