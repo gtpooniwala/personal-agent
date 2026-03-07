@@ -29,7 +29,7 @@ services:
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgresql+psycopg://${POSTGRES_USER:-personal_agent}:${POSTGRES_PASSWORD:-personal_agent}@postgres:5432/${POSTGRES_DB:-personal_agent}}
+      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgresql+psycopg://personal_agent:personal_agent@postgres:5432/personal_agent}
       HOST: 0.0.0.0
       PORT: ${PORT:-8000}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
