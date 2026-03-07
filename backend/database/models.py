@@ -204,6 +204,6 @@ class Lease(Base):
     lease_key = Column(String, primary_key=True)
     owner_id = Column(String, nullable=False)
     fencing_token = Column(Integer, nullable=False, default=1)
-    acquired_at = Column(DateTime(timezone=True), default=utcnow)
+    acquired_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

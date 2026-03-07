@@ -17,6 +17,8 @@ import atexit
 
 from backend.runtime import RUN_EVENT_TYPE_SET, RUN_STATUS_SET
 
+_UNSET = object()
+
 
 class DatabaseOperations:
     """Database operations for the personal agent."""
@@ -348,11 +350,11 @@ class DatabaseOperations:
         self,
         run_id: str,
         status: Optional[str] = None,
-        error: Optional[str] = None,
-        result: Optional[str] = None,
+        error: Any = _UNSET,
+        result: Any = _UNSET,
         attempt_count: Optional[int] = None,
-        started_at: Optional[datetime] = None,
-        completed_at: Optional[datetime] = None,
+        started_at: Any = _UNSET,
+        completed_at: Any = _UNSET,
     ) -> Optional[Dict[str, Any]]:
         """Update mutable run fields and return the updated record."""
         if status is not None:
@@ -368,15 +370,15 @@ class DatabaseOperations:
 
             if status is not None:
                 run.status = status
-            if error is not None:
+            if error is not _UNSET:
                 run.error = error
-            if result is not None:
+            if result is not _UNSET:
                 run.result = result
             if attempt_count is not None:
                 run.attempt_count = attempt_count
-            if started_at is not None:
+            if started_at is not _UNSET:
                 run.started_at = started_at
-            if completed_at is not None:
+            if completed_at is not _UNSET:
                 run.completed_at = completed_at
             run.updated_at = datetime.now(timezone.utc)
 

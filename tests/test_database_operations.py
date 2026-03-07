@@ -235,11 +235,24 @@ class TestDatabaseOperations(unittest.TestCase):
             status="running",
             attempt_count=1,
             started_at=started_at,
+            error="temporary failure",
         )
         self.assertIsNotNone(updated)
         self.assertEqual(updated["status"], "running")
         self.assertEqual(updated["attempt_count"], 1)
         self.assertIsNotNone(updated["started_at"])
+        self.assertEqual(updated["error"], "temporary failure")
+
+        # Nullable fields should be clearable (explicit None), not treated as "unset"
+        cleared = self.db_ops.update_run(
+            run["id"],
+            error=None,
+            started_at=None,
+            completed_at=None,
+        )
+        self.assertIsNone(cleared["error"])
+        self.assertIsNone(cleared["started_at"])
+        self.assertIsNone(cleared["completed_at"])
 
         fetched = self.db_ops.get_run(run["id"])
         self.assertEqual(fetched["id"], run["id"])
