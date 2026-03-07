@@ -55,6 +55,20 @@ A **dispatcher** service listens for trigger events and calls `POST /runs` to st
 | `webhook` | External HTTP | POST to a trigger endpoint; extensible |
 | `telegram` | Telegram Bot API | Webhook receives messages, creates runs |
 
+### Architectural dependency: backend hosting and min-instances
+
+**Deferred decision — discuss during implementation of #88 alongside #87 (cold start strategy).**
+
+The trigger architecture is directly coupled to how the backend is deployed and whether `min-instances` is 0 or 1. This is the most important design decision for this workstream:
+
+**Push-based triggers** (Telegram webhook, Cloud Scheduler HTTP, incoming webhooks) work with `min-instances=0`. An incoming HTTP request wakes a scaled-to-zero Cloud Run instance (with a ~2-3s cold start). The container processes the request and shuts down again.
+
+**Polling-based triggers** (email poller, internal scheduler heartbeat) do not work with `min-instances=0`. When the container is idle, there is no process running to do the polling. Two ways to solve this:
+1. Set `min-instances=1` — container is always running; internal pollers work as expected. Simpler implementation, fixed monthly cost.
+2. Use external scheduling (Cloud Scheduler sends an HTTP request to a trigger endpoint on a cron schedule) — wakes the container, does the poll and dispatch, container shuts down. More GCP infrastructure, but compatible with scale-to-zero and potentially cheaper.
+
+The right answer depends on usage patterns and cost tolerance. The trigger framework design should be finalized once the min-instances decision is made. Both paths are viable; they just produce different implementations.
+
 ---
 
 ## Individual Trigger Types
@@ -83,6 +97,8 @@ The scheduler polls `scheduled_tasks`, fires runs when `next_run_at` is due, and
 
 **Lift:** Medium — builds on #18 which is already in progress.
 
+**Deferred: execution model depends on min-instances decision.** If `min-instances=0`, the internal scheduler loop won't run when the container is idle. The alternative is an external Cloud Scheduler job that POSTs to a `/triggers/schedule` endpoint on a regular cadence, waking the container to check and fire due tasks. Decide during #90 implementation.
+
 ---
 
 ### 3. Email-Triggered Tasks
@@ -95,6 +111,8 @@ Poll Gmail for emails matching user-defined criteria (sender, subject pattern, l
 - Deduplicate: track processed message IDs to avoid re-triggering
 
 **Lift:** Medium — Gmail auth already exists; main work is the polling loop and dedup logic.
+
+**Deferred: polling model depends on min-instances decision.** An internal polling loop won't run when `min-instances=0`. Options: (1) set `min-instances=1`, (2) use Cloud Scheduler to trigger a `/triggers/email-poll` endpoint periodically, (3) use Gmail push notifications via Cloud Pub/Sub (avoids polling entirely but adds GCP infrastructure). Decide during #91 implementation.
 
 ---
 

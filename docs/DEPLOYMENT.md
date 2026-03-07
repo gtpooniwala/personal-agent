@@ -39,9 +39,9 @@ Limitations:
 
 ## Architecture Decisions
 
-### 1. Compute: Cloud Run (not GKE)
+### 1. Compute: Cloud Run (preferred, not final)
 
-**Decision:** Deploy backend and frontend as separate Cloud Run services.
+**Preference:** Cloud Run for backend and frontend.
 
 **Rationale:**
 - No Kubernetes complexity for a personal-use project
@@ -49,7 +49,18 @@ Limitations:
 - Pay per request; scale to zero when idle
 - Same container image as local Docker; minimal code changes
 
-**Rejected:** GKE — overkill for personal use, higher baseline cost.
+**Other options considered:**
+
+| Option | Cost (personal) | Notes |
+|--------|----------------|-------|
+| **Cloud Run** | ~$0–15/mo | Preferred. Scale to zero, managed HTTPS, no VM to maintain |
+| **Compute Engine (VM)** | ~$7–20/mo always-on | Simplest migration path — run Docker Compose directly on the VM. No GCS migration required for local filesystem. Valid faster-path option. |
+| **GKE** | ~$75+/mo | Overkill for personal use |
+| **App Engine** | ~$5–20/mo | Older, less flexible, harder to migrate existing Docker setup |
+
+**Faster alternative:** If the priority is "get it running in the cloud quickly," a Compute Engine VM is simpler — you run Docker Compose on it and skip the GCS migration. Cloud Run is the better long-term choice but has more setup steps and requires the GCS migration (#80) before it works correctly. Decide based on timeline.
+
+**Decision deferred on min-instances:** The choice of `min-instances=0` vs `min-instances=1` has significant implications for the event trigger architecture and is linked to that decision. See #87 (cold start) and #88 (event trigger framework). Discuss during implementation.
 
 ---
 
@@ -102,29 +113,49 @@ Secrets to migrate:
 
 **Action required:** Enable IAP on the backend Cloud Run service. Allowlist your Google account.
 
+**Deferred: Frontend-to-backend API calls through IAP**
+IAP works well for browser requests (it redirects to a Google login page). However, when the Next.js frontend makes `fetch()` API calls to the backend, those are not browser navigations — they need to include an IAP identity token in the `Authorization` header. Getting and refreshing that token in the frontend adds complexity. The resolution depends on how the frontend is hosted:
+- If the frontend is on Cloud Run behind IAP too, service-to-service auth (using a GCP service account) is one path
+- If the frontend is on Vercel or Firebase Hosting (outside GCP), it needs to obtain a user identity token via Google Sign-In and pass it to the backend
+
+This needs to be worked out during implementation of #85 (IAP) alongside the frontend hosting decision.
+
 ---
 
 ### 6. Frontend Hosting: Decision Deferred
 
-Three options — choose at deploy time:
+**Decision deferred** — to be finalized during implementation of #82.
+
+Key prerequisite question: does the Next.js app use server-side rendering (SSR) or Next.js API routes? Check `next.config.js` before deciding. If yes, options B and D below require code changes.
 
 | Option | Pros | Cons |
 |--------|------|------|
-| **A: Cloud Run** | Consistent deploy model; no code changes | Slightly higher latency than CDN; not optimized for static assets |
-| **B: Firebase Hosting** | Better CDN; free tier | Requires Next.js static export (`output: 'export'`); may need code changes for dynamic routes |
-| **C: Cloud Run + Cloud CDN** | Best of both; CDN in front of Cloud Run | More infrastructure to manage |
+| **A: Cloud Run** | Consistent deploy model; no code changes; works with SSR | Slightly higher latency than CDN; not optimized for static assets |
+| **B: Firebase Hosting** | Better CDN; generous free tier | Requires `output: 'export'` in `next.config.js`; dynamic routes may need refactoring |
+| **C: Cloud Run + Cloud CDN** | CDN performance with full Next.js support | More infrastructure; adds cost and complexity |
+| **D: Vercel** | Purpose-built for Next.js; zero config; excellent CDN; preview deploys | Outside GCP ecosystem; IAP integration more complex (see §5); separate billing |
 
-**Recommendation for initial deploy:** Option A (Cloud Run). Switch to Firebase Hosting or Cloud CDN if CDN performance matters later.
+**Notes:**
+- Vercel is the most ergonomic option for a Next.js project and worth considering if you want the smoothest frontend deployment experience. The tradeoff is that it lives outside GCP, which complicates IAP integration.
+- For initial deploy, Cloud Run (Option A) is the lowest friction path and keeps everything in one ecosystem.
+- Revisit if CDN performance or Vercel's developer experience matters more than ecosystem consistency.
 
 ---
 
-### 7. Cold Starts
+### 7. Cold Starts and min-instances
 
-**Decision:** Default to `min-instances=0` (scale to zero).
+**Default preference:** `min-instances=0` (scale to zero).
 
-**Rationale:** Personal use; occasional cold starts of ~2-3s are acceptable.
+**Rationale:** Personal use; occasional cold starts of ~2-3s are acceptable. Free when idle.
 
 **Optional:** Set `min-instances=1` on the backend if always-warm is preferred. Adds approximately $5-15/month.
+
+**Decision linked to event trigger architecture (#88):** This is not just a cost/latency tradeoff. The min-instances setting determines which trigger architectures are viable:
+
+- **`min-instances=0` (scale to zero):** Internal polling loops (email poller, scheduler heartbeat) don't run when the container is idle — there's no process alive to do the polling. Push-based and webhook-based triggers (Telegram webhook, Cloud Scheduler sending an HTTP request to wake the container) still work fine because an incoming HTTP request wakes the container.
+- **`min-instances=1` (always warm):** Internal polling loops work because the container is always running. Simpler trigger implementations, but adds fixed monthly cost.
+
+The event trigger framework design depends on this choice. If scale-to-zero is preferred, polling-based triggers (email, scheduled tasks) need to be driven externally (e.g. Cloud Scheduler sends an HTTP request to a trigger endpoint, which then does the poll and dispatch). This is a valid architecture but changes the implementation. Discuss during #87 (cold start) and #88 (trigger framework).
 
 ---
 
