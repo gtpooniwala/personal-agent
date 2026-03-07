@@ -26,6 +26,7 @@ export DATABASE_URL="${TEST_DB_URL}"
 import os
 from sqlalchemy.engine import make_url
 import psycopg
+from psycopg import sql
 
 test_url = make_url(os.environ["TEST_DATABASE_URL"])
 test_db = test_url.database
@@ -36,7 +37,7 @@ with psycopg.connect(admin_dsn, autocommit=True) as conn:
     with conn.cursor() as cur:
         cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (test_db,))
         if cur.fetchone() is None:
-            cur.execute(f'CREATE DATABASE "{test_db}"')
+            cur.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(test_db)))
 PY
 "${VENV_PY}" tests/run_unit_tests.py
 

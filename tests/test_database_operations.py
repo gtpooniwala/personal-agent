@@ -15,6 +15,7 @@ DB_IMPORT_ERROR = ""
 
 try:
     from sqlalchemy import create_engine
+    from sqlalchemy.engine import make_url
     from sqlalchemy.orm import sessionmaker
     from backend.database.models import Base
     from backend.database.operations import DatabaseOperations
@@ -33,7 +34,12 @@ class TestDatabaseOperations(unittest.TestCase):
         if not database_url:
             self.skipTest("TEST_DATABASE_URL is required for database tests.")
         if not database_url.startswith("postgresql"):
-            self.skipTest(f"TEST_DATABASE_URL must use PostgreSQL for this suite. Got: {database_url}")
+            self.skipTest("TEST_DATABASE_URL must use PostgreSQL for this suite.")
+        db_name = make_url(database_url).database or ""
+        if not db_name.endswith("_test"):
+            self.skipTest(
+                "TEST_DATABASE_URL must target a dedicated *_test database for destructive DB tests."
+            )
 
         self.engine = create_engine(database_url)
         Base.metadata.drop_all(bind=self.engine)

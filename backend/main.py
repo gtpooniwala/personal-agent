@@ -18,7 +18,10 @@ logger = logging.getLogger(__name__)
 
 def _safe_database_url() -> str:
     """Render configured database URL without exposing credentials."""
-    return make_url(settings.database_url).render_as_string(hide_password=True)
+    try:
+        return make_url(settings.database_url).render_as_string(hide_password=True)
+    except Exception:
+        return "<invalid DATABASE_URL>"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -27,6 +30,10 @@ async def lifespan(app: FastAPI):
     logger.info("Personal Agent API starting up...")
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Database URL: {_safe_database_url()}")
+    if not settings.gemini_api_key:
+        logger.warning(
+            "GEMINI_API_KEY is not configured; Gemini-backed requests may fail at runtime."
+        )
     langfuse_manager.initialize()
     
     yield
