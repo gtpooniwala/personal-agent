@@ -8,6 +8,8 @@ import { apiCall, runtimeApiCall, uploadPdf } from "@/lib/api";
 
 const RUN_POLL_INTERVAL_MS = 500;
 const RUN_POLL_MAX_ATTEMPTS = 120;
+const MAX_VISIBLE_RUN_EVENTS = 4;
+const NEW_CONVERSATION_KEY = "__new__";
 
 const RUN_IN_PROGRESS_STATUSES = new Set(["queued", "running", "retrying", "cancelling"]);
 
@@ -29,12 +31,54 @@ function normalizeMessages(payload) {
   }));
 }
 
+function isEditableElement(node) {
+  if (!(node instanceof HTMLElement)) {
+    return false;
+  }
+
+  return (
+    node.isContentEditable ||
+    node.tagName === "INPUT" ||
+    node.tagName === "TEXTAREA" ||
+    node.tagName === "SELECT"
+  );
+}
+
+function buildRunEventsUrl(runId, afterCursor) {
+  const params = new URLSearchParams();
+  if (afterCursor) {
+    params.set("after", afterCursor);
+  }
+
+  const query = params.toString();
+  return query ? `/runs/${runId}/events?${query}` : `/runs/${runId}/events`;
+}
+
+function mergeRunEvents(previousEvents, nextEvents) {
+  const merged = [...(previousEvents || [])];
+  const seen = new Set(merged.map((event) => event.event_id));
+
+  for (const event of nextEvents || []) {
+    if (!seen.has(event.event_id)) {
+      merged.push(event);
+      seen.add(event.event_id);
+    }
+  }
+
+  return merged.slice(-MAX_VISIBLE_RUN_EVENTS);
+}
+
+function sleep(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 export default function HomePage() {
   const [conversations, setConversations] = useState([]);
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [tools, setTools] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const [runStateByConversation, setRunStateByConversation] = useState({});
 
   const [selectedDocuments, setSelectedDocuments] = useState(() => new Set());
 
@@ -53,14 +97,50 @@ export default function HomePage() {
 
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [documentsExpanded, setDocumentsExpanded] = useState(true);
   const [dragActive, setDragActive] = useState(false);
 
   const fileInputRef = useRef(null);
+  const messageInputRef = useRef(null);
   const activeConversationIdRef = useRef(null);
   const latestMessagesRequestRef = useRef(0);
   const uploadRunRef = useRef(0);
   const uploadResetTimerRef = useRef(null);
   const uploadingRef = useRef(false);
+
+  const focusComposer = useCallback(() => {
+    const input = messageInputRef.current;
+    if (!input) {
+      return;
+    }
+
+    input.focus({ preventScroll: true });
+    const cursorPosition = input.value.length;
+    requestAnimationFrame(() => {
+      if (document.activeElement === input && typeof input.setSelectionRange === "function") {
+        input.setSelectionRange(cursorPosition, cursorPosition);
+      }
+    });
+  }, []);
+
+  const updateRunState = useCallback((conversationId, patch) => {
+    if (!conversationId) {
+      return;
+    }
+
+    setRunStateByConversation((previousState) => {
+      const currentState = previousState[conversationId] || {};
+      const nextPatch = typeof patch === "function" ? patch(currentState) : patch;
+
+      return {
+        ...previousState,
+        [conversationId]: {
+          ...currentState,
+          ...nextPatch,
+        },
+      };
+    });
+  }, []);
 
   const loadTools = useCallback(async () => {
     try {
@@ -189,50 +269,72 @@ export default function HomePage() {
       const nextConversationId = created?.id || null;
       await loadConversations(nextConversationId);
       setMessages([]);
+      focusComposer();
     } catch {
       setConversationError("Failed to create conversation.");
     }
-  }, [loadConversations]);
+  }, [focusComposer, loadConversations]);
 
   const sendMessage = useCallback(async () => {
     const trimmedMessage = messageInput.trim();
-    const requestConversationId = currentConversationId;
+    let requestConversationId = currentConversationId;
+    let sendingConversationKey = requestConversationId || NEW_CONVERSATION_KEY;
 
-    if (!trimmedMessage || sendingConversations.has(requestConversationId)) {
+    if (!trimmedMessage || sendingConversations.has(sendingConversationKey)) {
       return;
     }
 
-    if (!requestConversationId) {
-      setChatError("Create a conversation before sending a message.");
-      return;
-    }
-
-    setSendingConversations((prev) => new Set(prev).add(requestConversationId));
+    setSendingConversations((prev) => new Set(prev).add(sendingConversationKey));
     setChatError("");
-    setMessageInput("");
-
-    const thinkingId = localId("thinking");
-
-    const optimisticUserMessage = {
-      id: localId("user"),
-      role: "user",
-      content: trimmedMessage,
-      timestamp: new Date().toISOString(),
-      agent_actions: [],
-    };
-
-    const thinkingMessage = {
-      id: thinkingId,
-      role: "assistant",
-      content: "",
-      timestamp: new Date().toISOString(),
-      agent_actions: [],
-      isThinking: true,
-    };
-
-    setMessages((previousMessages) => [...previousMessages, optimisticUserMessage, thinkingMessage]);
+    let thinkingId = null;
 
     try {
+      if (!requestConversationId) {
+        const created = await apiCall("/conversations", {
+          method: "POST",
+          body: JSON.stringify({}),
+        });
+
+        requestConversationId = created?.id || null;
+        if (!requestConversationId) {
+          throw new Error("Conversation creation failed");
+        }
+
+        sendingConversationKey = requestConversationId;
+        activeConversationIdRef.current = requestConversationId;
+        setCurrentConversationId(requestConversationId);
+        setMessages([]);
+        setSendingConversations((prev) => {
+          const next = new Set(prev);
+          next.delete(NEW_CONVERSATION_KEY);
+          next.add(requestConversationId);
+          return next;
+        });
+        await loadConversations(requestConversationId);
+      }
+
+      setMessageInput("");
+      thinkingId = localId("thinking");
+
+      const optimisticUserMessage = {
+        id: localId("user"),
+        role: "user",
+        content: trimmedMessage,
+        timestamp: new Date().toISOString(),
+        agent_actions: [],
+      };
+
+      const thinkingMessage = {
+        id: thinkingId,
+        role: "assistant",
+        content: "",
+        timestamp: new Date().toISOString(),
+        agent_actions: [],
+        isThinking: true,
+      };
+
+      setMessages((previousMessages) => [...previousMessages, optimisticUserMessage, thinkingMessage]);
+
       const submitResponse = await runtimeApiCall("/chat", {
         method: "POST",
         body: JSON.stringify({
@@ -248,19 +350,43 @@ export default function HomePage() {
       }
 
       let status = null;
+      let latestEventsCursor = null;
+
+      updateRunState(requestConversationId, {
+        runId,
+        status: "queued",
+        error: "",
+        latestEvent: null,
+        events: [],
+      });
 
       for (let attempt = 0; attempt < RUN_POLL_MAX_ATTEMPTS; attempt += 1) {
-        if (activeConversationIdRef.current !== requestConversationId) {
-          return;
-        }
-
         try {
-          status = await runtimeApiCall(`/runs/${runId}/status`);
+          const [nextStatus, eventsPayload] = await Promise.all([
+            runtimeApiCall(`/runs/${runId}/status`),
+            runtimeApiCall(buildRunEventsUrl(runId, latestEventsCursor)),
+          ]);
+
+          status = nextStatus;
+          const nextEvents = Array.isArray(eventsPayload?.events) ? eventsPayload.events : [];
+          latestEventsCursor = eventsPayload?.next_after || latestEventsCursor;
+
+          updateRunState(requestConversationId, (previousRunState) => {
+            const mergedEvents = mergeRunEvents(previousRunState.events, nextEvents);
+
+            return {
+              runId,
+              status: status?.status || previousRunState.status || "queued",
+              error: status?.error || "",
+              events: mergedEvents,
+              latestEvent: mergedEvents[mergedEvents.length - 1] || previousRunState.latestEvent || null,
+            };
+          });
         } catch {
           if (attempt === RUN_POLL_MAX_ATTEMPTS - 1) {
             throw new Error("Run status polling failed");
           }
-          await new Promise((resolve) => setTimeout(resolve, RUN_POLL_INTERVAL_MS));
+          await sleep(RUN_POLL_INTERVAL_MS);
           continue;
         }
 
@@ -268,7 +394,7 @@ export default function HomePage() {
           break;
         }
 
-        await new Promise((resolve) => setTimeout(resolve, RUN_POLL_INTERVAL_MS));
+        await sleep(RUN_POLL_INTERVAL_MS);
       }
 
       if (!status || RUN_IN_PROGRESS_STATUSES.has(status.status)) {
@@ -284,7 +410,19 @@ export default function HomePage() {
         }
       }
     } catch {
-      if (activeConversationIdRef.current === requestConversationId) {
+      if (!requestConversationId) {
+        setChatError("Failed to start a conversation.");
+      }
+
+      if (requestConversationId) {
+        updateRunState(requestConversationId, (previousRunState) => ({
+          ...previousRunState,
+          status: "failed",
+          error: "Failed to send message.",
+        }));
+      }
+
+      if (thinkingId && activeConversationIdRef.current === requestConversationId) {
         setMessages((previousMessages) => [
           ...previousMessages.filter((message) => message.id !== thinkingId),
           {
@@ -300,17 +438,23 @@ export default function HomePage() {
     } finally {
       setSendingConversations((prev) => {
         const next = new Set(prev);
-        next.delete(requestConversationId);
+        next.delete(NEW_CONVERSATION_KEY);
+        if (sendingConversationKey) {
+          next.delete(sendingConversationKey);
+        }
         return next;
       });
+      focusComposer();
     }
   }, [
+    currentConversationId,
+    focusComposer,
     loadConversations,
     loadConversationMessages,
-    currentConversationId,
     messageInput,
     selectedDocuments,
     sendingConversations,
+    updateRunState,
   ]);
 
   const uploadFiles = useCallback(
@@ -429,6 +573,10 @@ export default function HomePage() {
   }, [uploading]);
 
   useEffect(() => {
+    focusComposer();
+  }, [focusComposer, currentConversationId]);
+
+  useEffect(() => {
     void loadConversationMessages(currentConversationId);
   }, [currentConversationId, loadConversationMessages]);
 
@@ -440,6 +588,56 @@ export default function HomePage() {
   }, [messages]);
 
   useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    if (!lastMessage || lastMessage.role !== "assistant" || lastMessage.isThinking) {
+      return;
+    }
+
+    focusComposer();
+  }, [focusComposer, messages]);
+
+  useEffect(() => {
+    focusComposer();
+
+    const onWindowFocus = () => {
+      focusComposer();
+    };
+
+    const onVisibilityChange = () => {
+      if (!document.hidden) {
+        focusComposer();
+      }
+    };
+
+    const onTypeToFocus = (event) => {
+      if (
+        event.defaultPrevented ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.key.length !== 1 ||
+        isEditableElement(event.target)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      focusComposer();
+      setMessageInput((previousValue) => previousValue + event.key);
+    };
+
+    window.addEventListener("focus", onWindowFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("keydown", onTypeToFocus);
+
+    return () => {
+      window.removeEventListener("focus", onWindowFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("keydown", onTypeToFocus);
+    };
+  }, [focusComposer]);
+
+  useEffect(() => {
     return () => {
       if (uploadResetTimerRef.current) {
         clearTimeout(uploadResetTimerRef.current);
@@ -447,11 +645,19 @@ export default function HomePage() {
     };
   }, []);
 
+  const currentConversation = conversations.find((conversation) => conversation.id === currentConversationId) || null;
+  const activeRun =
+    (currentConversationId && runStateByConversation[currentConversationId]) ||
+    runStateByConversation[NEW_CONVERSATION_KEY] ||
+    null;
+  const currentConversationKey = currentConversationId || NEW_CONVERSATION_KEY;
+
   return (
     <div className="app-root">
       <ConversationList
         conversations={conversations}
         currentConversationId={currentConversationId}
+        runStateByConversation={runStateByConversation}
         isLoading={loadingConversations}
         error={conversationError}
         isCollapsed={leftCollapsed}
@@ -463,17 +669,23 @@ export default function HomePage() {
       <ChatPanel
         tools={tools}
         messages={messages}
+        currentConversationTitle={currentConversation?.title || ""}
+        activeRun={activeRun}
+        selectedDocumentCount={selectedDocuments.size}
         isLoadingMessages={loadingMessages}
         chatError={chatError}
         messageInput={messageInput}
-        isSending={sendingConversations.has(currentConversationId)}
+        isSending={sendingConversations.has(currentConversationKey)}
         onChangeMessage={setMessageInput}
         onSendMessage={sendMessage}
+        onFocusComposer={focusComposer}
+        messageInputRef={messageInputRef}
       />
 
       <DocumentsPanel
         documents={documents}
         selectedDocuments={selectedDocuments}
+        documentsExpanded={documentsExpanded}
         isLoading={loadingDocuments}
         error={documentError}
         isUploading={uploading}
@@ -481,6 +693,7 @@ export default function HomePage() {
         isCollapsed={rightCollapsed}
         isDragActive={dragActive}
         onToggleCollapse={() => setRightCollapsed((isCollapsed) => !isCollapsed)}
+        onToggleDocumentsExpanded={() => setDocumentsExpanded((isExpanded) => !isExpanded)}
         onOpenFilePicker={() => fileInputRef.current?.click()}
         onFileSelect={onFileSelect}
         onDragEnter={(event) => {

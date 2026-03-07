@@ -1,8 +1,24 @@
 import { formatRelativeTime, truncateText } from "@/lib/formatters";
 
+function formatRunStatusLabel(status) {
+  switch (status) {
+    case "queued":
+      return "Queued";
+    case "running":
+      return "Running";
+    case "retrying":
+      return "Retrying";
+    case "failed":
+      return "Failed";
+    default:
+      return "";
+  }
+}
+
 export default function ConversationList({
   conversations,
   currentConversationId,
+  runStateByConversation,
   isLoading,
   error,
   isCollapsed,
@@ -43,6 +59,8 @@ export default function ConversationList({
               !error &&
               conversations.map((conversation) => {
                 const isActive = conversation.id === currentConversationId;
+                const runState = runStateByConversation?.[conversation.id];
+                const runLabel = formatRunStatusLabel(runState?.status);
 
                 return (
                   <button
@@ -52,8 +70,13 @@ export default function ConversationList({
                     onClick={() => onSelectConversation(conversation.id)}
                   >
                     <span className="conversation-title">{truncateText(conversation.title, 45)}</span>
-                    <span className="conversation-date">
-                      {formatRelativeTime(conversation.updated_at)}
+                    <span className="conversation-meta-row">
+                      <span className="conversation-date">
+                        {formatRelativeTime(conversation.updated_at)}
+                      </span>
+                      {runLabel && (
+                        <span className={`conversation-status ${runState.status}`}>{runLabel}</span>
+                      )}
                     </span>
                   </button>
                 );
