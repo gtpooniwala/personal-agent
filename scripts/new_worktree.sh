@@ -50,5 +50,10 @@ fi
 
 mkdir -p .worktrees
 git worktree add "${WT_PATH}" -b "${BRANCH}" origin/main
+
+if [ -f ".env" ] && [ ! -e "${WT_PATH}/.env" ] && [ ! -L "${WT_PATH}/.env" ]; then
+  ln -s ../../.env "${WT_PATH}/.env"
+fi
+
 echo "Created worktree: ${WT_PATH}"
 echo "Branch: ${BRANCH}"

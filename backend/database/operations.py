@@ -874,6 +874,42 @@ class DatabaseOperations:
             session.close()
 
 
-# Global database operations instance
-db_ops = DatabaseOperations()
+class LazyDatabaseOperations:
+    """Lazily construct DatabaseOperations on first use.
+
+    This avoids import-time database connections, which makes tests, eval
+    harnesses, and CLI tooling able to select the correct database before any
+    backend module binds to one.
+    """
+
+    def __init__(self) -> None:
+        self._instance: Optional[DatabaseOperations] = None
+
+    def _get_instance(self) -> DatabaseOperations:
+        if self._instance is None:
+            self._instance = DatabaseOperations()
+        return self._instance
+
+    def close(self) -> None:
+        if self._instance is not None:
+            self._instance.close()
+
+    def reset(self) -> None:
+        """Dispose the current instance so a later access re-reads settings."""
+        if self._instance is not None:
+            self._instance.close()
+            self._instance = None
+
+    def __getattr__(self, item: str) -> Any:
+        if item in {"engine", "SessionLocal"}:
+            return getattr(self._get_instance(), item)
+
+        def _lazy_method(*args: Any, **kwargs: Any) -> Any:
+            return getattr(self._get_instance(), item)(*args, **kwargs)
+
+        return _lazy_method
+
+
+# Global database operations handle
+db_ops = LazyDatabaseOperations()
 atexit.register(db_ops.close)

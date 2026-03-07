@@ -98,6 +98,7 @@ cp .env.example .env
 # Optional observability: set LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_BASE_URL
 # `DATABASE_URL` is used for local host runtime.
 # `DATABASE_URL_DOCKER` is used by the backend container in docker compose.
+# `TEST_DATABASE_URL` / `EVAL_DATABASE_URL` should point to a dedicated PostgreSQL *_test database for tests/evals.
 ```
 
 ### 3) Start backend + frontend

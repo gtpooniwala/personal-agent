@@ -5,6 +5,7 @@
   "cases": [
     {
       "id": "multi_tool_single_turn",
+      "set": "core",
       "description": "Combined requests should trigger multiple relevant tools.",
       "turns": [
         {
@@ -28,6 +29,7 @@
     },
     {
       "id": "document_fallback_without_selection",
+      "set": "core",
       "description": "Document queries without selected docs should return clear fallback guidance.",
       "turns": [
         {
@@ -63,6 +65,7 @@
     },
     {
       "id": "iterative_math_then_time",
+      "set": "core",
       "description": "Workflow should stay coherent over multiple turns in one conversation.",
       "turns": [
         {
@@ -119,6 +122,60 @@
             ],
             "overall_must_not_call": [
               "search_documents"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "iterative_document_then_latest_news",
+      "set": "extended",
+      "description": "A mixed conversation should route documents first and internet later.",
+      "turns": [
+        {
+          "message": "Search my uploaded contract for renewal terms.",
+          "selected_documents": [
+            "doc-123"
+          ]
+        },
+        {
+          "message": "Now search the internet for today's top AI headlines."
+        }
+      ],
+      "expected": {
+        "by_mode": {
+          "mock": {
+            "per_turn": [
+              {
+                "must_call": [
+                  "search_documents"
+                ],
+                "must_not_call": [
+                  "internet_search"
+                ]
+              },
+              {
+                "must_call": [
+                  "internet_search"
+                ],
+                "response_contains": [
+                  "search"
+                ]
+              }
+            ]
+          },
+          "live": {
+            "per_turn": [
+              {
+                "must_call": [
+                  "search_documents"
+                ]
+              },
+              {
+                "must_call": [
+                  "internet_search"
+                ]
+              }
             ]
           }
         }

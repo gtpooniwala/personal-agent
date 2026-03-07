@@ -5,6 +5,7 @@
   "cases": [
     {
       "id": "gmail_read_latest",
+      "set": "extended",
       "description": "Query for latest email should route to gmail_read and return success.",
       "turns": [
         {

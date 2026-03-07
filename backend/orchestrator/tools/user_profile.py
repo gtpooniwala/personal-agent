@@ -4,6 +4,7 @@ import os
 import json
 from langchain_core.tools import BaseTool
 from backend.llm import create_chat_model, MissingProviderKeyError, MissingModelDependencyError
+from backend.orchestrator.prompts import build_user_profile_prompt
 
 # Use BASE_DIR from environment or fallback to project root
 BASE_DIR = os.environ.get("BASE_DIR")
@@ -84,14 +85,11 @@ class UserProfileTool(BaseTool):
         return self._run(action, instruction)
 
     def _merge_profile_with_llm(self, current_profile: Dict[str, Any], instruction: Optional[str], user_prompt: Optional[str]) -> Dict[str, Any]:
-        prompt = f"""
-You are an assistant that maintains a structured user profile for personalization.\n
-Current profile (JSON):\n{json.dumps(current_profile, indent=2)}\n
-Instruction: {instruction}\n
-User's original message: {user_prompt}\n
-Extract all relevant facts about the user from the user's message and update the profile as instructed. You may add, update, or delete any information as requested.\n
-IMPORTANT: Only use the scratchpad for temporary, session-specific notes. For all persistent, user-specific facts, preferences, or background, ALWAYS use the user profile.\n
-Return the updated profile as a valid JSON object only, with no extra text or explanation. Do not lose any existing information unless it is contradicted by the instruction or user message.\n"""
+        prompt = build_user_profile_prompt(
+            current_profile=current_profile,
+            instruction=instruction,
+            user_prompt=user_prompt,
+        )
         response = self._llm.invoke(prompt)
         response_text = getattr(response, 'content', str(response))
         print(f"[DEBUG] LLM response: {response_text}")
