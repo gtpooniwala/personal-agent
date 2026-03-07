@@ -1,0 +1,23 @@
+tests/test_runtime_store.py
+  0edeb85fc174ebfd 53,55-56,58-60,63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "2b653c7dd49e4cbd54ce4f2d7fb759961965b45e",
+  "prompts": {
+    "0edeb85fc174ebfd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ec815729-2ef0-438e-92f6-c89e6342a538",
+        "model": "claude-haiku-4-5-20251001"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 0,
+      "accepted_lines": 7,
+      "overriden_lines": 0
+    }
+  }
+}
