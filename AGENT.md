@@ -22,6 +22,9 @@ Canonical workflow contract for AI coding agents in this repository.
    - before opening or updating a PR
 9. Merge using **Squash and merge** only.
 10. For code-change workflow tasks, apply `repo-workflow-env` and `repo-commit-pr-flow`. For PR review comments, apply `gh-address-comments`. For failing checks, apply `gh-fix-ci`.
+11. Keep `#59` as the permanent workflow-improvements tracker:
+   - Never close issue `#59`.
+   - Workflow/process policy PRs should include `Refs #59` in the PR body.
 
 ## Required Checks
 - `CI / tests-and-repo-checks`
