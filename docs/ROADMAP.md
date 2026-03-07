@@ -1,16 +1,15 @@
 # Roadmap
 
-Last updated: March 6, 2026
+Last updated: March 7, 2026
 
 ## Objective
 Move from strong prototype to production-ready personal AI agent with reliable behavior, safer defaults, and measurable quality.
 
-Current high-priority execution objective: implement and validate the async run model (`#15`-`#17`) now that migration design and prerequisite upgrades are complete (`#14`, `#22`, `#23`).
+Current high-priority execution objective: validate and harden the async run model (`#15`-`#17`, now complete) and address frontend correctness follow-ups (`#31`, `#30`).
 
 ## Now (Stabilize Core)
-- Foundation hardening baseline is complete (`#10`, `#11`, `#12`, `#13`); land Gmail reliability follow-up (`#40`).
-- Active implementation lane is durable run lifecycle schema + async submission/status/event contracts (`#15`, `#17`).
-- Sequence worker execution and per-session serialization after data contract freeze (`#16`).
+- Async run lifecycle schema + submission/status/event contracts complete (`#15`, `#16`, `#17`).
+- Land Gmail reliability follow-up (`#40`).
 - Address active frontend send correctness risk (`#31`) and IME Enter handling (`#30`).
 
 Success criteria:
@@ -53,5 +52,6 @@ Success criteria:
 - Workflow automation milestone: [03 Workflow Automation](https://github.com/gtpooniwala/personal-agent/milestone/3)
 - Future backlog milestone: [Backlog / Future](https://github.com/gtpooniwala/personal-agent/milestone/4)
 - Completed migration prerequisites: [#14](https://github.com/gtpooniwala/personal-agent/issues/14) (design + PR decomposition), [#22](https://github.com/gtpooniwala/personal-agent/issues/22), [#23](https://github.com/gtpooniwala/personal-agent/issues/23)
-- Core migration implementation set: [#15](https://github.com/gtpooniwala/personal-agent/issues/15), [#17](https://github.com/gtpooniwala/personal-agent/issues/17), [#16](https://github.com/gtpooniwala/personal-agent/issues/16), [#19](https://github.com/gtpooniwala/personal-agent/issues/19), [#18](https://github.com/gtpooniwala/personal-agent/issues/18)
+- Completed core migration implementation: [#15](https://github.com/gtpooniwala/personal-agent/issues/15) (run lifecycle schema), [#16](https://github.com/gtpooniwala/personal-agent/issues/16) (worker queue + per-session serialization), [#17](https://github.com/gtpooniwala/personal-agent/issues/17) (async contracts)
+- Remaining migration items: [#19](https://github.com/gtpooniwala/personal-agent/issues/19) (runtime evals), [#18](https://github.com/gtpooniwala/personal-agent/issues/18) (scheduler/heartbeat)
 - Active migration/frontend follow-ups: [#28](https://github.com/gtpooniwala/personal-agent/issues/28), [#29](https://github.com/gtpooniwala/personal-agent/issues/29), [#31](https://github.com/gtpooniwala/personal-agent/issues/31), [#30](https://github.com/gtpooniwala/personal-agent/issues/30), [#40](https://github.com/gtpooniwala/personal-agent/issues/40)

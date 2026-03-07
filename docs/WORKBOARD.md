@@ -1,6 +1,6 @@
 # Workboard
 
-Last updated: March 6, 2026
+Last updated: March 7, 2026
 
 ## How This Is Used
 This file is the AI execution board for this repo.
@@ -19,30 +19,25 @@ Workflow:
 - `done`
 
 ## Now
-- [ ] `in_progress` Adopt PostgreSQL as default runtime and test database baseline ([#46](https://github.com/gtpooniwala/personal-agent/issues/46))
 - [ ] `todo` Fix Gmail auth flow and dependency packaging ([#40](https://github.com/gtpooniwala/personal-agent/issues/40))
-- [ ] `in_progress` Add run lifecycle schema (`runs`, `run_events`, `leases`) ([#15](https://github.com/gtpooniwala/personal-agent/issues/15))
-- [ ] `in_progress` Deliver async submission contracts for `/chat` and `/runs` plus status/events endpoints ([#17](https://github.com/gtpooniwala/personal-agent/issues/17))
-
-## Next
 - [ ] `todo` Prevent cross-conversation message race on send ([#31](https://github.com/gtpooniwala/personal-agent/issues/31))
 - [ ] `todo` Guard Enter key send during IME composition ([#30](https://github.com/gtpooniwala/personal-agent/issues/30))
 
+## Next
+- [ ] `todo` Add runtime evals for lifecycle/retry/session isolation ([#19](https://github.com/gtpooniwala/personal-agent/issues/19))
+- [ ] `todo` Add scheduler/heartbeat for autonomous workflows ([#18](https://github.com/gtpooniwala/personal-agent/issues/18))
+
 ## Migration Track
 - [x] `done` Publish migration architecture contract + PR decomposition for long-running runtime ([#14](https://github.com/gtpooniwala/personal-agent/issues/14))
-- [ ] `in_progress` Add run lifecycle schema (`runs`, `run_events`, `leases`) ([#15](https://github.com/gtpooniwala/personal-agent/issues/15))
-- [ ] `in_progress` Deliver async submission contracts for `/chat` and `/runs` plus status/events endpoints ([#17](https://github.com/gtpooniwala/personal-agent/issues/17))
-- [ ] `todo` Implement runtime worker queue with per-session serialization ([#16](https://github.com/gtpooniwala/personal-agent/issues/16))
+- [x] `done` Add run lifecycle schema (`runs`, `run_events`, `leases`) ([#15](https://github.com/gtpooniwala/personal-agent/issues/15))
+- [x] `done` Deliver async submission contracts for `/chat` and `/runs` plus status/events endpoints ([#17](https://github.com/gtpooniwala/personal-agent/issues/17))
+- [x] `done` Implement runtime worker queue with per-session serialization ([#16](https://github.com/gtpooniwala/personal-agent/issues/16))
 - [ ] `todo` Add scheduler/heartbeat for autonomous workflows ([#18](https://github.com/gtpooniwala/personal-agent/issues/18))
 - [ ] `todo` Add runtime evals for lifecycle/retry/session isolation ([#19](https://github.com/gtpooniwala/personal-agent/issues/19))
 - [ ] `todo` Make summarisation tool non-blocking in async path ([#28](https://github.com/gtpooniwala/personal-agent/issues/28))
 - [ ] `todo` Remove import-time global warning filter side effect ([#29](https://github.com/gtpooniwala/personal-agent/issues/29))
 - [x] `done` Build real LLM/workflow evaluation harness (separate from deterministic repo checks) ([#23](https://github.com/gtpooniwala/personal-agent/issues/23))
 - [x] `done` Upgrade to latest LangChain/LangGraph stack (deferred major migration) ([#22](https://github.com/gtpooniwala/personal-agent/issues/22))
-
-Execution sequence after #14:
-- #15 and #17 can run in parallel once event/state vocabulary is frozen.
-- #16 should be sequenced after #15 and / or #17 settle the data contract.
 
 ## Backlog
 - [ ] `todo` Chat naming polish ([#1](https://github.com/gtpooniwala/personal-agent/issues/1))
