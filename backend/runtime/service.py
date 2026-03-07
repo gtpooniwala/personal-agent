@@ -18,6 +18,7 @@ from backend.runtime.contracts import (
 from backend.runtime.store import RunNotFoundError, RunStore
 
 logger = logging.getLogger(__name__)
+GENERIC_RUNTIME_FAILURE_MESSAGE = "Run failed due to an internal error."
 
 
 class RuntimeService:
@@ -120,7 +121,12 @@ class RuntimeService:
 
                 if result.get("error", False):
                     error_message = result.get("response") or "Run failed"
-                    self._run_store.update_run(run_id=run_id, status=RUN_STATUS_FAILED, error=error_message)
+                    self._run_store.update_run(
+                        run_id=run_id,
+                        status=RUN_STATUS_FAILED,
+                        error=error_message,
+                        result=None,
+                    )
                     self._run_store.append_event(
                         run_id=run_id,
                         event_type=RUN_EVENT_FAILED,
@@ -146,7 +152,12 @@ class RuntimeService:
                     )
 
                 response = result.get("response") or ""
-                self._run_store.update_run(run_id=run_id, status=RUN_STATUS_SUCCEEDED, result=response)
+                self._run_store.update_run(
+                    run_id=run_id,
+                    status=RUN_STATUS_SUCCEEDED,
+                    result=response,
+                    error=None,
+                )
                 self._run_store.append_event(
                     run_id=run_id,
                     event_type=RUN_EVENT_SUCCEEDED,
@@ -160,12 +171,17 @@ class RuntimeService:
             except Exception as exc:
                 logger.exception("Unexpected run execution failure", extra={"event": "runtime.run_crash", "run_id": run_id})
                 try:
-                    self._run_store.update_run(run_id=run_id, status=RUN_STATUS_FAILED, error=str(exc))
+                    self._run_store.update_run(
+                        run_id=run_id,
+                        status=RUN_STATUS_FAILED,
+                        error=GENERIC_RUNTIME_FAILURE_MESSAGE,
+                        result=None,
+                    )
                     self._run_store.append_event(
                         run_id=run_id,
                         event_type=RUN_EVENT_FAILED,
                         status=RUN_STATUS_FAILED,
-                        message=f"Unexpected runtime failure: {exc}",
+                        message=GENERIC_RUNTIME_FAILURE_MESSAGE,
                     )
                 except RunNotFoundError:
                     logger.warning("Run disappeared while storing failure", extra={"event": "runtime.run_missing", "run_id": run_id})
@@ -173,6 +189,6 @@ class RuntimeService:
                 update_observation(
                     observation,
                     output={"status": RUN_STATUS_FAILED, "run_id": run_id},
-                    status_message=str(exc),
+                    status_message=GENERIC_RUNTIME_FAILURE_MESSAGE,
                     metadata={"error_type": type(exc).__name__},
                 )

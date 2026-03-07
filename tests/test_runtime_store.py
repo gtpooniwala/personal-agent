@@ -39,6 +39,28 @@ class TestInMemoryRunStore(unittest.TestCase):
         with self.assertRaises(RunNotFoundError):
             self.store.get_run("missing")
 
+    def test_update_run_can_clear_error_and_result(self):
+        run = self.store.create_run(conversation_id="conv-1", message="hello", selected_documents=[])
+        self.store.update_run(run_id=run.run_id, status="failed", error="boom", result="temp")
+        updated = self.store.update_run(run_id=run.run_id, status="succeeded", error=None, result=None)
+        self.assertIsNone(updated.error)
+        self.assertIsNone(updated.result)
+
+    def test_store_prunes_old_runs_when_capacity_exceeded(self):
+        original_max = InMemoryRunStore.MAX_STORED_RUNS
+        InMemoryRunStore.MAX_STORED_RUNS = 2
+        try:
+            run1 = self.store.create_run(conversation_id="conv-1", message="m1", selected_documents=[])
+            run2 = self.store.create_run(conversation_id="conv-2", message="m2", selected_documents=[])
+            run3 = self.store.create_run(conversation_id="conv-3", message="m3", selected_documents=[])
+
+            with self.assertRaises(RunNotFoundError):
+                self.store.get_run(run1.run_id)
+            self.assertEqual(self.store.get_run(run2.run_id).conversation_id, "conv-2")
+            self.assertEqual(self.store.get_run(run3.run_id).conversation_id, "conv-3")
+        finally:
+            InMemoryRunStore.MAX_STORED_RUNS = original_max
+
 
 if __name__ == "__main__":
     unittest.main()

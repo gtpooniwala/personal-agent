@@ -99,10 +99,10 @@ Response body:
       "created_at": "2026-03-06T10:00:01Z"
     },
     {
-      "type": "tool_call",
+      "type": "tool_result",
       "status": "running",
       "tool": "calculator",
-      "message": "Tool selected and executing",
+      "message": "Tool action completed",
       "created_at": "2026-03-06T10:00:02Z"
     }
   ],
@@ -229,7 +229,7 @@ Response body:
 ```json
 {
   "event_id": "string cursor",
-  "type": "started|tool_call|tool_result|retrying|failed|succeeded|cancelled",
+  "type": "queued|started|tool_result|retrying|failed|succeeded|cancelled",
   "status": "queued|running|retrying|succeeded|failed|cancelling|cancelled",
   "message": "string",
   "tool": "string|null",

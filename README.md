@@ -40,7 +40,7 @@ flowchart LR
 Current runtime path:
 1. User sends a message from the frontend.
 2. `POST /chat` or `POST /runs` submits asynchronous work and returns a `run_id`.
-3. Backend worker processes run steps asynchronously (tool selection, tool execution, synthesis).
+3. Backend in-process background tasks execute run steps asynchronously (tool selection, tool execution, synthesis), with dedicated worker queueing planned in `#16`.
 4. Frontend polls `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events`.
 
 ## Implemented Capabilities

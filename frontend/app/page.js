@@ -248,7 +248,6 @@ export default function HomePage() {
       }
 
       let status = null;
-      let afterCursor = null;
       let switchedConversation = false;
 
       for (let attempt = 0; attempt < RUN_POLL_MAX_ATTEMPTS; attempt += 1) {
@@ -258,15 +257,6 @@ export default function HomePage() {
         }
 
         status = await runtimeApiCall(`/runs/${runId}/status`);
-
-        const params = new URLSearchParams({ limit: "50" });
-        if (afterCursor) {
-          params.set("after", afterCursor);
-        }
-        const events = await runtimeApiCall(`/runs/${runId}/events?${params.toString()}`);
-        if (events?.next_after) {
-          afterCursor = events.next_after;
-        }
 
         if (!RUN_IN_PROGRESS_STATUSES.has(status?.status)) {
           break;

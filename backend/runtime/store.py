@@ -21,6 +21,9 @@ class InvalidEventsCursorError(RunStoreError):
     """Raised when an events cursor is malformed."""
 
 
+_UNSET = object()
+
+
 class RunStore(ABC):
     @abstractmethod
     def create_run(self, *, conversation_id: str, message: str, selected_documents: Sequence[str]) -> RunRecord:
@@ -59,6 +62,9 @@ class RunStore(ABC):
 
 class InMemoryRunStore(RunStore):
     # TODO(#15): Replace temporary in-memory run store with durable runs/run_events persistence.
+    MAX_STORED_RUNS = 500
+    MAX_EVENTS_PER_RUN = 1000
+
     def __init__(self):
         self._runs: Dict[str, RunRecord] = {}
         self._events: Dict[str, List[RunEventRecord]] = {}
@@ -80,6 +86,7 @@ class InMemoryRunStore(RunStore):
             )
             self._runs[run_id] = record
             self._events[run_id] = []
+            self._prune_runs_locked()
             return replace(record)
 
     def get_run(self, run_id: str) -> RunRecord:
@@ -89,7 +96,14 @@ class InMemoryRunStore(RunStore):
                 raise RunNotFoundError(f"Run '{run_id}' was not found")
             return replace(record)
 
-    def update_run(self, *, run_id: str, status: str, error: Optional[str] = None, result: Optional[str] = None) -> RunRecord:
+    def update_run(
+        self,
+        *,
+        run_id: str,
+        status: str,
+        error: Optional[str] = _UNSET,
+        result: Optional[str] = _UNSET,
+    ) -> RunRecord:
         with self._lock:
             record = self._runs.get(run_id)
             if record is None:
@@ -97,9 +111,9 @@ class InMemoryRunStore(RunStore):
 
             record.status = status
             record.updated_at = utcnow()
-            if error is not None:
+            if error is not _UNSET:
                 record.error = error
-            if result is not None:
+            if result is not _UNSET:
                 record.result = result
             return replace(record)
 
@@ -127,6 +141,8 @@ class InMemoryRunStore(RunStore):
                 created_at=utcnow(),
             )
             self._events[run_id].append(event)
+            if len(self._events[run_id]) > self.MAX_EVENTS_PER_RUN:
+                self._events[run_id] = self._events[run_id][-self.MAX_EVENTS_PER_RUN :]
             return replace(event)
 
     def list_events(
@@ -161,6 +177,16 @@ class InMemoryRunStore(RunStore):
             has_more = start_idx + limit < len(events)
             next_after = page[-1].event_id if page else after
             return [replace(evt) for evt in page], next_after, has_more
+
+    def _prune_runs_locked(self) -> None:
+        overflow = len(self._runs) - self.MAX_STORED_RUNS
+        if overflow <= 0:
+            return
+
+        stale_run_ids = list(self._runs.keys())[:overflow]
+        for stale_run_id in stale_run_ids:
+            self._runs.pop(stale_run_id, None)
+            self._events.pop(stale_run_id, None)
 
 
 class SqliteRunStorePlaceholder(RunStore):
