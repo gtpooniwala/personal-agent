@@ -1,0 +1,15 @@
+# Agent behaviour configuration.
+# These are non-secret runtime tunables. Do NOT put secrets here.
+# Secret values (API keys, credentials) belong in .env.
+
+conversation_naming:
+  # Minutes of inactivity before the maintenance scan schedules auto-naming.
+  delay_minutes: 5
+  # Minutes to wait before retrying a failed or skipped naming attempt.
+  retry_delay_minutes: 2
+  # Maximum character length for a generated title (excess is truncated with "...").
+  title_max_length: 50
+  # Number of leading messages fed to the LLM for context when generating a title.
+  context_messages: 6
+  # Maximum number of automatic retry attempts per conversation.
+  max_retries: 3

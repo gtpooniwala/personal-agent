@@ -95,5 +95,18 @@ def load_llm_config():
 
 llm_config = load_llm_config()
 
+AGENT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "agent_config.yaml")
+
+
+def load_agent_config():
+    if os.path.exists(AGENT_CONFIG_PATH):
+        with open(AGENT_CONFIG_PATH, "r") as f:
+            data = yaml.safe_load(f)
+            return data if isinstance(data, dict) else {}
+    return {}
+
+
+agent_config = load_agent_config()
+
 # Ensure local data directory exists for uploads and local tool files.
 os.makedirs(os.path.join(PROJECT_ROOT, "data"), exist_ok=True)
