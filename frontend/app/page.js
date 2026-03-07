@@ -4,7 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import ChatPanel from "@/components/ChatPanel";
 import ConversationList from "@/components/ConversationList";
 import DocumentsPanel from "@/components/DocumentsPanel";
-import { apiCall, uploadPdf } from "@/lib/api";
+import { apiCall, runtimeApiCall, uploadPdf } from "@/lib/api";
+
+const RUN_POLL_INTERVAL_MS = 500;
+const RUN_POLL_MAX_ATTEMPTS = 120;
+
+const RUN_IN_PROGRESS_STATUSES = new Set(["queued", "running", "retrying", "cancelling"]);
 
 function localId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -228,7 +233,7 @@ export default function HomePage() {
     setMessages((previousMessages) => [...previousMessages, optimisticUserMessage, thinkingMessage]);
 
     try {
-      const response = await apiCall("/chat", {
+      const submitResponse = await runtimeApiCall("/chat", {
         method: "POST",
         body: JSON.stringify({
           message: trimmedMessage,
@@ -237,22 +242,45 @@ export default function HomePage() {
         }),
       });
 
-      const assistantMessage = {
-        id: localId("assistant"),
-        role: "assistant",
-        content: response?.response || "",
-        timestamp: new Date().toISOString(),
-        agent_actions: response?.agent_actions || [],
-      };
+      const runId = submitResponse?.run_id;
+      if (!runId) {
+        throw new Error("Run submission did not return run_id");
+      }
 
-      if (activeConversationIdRef.current === requestConversationId) {
-        setMessages((previousMessages) => [
-          ...previousMessages.filter((message) => message.id !== thinkingId),
-          assistantMessage,
-        ]);
+      let status = null;
+      let afterCursor = null;
+
+      for (let attempt = 0; attempt < RUN_POLL_MAX_ATTEMPTS; attempt += 1) {
+        status = await runtimeApiCall(`/runs/${runId}/status`);
+
+        const params = new URLSearchParams({ limit: "50" });
+        if (afterCursor) {
+          params.set("after", afterCursor);
+        }
+        const events = await runtimeApiCall(`/runs/${runId}/events?${params.toString()}`);
+        if (events?.next_after) {
+          afterCursor = events.next_after;
+        }
+
+        if (!RUN_IN_PROGRESS_STATUSES.has(status?.status)) {
+          break;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, RUN_POLL_INTERVAL_MS));
+      }
+
+      if (!status || RUN_IN_PROGRESS_STATUSES.has(status.status)) {
+        throw new Error("Run polling timed out");
       }
 
       await loadConversations();
+      if (activeConversationIdRef.current === requestConversationId) {
+        setMessages((previousMessages) => previousMessages.filter((item) => item.id !== thinkingId));
+        await loadConversationMessages(requestConversationId);
+        if (status.status !== "succeeded") {
+          setChatError(status.error || "Run failed.");
+        }
+      }
     } catch {
       if (activeConversationIdRef.current === requestConversationId) {
         setMessages((previousMessages) => [
@@ -272,6 +300,7 @@ export default function HomePage() {
     }
   }, [
     loadConversations,
+    loadConversationMessages,
     currentConversationId,
     messageInput,
     selectedDocuments,
