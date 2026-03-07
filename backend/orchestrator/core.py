@@ -634,11 +634,15 @@ Title:"""
                 still_untitled = await asyncio.to_thread(
                     db_ops.is_conversation_untitled, conversation_id
                 )
-                if still_untitled:
-                    await asyncio.to_thread(
-                        db_ops.update_conversation_title, conversation_id, title
+                if not still_untitled:
+                    logger.debug(
+                        f"Skipping title write for {conversation_id}: already titled by concurrent task"
                     )
-                    logger.info(f"Generated title for conversation {conversation_id}: {title}")
+                    return None
+                await asyncio.to_thread(
+                    db_ops.update_conversation_title, conversation_id, title
+                )
+                logger.info(f"Generated title for conversation {conversation_id}: {title}")
                 return title
 
             return None
