@@ -115,6 +115,7 @@ class InMemoryRunStore(RunStore):
                 record.error = error
             if result is not _UNSET:
                 record.result = result
+            self._prune_runs_locked()
             return replace(record)
 
     def append_event(

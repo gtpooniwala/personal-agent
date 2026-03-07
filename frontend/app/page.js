@@ -250,6 +250,10 @@ export default function HomePage() {
       let status = null;
 
       for (let attempt = 0; attempt < RUN_POLL_MAX_ATTEMPTS; attempt += 1) {
+        if (activeConversationIdRef.current !== requestConversationId) {
+          return;
+        }
+
         try {
           status = await runtimeApiCall(`/runs/${runId}/status`);
         } catch {
@@ -265,10 +269,6 @@ export default function HomePage() {
         }
 
         await new Promise((resolve) => setTimeout(resolve, RUN_POLL_INTERVAL_MS));
-      }
-
-      if (activeConversationIdRef.current !== requestConversationId) {
-        return;
       }
 
       if (!status || RUN_IN_PROGRESS_STATUSES.has(status.status)) {
