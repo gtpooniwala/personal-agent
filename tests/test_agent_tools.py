@@ -1,11 +1,12 @@
 """Behavioral tests for core tool modules."""
+import asyncio
 import datetime
 import os
 import shutil
 import sys
 import tempfile
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 # Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -137,6 +138,113 @@ class TestWebSearchProviders(unittest.TestCase):
         mock_requests.get.side_effect = Exception("network down")
         result = web_search_providers.bing_search("python", "test-key")
         self.assertIsNone(result)
+
+
+SUMMARISATION_AVAILABLE = True
+SUMMARISATION_IMPORT_ERROR = ""
+_summarisation_module = None
+
+try:
+    from backend.orchestrator.tools.summarisation_agent import SummarisationAgent
+    _summarisation_module = sys.modules["backend.orchestrator.tools.summarisation_agent"]
+except Exception as exc:
+    SUMMARISATION_AVAILABLE = False
+    SUMMARISATION_IMPORT_ERROR = str(exc)
+
+
+@unittest.skipUnless(
+    SUMMARISATION_AVAILABLE,
+    f"SummarisationAgent unavailable: {SUMMARISATION_IMPORT_ERROR}",
+)
+class TestSummarisationAgentSync(unittest.TestCase):
+    @patch.object(_summarisation_module or object(), "create_chat_model", create=True)
+    def test_run_returns_summary_text(self, mock_create):
+        mock_llm = Mock()
+        mock_llm.invoke.return_value = Mock(content="Summary text")
+        mock_create.return_value = mock_llm
+
+        tool = SummarisationAgent()
+        result = tool._run("User: hello\nAssistant: hi")
+        self.assertEqual(result, "Summary text")
+
+    @patch.object(_summarisation_module or object(), "create_chat_model", create=True)
+    def test_run_falls_back_to_str_when_no_content_attr(self, mock_create):
+        mock_llm = Mock()
+        mock_llm.invoke.return_value = "plain string"
+        mock_create.return_value = mock_llm
+
+        tool = SummarisationAgent()
+        result = tool._run("history")
+        self.assertEqual(result, "plain string")
+
+    @patch.object(_summarisation_module or object(), "create_chat_model", create=True)
+    def test_run_includes_conversation_in_prompt(self, mock_create):
+        mock_llm = Mock()
+        mock_llm.invoke.return_value = Mock(content="ok")
+        mock_create.return_value = mock_llm
+
+        tool = SummarisationAgent()
+        tool._run("special history content")
+        call_args = mock_llm.invoke.call_args[0][0]
+        self.assertIn("special history content", call_args)
+
+
+@unittest.skipUnless(
+    SUMMARISATION_AVAILABLE,
+    f"SummarisationAgent unavailable: {SUMMARISATION_IMPORT_ERROR}",
+)
+class TestSummarisationAgentAsync(unittest.IsolatedAsyncioTestCase):
+    @patch.object(_summarisation_module or object(), "create_chat_model", create=True)
+    async def test_arun_uses_ainvoke(self, mock_create):
+        mock_llm = Mock()
+        mock_llm.ainvoke = AsyncMock(return_value=Mock(content="Async summary"))
+        mock_create.return_value = mock_llm
+
+        tool = SummarisationAgent()
+        result = await tool._arun("User: hello\nAssistant: hi")
+
+        mock_llm.ainvoke.assert_awaited_once()
+        mock_llm.invoke.assert_not_called()
+        self.assertEqual(result, "Async summary")
+
+    @patch.object(_summarisation_module or object(), "create_chat_model", create=True)
+    async def test_arun_passes_conversation_in_prompt(self, mock_create):
+        mock_llm = Mock()
+        mock_llm.ainvoke = AsyncMock(return_value=Mock(content="ok"))
+        mock_create.return_value = mock_llm
+
+        tool = SummarisationAgent()
+        await tool._arun("unique async history")
+
+        prompt = mock_llm.ainvoke.call_args[0][0]
+        self.assertIn("unique async history", prompt)
+
+    @patch.object(_summarisation_module or object(), "create_chat_model", create=True)
+    async def test_arun_respects_max_tokens(self, mock_create):
+        mock_llm = Mock()
+        mock_llm.ainvoke = AsyncMock(return_value=Mock(content="short"))
+        mock_create.return_value = mock_llm
+
+        tool = SummarisationAgent()
+        await tool._arun("history", max_tokens=256)
+
+        mock_create.assert_called_once_with(
+            "summarisation_agent", temperature=0.2, max_tokens=256
+        )
+
+    @patch.object(_summarisation_module or object(), "create_chat_model", create=True)
+    async def test_arun_does_not_call_sync_run(self, mock_create):
+        mock_llm = Mock()
+        mock_llm.ainvoke = AsyncMock(return_value=Mock(content="result"))
+        mock_create.return_value = mock_llm
+
+        tool = SummarisationAgent()
+        original_run = tool._run
+        run_called = []
+        tool._run = lambda *a, **kw: run_called.append(True) or original_run(*a, **kw)
+
+        await tool._arun("history")
+        self.assertEqual(run_called, [], "_run must not be called from _arun")
 
 
 if __name__ == "__main__":
