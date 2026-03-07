@@ -18,8 +18,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-from sqlalchemy import create_engine, text
-
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -138,15 +136,27 @@ def _check_live_eval_database_connectivity() -> Optional[str]:
     if error:
         return error
     try:
-        engine = create_engine(str(database_url), pool_pre_ping=True)
+        engine, sql_text = _create_live_eval_engine(str(database_url))
         try:
             with engine.connect() as connection:
-                connection.execute(text("SELECT 1"))
+                connection.execute(sql_text("SELECT 1"))
         finally:
             engine.dispose()
     except Exception as exc:
         return f"Live eval database is not reachable: {exc}"
     return None
+
+
+def _create_live_eval_engine(database_url: str):
+    """Import SQLAlchemy only when live eval DB checks are required."""
+    try:
+        from sqlalchemy import create_engine, text
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "SQLAlchemy is required for live eval database connectivity checks. "
+            "Install backend requirements and retry."
+        ) from exc
+    return create_engine(database_url, pool_pre_ping=True), text
 
 
 def _case_matches_eval_set(case: Dict[str, Any], eval_set: str) -> bool:

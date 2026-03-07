@@ -48,7 +48,7 @@ The Gmail Tool provides robust integration with Gmail, enabling the agent to sea
 ## Limitations
 - Only read/search is implemented (no send/compose yet)
 - Requires user to complete OAuth flow on first use
-- Tool is hidden from the active tool list unless dependencies, credentials, and token/auth readiness checks pass
+- Tool is hidden from the active tool list unless dependencies and credentials checks pass (OAuth/token setup happens on first use)
 
 ## References
 - See [`README.md`](../../README.md) and [`AGENT.md`](../../AGENT.md) for user and workflow documentation

@@ -63,6 +63,10 @@ class DocumentProcessor:
                 self.initialization_error
                 or "Document processing requires a configured chat model."
             )
+
+    def _current_embedding_model_name(self) -> str:
+        self._require_embeddings_model()
+        return str(getattr(self.embeddings, "model", "configured-embedding-model"))
     
     async def process_pdf_upload(self, file_content: bytes, filename: str, user_id: str = "default") -> str:
         """
@@ -155,7 +159,7 @@ class DocumentProcessor:
                         chunk_index=i,
                         content=chunk_text,
                         embedding=embedding_bytes,
-                        embedding_model=getattr(self.embeddings, "model", "configured-embedding-model")
+                        embedding_model=self._current_embedding_model_name(),
                     )
                     session.add(chunk)
                 
@@ -260,6 +264,7 @@ class DocumentProcessor:
         """
         try:
             self._require_embeddings_model()
+            current_embedding_model = self._current_embedding_model_name()
             # Generate embedding for query
             query_embedding = await self.embeddings.aembed_query(query)
             
@@ -269,7 +274,8 @@ class DocumentProcessor:
                 # Build query with optional document filtering
                 query_filter = session.query(DocumentChunk).join(Document).filter(
                     Document.user_id == user_id,
-                    Document.processed == "completed"
+                    Document.processed == "completed",
+                    DocumentChunk.embedding_model == current_embedding_model,
                 )
                 
                 # Filter by selected documents if provided
@@ -335,6 +341,7 @@ class DocumentProcessor:
         """
         try:
             self._require_embeddings_model()
+            current_embedding_model = self._current_embedding_model_name()
             # Generate embedding for query (synchronous)
             query_embedding = self.embeddings.embed_query(query)
             
@@ -344,7 +351,8 @@ class DocumentProcessor:
                 # Build query with optional document filtering
                 query_filter = session.query(DocumentChunk).join(Document).filter(
                     Document.user_id == user_id,
-                    Document.processed == "completed"
+                    Document.processed == "completed",
+                    DocumentChunk.embedding_model == current_embedding_model,
                 )
                 
                 # Filter by selected documents if provided

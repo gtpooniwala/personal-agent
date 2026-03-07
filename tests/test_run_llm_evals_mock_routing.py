@@ -112,7 +112,7 @@ class TestRunLLMEvalsMockRouting(unittest.TestCase):
     def test_live_eval_database_connectivity_returns_blocking_message(self):
         test_url = "postgresql+psycopg://user:pass@127.0.0.1:5432/personal_agent_eval"
         with patch.dict(os.environ, {"EVAL_DATABASE_URL": test_url}, clear=True):
-            with patch.object(self.harness, "create_engine", side_effect=RuntimeError("db down")):
+            with patch.object(self.harness, "_create_live_eval_engine", side_effect=RuntimeError("db down")):
                 error = self.harness._check_live_eval_database_connectivity()
         self.assertEqual(error, "Live eval database is not reachable: db down")
 

@@ -182,6 +182,13 @@ class TestCoreOrchestrator(unittest.TestCase):
             response,
         )
 
+    def test_short_circuit_does_not_misclassify_profile_as_document_query(self):
+        response = self.orchestrator._maybe_short_circuit_unselected_document_request(
+            user_request="Can you update my profile preferences?",
+            selected_documents=[],
+        )
+        self.assertIsNone(response)
+
     def test_format_document_status_prefers_selected_document_state(self):
         status = self.orchestrator._format_document_status(
             {

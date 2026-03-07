@@ -29,6 +29,9 @@ NO_SELECTED_DOCUMENTS_MESSAGE = (
     "No documents are currently selected. Please select one or more documents "
     "to enable document search."
 )
+DOCUMENT_INTENT_PATTERN = re.compile(
+    r"\b(document|documents|uploaded|file|files|contract|contracts|pdf|pdfs)\b"
+)
 
 
 class CoreOrchestrator:
@@ -449,11 +452,14 @@ class CoreOrchestrator:
             return None
 
         query = (user_request or "").strip().lower()
-        document_intent = any(token in query for token in ("document", "uploaded", "file", "contract", "pdf"))
+        document_intent = self._has_document_intent(query)
         if not document_intent:
             return None
 
         return self._build_no_selected_documents_response(user_request)
+
+    def _has_document_intent(self, query: str) -> bool:
+        return DOCUMENT_INTENT_PATTERN.search((query or "").lower()) is not None
 
     def _build_no_selected_documents_response(self, user_request: str) -> str:
         """Keep fallback guidance explicit while acknowledging the requested document topic."""
@@ -505,7 +511,7 @@ class CoreOrchestrator:
                     "output": output,
                 })
 
-        document_intent = any(token in query_lower for token in ("document", "uploaded", "file", "contract", "pdf"))
+        document_intent = self._has_document_intent(query_lower)
         if document_intent:
             search_tool = self.tool_registry._tools.get("search_documents")
             with observe_operation(
