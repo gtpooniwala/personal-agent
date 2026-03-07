@@ -2,9 +2,9 @@ import React from 'react';
 import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import HomePage from '@/app/page';
-import { apiCall, runtimeApiCall } from '../lib/api';
+import { apiCall, runtimeApiCall } from '@/lib/api';
 
-jest.mock('../lib/api', () => ({
+jest.mock('@/lib/api', () => ({
   apiCall: jest.fn(),
   runtimeApiCall: jest.fn(),
   uploadPdf: jest.fn(),
@@ -146,6 +146,62 @@ describe('sendMessage conversation scoping (issue #31)', () => {
     await user.click(screen.getByRole('button', { name: /^send$/i }));
 
     // After all promises resolve, the button should return to "Send" and be enabled
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^send$/i })).not.toBeDisabled();
+    });
+  });
+
+  test('maintains sending state for original conversation if user switches during status polling', async () => {
+    const user = userEvent.setup();
+
+    // /chat resolves immediately, but status polling is delayed
+    let resolveStatus;
+    const statusPromise = new Promise((resolve) => {
+      resolveStatus = resolve;
+    });
+
+    setupApiMocks({ runtimeChatResponse: async () => ({ run_id: 'run-1' }) });
+    runtimeApiCall.mockImplementation(async (path) => {
+      if (path === '/chat') return { run_id: 'run-1' };
+      if (path.includes('/status')) {
+        await statusPromise;
+        return { status: 'succeeded' };
+      }
+      return {};
+    });
+
+    await act(async () => {
+      render(<HomePage />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Conv A')).toBeInTheDocument();
+      expect(screen.getByText('Conv B')).toBeInTheDocument();
+    });
+
+    const input = screen.getByRole('textbox');
+    await user.type(input, 'hello');
+
+    await user.click(screen.getByRole('button', { name: /^send$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /sending/i })).toBeDisabled();
+    });
+
+    await user.click(screen.getByText('Conv B'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^send$/i })).not.toBeDisabled();
+    });
+
+    await user.click(screen.getByText('Conv A'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /sending/i })).toBeDisabled();
+    });
+
+    resolveStatus();
+
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /^send$/i })).not.toBeDisabled();
     });

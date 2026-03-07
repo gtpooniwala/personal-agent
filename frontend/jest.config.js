@@ -9,6 +9,9 @@ const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testMatch: ['<rootDir>/tests/**/*.test.[jt]s?(x)'],
   modulePathIgnorePatterns: ['<rootDir>/.next/'],
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/$1',
+  },
 };
 
 module.exports = createJestConfig(customJestConfig);

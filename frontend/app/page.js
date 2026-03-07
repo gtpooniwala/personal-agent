@@ -43,7 +43,7 @@ export default function HomePage() {
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
-  const [sendingConversationId, setSendingConversationId] = useState(null);
+  const [sendingConversations, setSendingConversations] = useState(() => new Set());
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
@@ -198,7 +198,7 @@ export default function HomePage() {
     const trimmedMessage = messageInput.trim();
     const requestConversationId = currentConversationId;
 
-    if (!trimmedMessage || (sendingConversationId && sendingConversationId === requestConversationId)) {
+    if (!trimmedMessage || sendingConversations.has(requestConversationId)) {
       return;
     }
 
@@ -207,7 +207,7 @@ export default function HomePage() {
       return;
     }
 
-    setSendingConversationId(requestConversationId);
+    setSendingConversations((prev) => new Set(prev).add(requestConversationId));
     setChatError("");
     setMessageInput("");
 
@@ -298,7 +298,11 @@ export default function HomePage() {
         setChatError("Failed to send message.");
       }
     } finally {
-      setSendingConversationId((current) => current === requestConversationId ? null : current);
+      setSendingConversations((prev) => {
+        const next = new Set(prev);
+        next.delete(requestConversationId);
+        return next;
+      });
     }
   }, [
     loadConversations,
@@ -306,7 +310,7 @@ export default function HomePage() {
     currentConversationId,
     messageInput,
     selectedDocuments,
-    sendingConversationId,
+    sendingConversations,
   ]);
 
   const uploadFiles = useCallback(
@@ -462,7 +466,7 @@ export default function HomePage() {
         isLoadingMessages={loadingMessages}
         chatError={chatError}
         messageInput={messageInput}
-        isSending={!!(sendingConversationId && sendingConversationId === currentConversationId)}
+        isSending={sendingConversations.has(currentConversationId)}
         onChangeMessage={setMessageInput}
         onSendMessage={sendMessage}
       />

@@ -29,7 +29,7 @@ describe('ChatPanel IME composition guard (issue #30)', () => {
   test('Enter with keyCode 229 (IME fallback) does not call onSendMessage', () => {
     render(<ChatPanel {...defaultProps} />);
     const input = screen.getByRole('textbox');
-    fireEvent.keyDown(input, { key: 'Process', keyCode: 229 });
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 });
     expect(defaultProps.onSendMessage).not.toHaveBeenCalled();
   });
 
