@@ -8,6 +8,7 @@ import ast
 import asyncio
 import json
 import math
+import os
 import re
 import sys
 import time
@@ -49,6 +50,13 @@ def parse_args() -> argparse.Namespace:
         help="Run only selected suite(s). Can be passed multiple times.",
     )
     parser.add_argument(
+        "--set",
+        dest="eval_set",
+        choices=("core", "extended", "all"),
+        default="all",
+        help="Run only the core cases, only the extended cases, or all cases.",
+    )
+    parser.add_argument(
         "--cases-dir",
         default=str(CASES_DIR),
         help="Directory containing eval suite JSON files.",
@@ -65,7 +73,42 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _load_suite_files(cases_dir: Path, suite_filter: Sequence[str]) -> List[Dict[str, Any]]:
+def _resolve_live_eval_database_url() -> Tuple[Optional[str], Optional[str]]:
+    """Return an isolated Postgres URL for live evals or a blocking message."""
+    database_url = (os.environ.get("EVAL_DATABASE_URL") or os.environ.get("TEST_DATABASE_URL") or "").strip()
+    if not database_url:
+        return None, (
+            "Live evals require EVAL_DATABASE_URL or TEST_DATABASE_URL to point to a dedicated "
+            "PostgreSQL *_test database."
+        )
+    if not database_url.startswith("postgresql"):
+        return None, "Live eval database must use PostgreSQL."
+    database_name = database_url.rsplit("/", 1)[-1]
+    if not database_name.endswith("_test"):
+        return None, "Live eval database must target a dedicated PostgreSQL *_test database."
+    return database_url, None
+
+
+def _configure_live_eval_environment() -> Optional[str]:
+    """Pin live evals to an isolated database before importing backend modules."""
+    database_url, error = _resolve_live_eval_database_url()
+    if error:
+        return error
+    os.environ["DATABASE_URL"] = str(database_url)
+    return None
+
+
+def _case_matches_eval_set(case: Dict[str, Any], eval_set: str) -> bool:
+    case_set = str(case.get("set", "core")).strip().lower() or "core"
+    if case_set not in {"core", "extended"}:
+        raise ValueError(
+            f"Case '{case.get('id', 'unknown')}' has invalid set '{case_set}'. "
+            "Expected 'core' or 'extended'."
+        )
+    return eval_set == "all" or case_set == eval_set
+
+
+def _load_suite_files(cases_dir: Path, suite_filter: Sequence[str], eval_set: str) -> List[Dict[str, Any]]:
     if not cases_dir.exists():
         raise ValueError(f"Cases directory does not exist: {cases_dir}")
     if not cases_dir.is_dir():
@@ -79,6 +122,13 @@ def _load_suite_files(cases_dir: Path, suite_filter: Sequence[str]) -> List[Dict
         suite_name = str(payload.get("suite", "")).strip()
         if selected and suite_name not in selected:
             continue
+        filtered_cases = [
+            case for case in payload.get("cases", [])
+            if isinstance(case, dict) and _case_matches_eval_set(case, eval_set)
+        ]
+        if not filtered_cases:
+            continue
+        payload["cases"] = filtered_cases
         try:
             payload["_source_file"] = str(path.relative_to(ROOT))
         except ValueError:
@@ -229,6 +279,10 @@ def _mock_execute_turn(message: str, selected_documents: Optional[List[str]]) ->
 
 
 async def _live_execute_case(turns: Sequence[Dict[str, Any]]) -> List[TurnExecution]:
+    env_error = _configure_live_eval_environment()
+    if env_error:
+        raise RuntimeError(env_error)
+
     # Imported lazily so mock mode can run with minimal dependencies.
     from backend.orchestrator.core import CoreOrchestrator
     from backend.database.operations import db_ops
@@ -362,7 +416,7 @@ def _evaluate_case(
 
 async def run_evals(args: argparse.Namespace) -> Dict[str, Any]:
     cases_dir = Path(args.cases_dir).resolve()
-    suites = _load_suite_files(cases_dir, args.suite)
+    suites = _load_suite_files(cases_dir, args.suite, args.eval_set)
     generated_at = _utc_now_iso()
     results: List[Dict[str, Any]] = []
 
@@ -406,6 +460,7 @@ async def run_evals(args: argparse.Namespace) -> Dict[str, Any]:
                 {
                     "suite": suite_name,
                     "case_id": case_id,
+                    "set": str(case.get("set", "core")),
                     "description": case.get("description", ""),
                     "passed": passed,
                     "failures": failures,
@@ -445,6 +500,7 @@ async def run_evals(args: argparse.Namespace) -> Dict[str, Any]:
     return {
         "generated_at": generated_at,
         "mode": args.mode,
+        "eval_set": args.eval_set,
         "summary": summary,
         "suite_summaries": dict(suite_summaries),
         "results": results,
@@ -456,8 +512,8 @@ def write_report(payload: Dict[str, Any], output_arg: Optional[str]) -> Path:
     if output_arg:
         output_path = Path(output_arg).resolve()
     else:
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        output_path = RESULTS_DIR / f"report-{payload['mode']}-{timestamp}.json"
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+        output_path = RESULTS_DIR / f"report-{payload['mode']}-{payload.get('eval_set', 'all')}-{timestamp}.json"
 
     output_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     latest_path = RESULTS_DIR / "latest.json"
@@ -467,6 +523,10 @@ def write_report(payload: Dict[str, Any], output_arg: Optional[str]) -> Path:
 
 def check_live_prerequisites() -> Optional[str]:
     """Return blocking message if live mode cannot run in current environment."""
+    env_error = _configure_live_eval_environment()
+    if env_error:
+        return env_error
+
     try:
         from backend.llm import create_chat_model, MissingProviderKeyError, MissingModelDependencyError
     except ModuleNotFoundError as exc:
@@ -498,6 +558,7 @@ def print_summary(payload: Dict[str, Any], output_path: Path) -> None:
     print("LLM Eval Harness")
     print("=" * 60)
     print(f"Mode: {payload['mode']}")
+    print(f"Set: {payload.get('eval_set', 'all')}")
     print(f"Generated at: {payload['generated_at']}")
     print(f"Passed: {summary['passed']}/{summary['total']}")
     print(f"Failed: {summary['failed']}/{summary['total']}")

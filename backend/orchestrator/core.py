@@ -3,6 +3,12 @@ from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.messages import HumanMessage, AIMessage
 from backend.llm import create_chat_model, predict_text, MissingProviderKeyError, MissingModelDependencyError
 from backend.orchestrator.tool_registry import ToolRegistry
+from backend.orchestrator.prompts import (
+    build_direct_response_prompt,
+    build_orchestrator_system_prompt,
+    build_title_prompt,
+    format_conversation_history,
+)
 from ..database.operations import db_ops
 from typing import Dict, Any, Optional, List
 import json
@@ -72,34 +78,7 @@ class CoreOrchestrator:
         document_context = self._get_document_context()
 
         # Default system prompt (always included)
-        system_prompt = """# PERSONAL ASSISTANT CORE ORCHESTRATOR
-
-## IDENTITY & ROLE
-You are an intelligent personal assistant's orchestrator agent. Your purpose is to understand user needs and execute appropriate tools to fulfill them efficiently. You operate using a Reasoning-Acting (ReAct) framework.
-
-## AGENT BEHAVIOR GUIDELINES
-- Use available tools when appropriate to answer user queries or perform actions.
-- Your job is to analyze the user request, decide which tools to use (including document search, calculator, etc.), and provide a direct final response to the user.
-- Avoid asking the user for clarification; always attempt to execute the task to the best of your ability with the information provided.
-- Never explain which tool you will use—just use it.
-- Never guess or use a tool inappropriately; if unsure, do your best with the available information.
-- You can use some tools multiple times if needed, but only if you expect to get new information or perform a different action.
-- For document-related queries, use the `search_documents` tool to find relevant information even if you are not sure which document the answer is in.
-- **You operate in an iterative, cyclical fashion:** After each tool call, re-evaluate the current state and decide if another tool/action is needed. Continue this loop until all necessary actions are complete, then provide a final response.
-- If you still cant find sufficient information to answer the user query after using all available tools iteratively, clearly tell the user what is missing and suggest they try rephrasing their question or using a different approach.
-
-## SUCCESS METRICS
-Your effectiveness is measured by:
-1. **Accuracy**: Right tool for the right query
-2. **Efficiency**: No unnecessary tool usage
-3. **Naturalness**: Smooth, conversational responses
-4. **Correct Workflow**: Use tools only when needed and provide a clear final answer.
-"""
-
-        # If files are available, append document context
-        if document_context.get('has_documents', False) and document_context.get('selected_count', 0) > 0:
-            system_prompt += f"""
-\n## CONTEXT\nThe following documents have been selected and available to you. Use search_documents tool in case you need additional context for this conversation:\n{self._format_document_status(document_context)}"""
+        system_prompt = build_orchestrator_system_prompt(self._format_document_status(document_context))
 
         # Create memory saver for this conversation
         memory = MemorySaver()
@@ -277,7 +256,10 @@ Your effectiveness is measured by:
                         else:
                             response = orchestration_actions[-1].get("output", "")
                     else:
-                        response = await predict_text(self.llm, user_request)
+                        response = await self._generate_direct_response(
+                            user_request=user_request,
+                            conversation_history=condensed_history,
+                        )
                         orchestration_actions = []
 
                 for action in orchestration_actions or []:
@@ -408,6 +390,19 @@ Your effectiveness is measured by:
                             "total_tokens": total,
                         }
         return None
+
+    async def _generate_direct_response(
+        self,
+        *,
+        user_request: str,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+    ) -> str:
+        """Fallback direct response when the graph cannot complete and no tool route applies."""
+        prompt = build_direct_response_prompt(
+            user_request=user_request,
+            conversation_history=conversation_history,
+        )
+        return await predict_text(self.llm, prompt)
 
     def _run_rule_based_fallback(self, user_request: str) -> Optional[List[Dict[str, Any]]]:
         """
@@ -593,20 +588,10 @@ Your effectiveness is measured by:
             relevant_messages = messages[:6]  # First 3 exchanges
             
             # Build context for title generation
-            conversation_context = "\n".join([
-                f"{msg['role'].capitalize()}: {msg['content']}"
-                for msg in relevant_messages
-            ])
-            
+            conversation_context = format_conversation_history(relevant_messages, max_messages=None)
+
             # Create title generation prompt
-            title_prompt = f"""Based on the following conversation, generate a concise, descriptive title (maximum 5 words) that captures the main topic or purpose of the conversation.
-
-Conversation:
-{conversation_context}
-
-Generate only the title, no additional text or quotes. The title should be specific and meaningful, avoiding generic phrases like "General Chat" or "Conversation".
-
-Title:"""
+            title_prompt = build_title_prompt(conversation_context)
 
             # Generate title using orchestrator LLM
             title = await predict_text(self.llm, title_prompt)

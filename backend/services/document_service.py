@@ -18,6 +18,7 @@ from backend.llm import (
     MissingProviderKeyError,
     MissingModelDependencyError,
 )
+from backend.orchestrator.prompts import build_document_summary_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -224,14 +225,7 @@ class DocumentProcessor:
             if len(text_content) > max_chars:
                 text_content = text_content[:max_chars] + "..."
             
-            summary_prompt = f"""Analyze the following document content and generate a single, concise sentence that summarizes what this document is about. Focus on the main topic, purpose, or subject matter.
-
-Document content:
-{text_content}
-
-Generate only one clear, informative sentence that captures the essence of this document. Do not include any additional text, quotes, or explanations.
-
-Summary:"""
+            summary_prompt = build_document_summary_prompt(text_content)
             summary = await predict_text(self.llm, summary_prompt)
             
             # Clean up the summary

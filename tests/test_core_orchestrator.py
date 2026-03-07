@@ -5,7 +5,7 @@ import sys
 import os
 import asyncio
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 # Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -143,6 +143,33 @@ class TestCoreOrchestrator(unittest.TestCase):
         self.assertEqual(len(messages), 1)
         self.assertIsInstance(messages[0], HumanMessage)
         self.assertEqual(messages[0].content, "Hello")
+
+    def test_generate_direct_response_uses_structured_fallback_prompt(self):
+        """Direct fallback responses should use the shared honesty-first prompt contract."""
+        self.orchestrator.llm = Mock()
+        conversation_history = [
+            {"role": "user", "content": "Earlier question"},
+            {"role": "assistant", "content": "Earlier answer"},
+        ]
+
+        with patch(
+            "backend.orchestrator.core.predict_text",
+            new=AsyncMock(return_value="Fallback answer"),
+        ) as mock_predict:
+            result = asyncio.run(
+                self.orchestrator._generate_direct_response(
+                    user_request="What should I do next?",
+                    conversation_history=conversation_history,
+                )
+            )
+
+        self.assertEqual(result, "Fallback answer")
+        mock_predict.assert_awaited_once()
+        prompt = mock_predict.await_args.args[1]
+        self.assertIn("without tool execution", prompt)
+        self.assertIn("Do not claim that you searched the web", prompt)
+        self.assertIn("User: Earlier question", prompt)
+        self.assertIn("What should I do next?", prompt)
 
 
 if __name__ == '__main__':

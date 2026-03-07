@@ -53,17 +53,18 @@ It writes a machine-readable report to `tests/repo_checks/results.json` (local a
 Deterministic mock mode:
 
 ```bash
-python tests/run_llm_evals.py --mode mock
+python tests/run_llm_evals.py --mode mock --set core
 ```
 
 Live orchestrator/model mode:
 
 ```bash
-python tests/run_llm_evals.py --mode live
+python tests/run_llm_evals.py --mode live --set core
 ```
 
 It writes machine-readable reports to `tests/llm_evals/results/`.
-If the provider key is missing, live mode exits with a clear `blocked` message explaining which API key to set.
+If the provider key is missing, or if `EVAL_DATABASE_URL` / `TEST_DATABASE_URL` does not point to a dedicated PostgreSQL `*_test` database, live mode exits with a clear `blocked` message.
+Use `--set extended` for broader scenario coverage and `--set all` to run both core and extended cases together.
 
 ## Notes
 
