@@ -1,0 +1,23 @@
+backend/database/operations.py
+  981ff5bc3a68cf51 467,474,483,514,524
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "8091f4a54daf63c7250edcd4653891f2b34d70bb",
+  "prompts": {
+    "981ff5bc3a68cf51": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c55d2cea-11de-4c58-82a6-08ce6fd12baf",
+        "model": "claude-haiku-4-5-20251001"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 5,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}
