@@ -101,7 +101,8 @@ AGENT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "agent_config.yaml")
 def load_agent_config():
     if os.path.exists(AGENT_CONFIG_PATH):
         with open(AGENT_CONFIG_PATH, "r") as f:
-            return yaml.safe_load(f)
+            data = yaml.safe_load(f)
+            return data if isinstance(data, dict) else {}
     return {}
 
 

@@ -624,13 +624,21 @@ Title:"""
             title = title.strip().strip('"\'').strip()
 
             if len(title) > _TITLE_MAX_LENGTH:
-                title = title[:_TITLE_MAX_LENGTH - 3] + "..."
+                if _TITLE_MAX_LENGTH > 3:
+                    title = title[:_TITLE_MAX_LENGTH - 3] + "..."
+                else:
+                    title = title[:_TITLE_MAX_LENGTH]
 
             if title:
-                await asyncio.to_thread(
-                    db_ops.update_conversation_title, conversation_id, title
+                # Re-check before writing to guard against concurrent naming tasks.
+                still_untitled = await asyncio.to_thread(
+                    db_ops.is_conversation_untitled, conversation_id
                 )
-                logger.info(f"Generated title for conversation {conversation_id}: {title}")
+                if still_untitled:
+                    await asyncio.to_thread(
+                        db_ops.update_conversation_title, conversation_id, title
+                    )
+                    logger.info(f"Generated title for conversation {conversation_id}: {title}")
                 return title
 
             return None

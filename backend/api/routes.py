@@ -63,10 +63,12 @@ async def async_generate_title(conversation_id: str):
                 logger.warning(
                     f"Attempt {attempt}: title generation returned empty for {conversation_id}"
                 )
-            except Exception as e:
-                logger.error(
-                    f"Attempt {attempt}: title generation failed for {conversation_id}: {e}"
+            except Exception:
+                logger.exception(
+                    f"Attempt {attempt}: title generation failed for {conversation_id}"
                 )
+                if attempt == _NAMING_MAX_RETRIES:
+                    raise
 
             if attempt < _NAMING_MAX_RETRIES:
                 still_untitled = await asyncio.to_thread(
