@@ -156,6 +156,13 @@ class RuntimeService:
                             raise
                         else:
                             logger.warning(f"Attempt {attempt} failed, retrying...", extra={"event": "runtime.run_retry", "run_id": run_id, "attempt": attempt}, exc_info=True)
+                            # Only update status to RETRYING if not already in a terminal state
+                            current_run = self._run_store.get_run(run_id)
+                            if current_run.status not in {"succeeded", "failed", "cancelled"}:
+                                self._run_store.update_run(
+                                    run_id=run_id,
+                                    status=RUN_STATUS_RETRYING,
+                                )
                             self._run_store.append_event(
                                 run_id=run_id,
                                 event_type=RUN_EVENT_RETRYING,
@@ -193,6 +200,10 @@ class RuntimeService:
                 # Release lease and cancel renewal task
                 if renewal_task:
                     renewal_task.cancel()
+                    try:
+                        await renewal_task
+                    except asyncio.CancelledError:
+                        pass
                 try:
                     from backend.database.operations import db_ops
                     db_ops.release_lease(lease_key, owner_id)
@@ -204,9 +215,15 @@ class RuntimeService:
         from backend.database.operations import db_ops
 
         for attempt in range(max_attempts):
-            lease = db_ops.acquire_lease(lease_key, owner_id, LEASE_TTL_SECONDS)
-            if lease is not None:
-                return lease
+            try:
+                lease = db_ops.acquire_lease(lease_key, owner_id, LEASE_TTL_SECONDS)
+                if lease is not None:
+                    return lease
+            except Exception as exc:
+                logger.warning(f"Exception acquiring lease (attempt {attempt + 1}/{max_attempts})", exc_info=True)
+                if attempt == max_attempts - 1:
+                    # On final attempt, raise to fail the run
+                    raise
             if attempt < max_attempts - 1:
                 # Exponential backoff: 0.5s, 1s, etc.
                 await asyncio.sleep(0.5 * (2 ** attempt))
@@ -234,15 +251,17 @@ class RuntimeService:
         selected_documents,
         attempt: int,
     ) -> None:
-        """Execute a single attempt of the run."""
-        self._run_store.update_run(run_id=run_id, status=RUN_STATUS_RUNNING)
-        self._run_store.append_event(
-            run_id=run_id,
-            event_type=RUN_EVENT_STARTED,
-            status=RUN_STATUS_RUNNING,
-            message="Run started",
-        )
-        increment_counter("runtime.runs.running_total")
+        """Execute a single attempt of the run. Only append 'started' event on first attempt."""
+        # Only set running status and append started event on first attempt
+        if attempt == 1:
+            self._run_store.update_run(run_id=run_id, status=RUN_STATUS_RUNNING)
+            self._run_store.append_event(
+                run_id=run_id,
+                event_type=RUN_EVENT_STARTED,
+                status=RUN_STATUS_RUNNING,
+                message="Run started",
+            )
+            increment_counter("runtime.runs.running_total")
 
         with push_context(conversation_id=conversation_id):
             result = await self._orchestrator.process_request(

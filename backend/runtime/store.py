@@ -245,6 +245,8 @@ class DbRunStore(RunStore):
         )
 
     def get_run(self, run_id: str) -> RunRecord:
+        if not run_id or not isinstance(run_id, str):
+            raise RunNotFoundError(f"Invalid run_id: {run_id!r}")
         db_record = self._db_ops.get_run(run_id)
         if db_record is None:
             raise RunNotFoundError(f"Run '{run_id}' was not found")
@@ -252,8 +254,10 @@ class DbRunStore(RunStore):
             run_id=str(db_record["id"]),
             conversation_id=db_record["conversation_id"],
             status=db_record["status"],
-            message="",  # Message not stored in DB, only available at creation time
-            selected_documents=tuple(),  # Documents not stored in DB
+            # TODO: Store message and selected_documents in DB (requires schema change).
+            # Currently only available at creation time via create_run return value.
+            message="",
+            selected_documents=tuple(),
             created_at=self._parse_iso(db_record["created_at"]),
             updated_at=self._parse_iso(db_record["updated_at"]),
             error=db_record["error"],
@@ -328,7 +332,15 @@ class DbRunStore(RunStore):
             except ValueError as exc:
                 raise InvalidEventsCursorError("Invalid events cursor") from exc
 
-        db_events = self._db_ops.list_run_events(run_id=run_id, after_event_id=after_event_id, limit=limit)
+        # Fetch one extra to determine if there are more events
+        db_events = self._db_ops.list_run_events(run_id=run_id, after_event_id=after_event_id, limit=limit + 1)
+
+        # Determine if there are more events beyond the requested limit
+        has_more = len(db_events) > limit
+
+        # Trim to requested limit
+        db_events = db_events[:limit]
+
         events = [
             RunEventRecord(
                 event_id=str(event["id"]),
@@ -342,10 +354,6 @@ class DbRunStore(RunStore):
             for event in db_events
         ]
 
-        # Determine if there are more events (fetch one extra to check)
-        db_events_extra = self._db_ops.list_run_events(run_id=run_id, after_event_id=after_event_id, limit=limit + 1)
-        has_more = len(db_events_extra) > limit
-
         next_after = events[-1].event_id if events else after
         return events, next_after, has_more
 
@@ -353,11 +361,13 @@ class DbRunStore(RunStore):
     def _parse_iso(iso_str: Optional[str]) -> Optional[datetime]:
         if iso_str is None:
             return None
-        from datetime import datetime, timezone
         # Parse ISO format string, handling both Z and +00:00 suffixes
-        if iso_str.endswith('Z'):
-            iso_str = iso_str[:-1] + '+00:00'
-        return datetime.fromisoformat(iso_str)
+        try:
+            if iso_str.endswith('Z'):
+                iso_str = iso_str[:-1] + '+00:00'
+            return datetime.fromisoformat(iso_str)
+        except ValueError as exc:
+            raise ValueError(f"Failed to parse ISO datetime: {iso_str!r}") from exc
 
 
 class PostgresRunStorePlaceholder(RunStore):
