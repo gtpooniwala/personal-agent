@@ -131,3 +131,34 @@ class TitleGenerationResponse(BaseModel):
     conversation_id: str = Field(..., description="Conversation ID")
     title: str = Field(..., description="Generated title")
     generated_at: str = Field(..., description="Title generation timestamp")
+
+
+class ScheduledTaskCreate(BaseModel):
+    """Request model for creating a scheduled task."""
+    name: str = Field(..., description="Unique human-readable label")
+    conversation_id: str = Field(..., description="Target conversation ID")
+    message: str = Field(..., description="Prompt injected as user message")
+    cron_expr: str = Field(..., description="Standard cron expression, e.g. '0 * * * *' (every hour at minute 0)")
+
+
+class ScheduledTaskUpdate(BaseModel):
+    """Request model for patching a scheduled task."""
+    name: Optional[str] = Field(None, description="New label")
+    message: Optional[str] = Field(None, description="New prompt")
+    cron_expr: Optional[str] = Field(None, description="New cron expression")
+    enabled: Optional[bool] = Field(None, description="Enable or pause the task")
+
+
+class ScheduledTaskResponse(BaseModel):
+    """Response model for a scheduled task."""
+    id: str = Field(..., description="Task ID")
+    name: str = Field(..., description="Task label")
+    conversation_id: str = Field(..., description="Target conversation ID")
+    message: str = Field(..., description="Prompt message")
+    cron_expr: str = Field(..., description="Cron expression")
+    enabled: bool = Field(..., description="Whether the task is active")
+    next_run_at: str = Field(..., description="Next scheduled fire time (ISO 8601)")
+    last_run_at: Optional[str] = Field(None, description="Last fire time")
+    last_run_id: Optional[str] = Field(None, description="Run ID from last dispatch")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")

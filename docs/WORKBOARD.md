@@ -26,7 +26,7 @@ Workflow:
 - [ ] `todo` Guard Enter key send during IME composition ([#30](https://github.com/gtpooniwala/personal-agent/issues/30))
 
 ### Runtime Quality (Parallel)
-- [ ] `todo` Add scheduler/heartbeat for autonomous workflows ([#18](https://github.com/gtpooniwala/personal-agent/issues/18)) — *parallel with #19*
+- [ ] `in_progress` Add scheduler/heartbeat for autonomous workflows ([#18](https://github.com/gtpooniwala/personal-agent/issues/18)) — *parallel with #19*
 - [ ] `todo` Add runtime evals for lifecycle/retry/session isolation ([#19](https://github.com/gtpooniwala/personal-agent/issues/19)) — *parallel with #18*
 
 ## Next
@@ -36,7 +36,7 @@ Workflow:
 - [x] `done` Add run lifecycle schema (`runs`, `run_events`, `leases`) ([#15](https://github.com/gtpooniwala/personal-agent/issues/15))
 - [x] `done` Deliver async submission contracts for `/chat` and `/runs` plus status/events endpoints ([#17](https://github.com/gtpooniwala/personal-agent/issues/17))
 - [x] `done` Implement runtime worker queue with per-session serialization ([#16](https://github.com/gtpooniwala/personal-agent/issues/16))
-- [ ] `todo` Add scheduler/heartbeat for autonomous workflows ([#18](https://github.com/gtpooniwala/personal-agent/issues/18))
+- [ ] `in_progress` Add scheduler/heartbeat for autonomous workflows ([#18](https://github.com/gtpooniwala/personal-agent/issues/18))
 - [ ] `todo` Add runtime evals for lifecycle/retry/session isolation ([#19](https://github.com/gtpooniwala/personal-agent/issues/19))
 - [ ] `todo` Make summarisation tool non-blocking in async path ([#28](https://github.com/gtpooniwala/personal-agent/issues/28))
 - [ ] `todo` Remove import-time global warning filter side effect ([#29](https://github.com/gtpooniwala/personal-agent/issues/29))

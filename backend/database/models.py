@@ -1,4 +1,5 @@
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Column,
     DateTime,
@@ -207,3 +208,26 @@ class Lease(Base):
     acquired_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class ScheduledTask(Base):
+    """Cron-scheduled autonomous agent task."""
+
+    __tablename__ = "scheduled_tasks"
+    __table_args__ = (
+        Index("ix_scheduled_tasks_enabled_next_run_at", "enabled", "next_run_at"),
+    )
+
+    id = Column(String, primary_key=True, default=generate_id)
+    name = Column(String, nullable=False, unique=True)
+    conversation_id = Column(String, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False)
+    message = Column(Text, nullable=False)
+    cron_expr = Column(String, nullable=False)
+    enabled = Column(Boolean, nullable=False, default=True)
+    next_run_at = Column(DateTime(timezone=True), nullable=False)
+    last_run_at = Column(DateTime(timezone=True), nullable=True)
+    last_run_id = Column(String, ForeignKey("runs.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    conversation = relationship("Conversation")

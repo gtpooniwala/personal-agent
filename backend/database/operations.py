@@ -8,6 +8,7 @@ from backend.database.models import (
     Run,
     RunEvent,
     RuntimeCounter,
+    ScheduledTask,
 )
 from backend.config import settings
 from typing import List, Optional, Dict, Any
@@ -23,8 +24,9 @@ _UNSET = object()
 class DatabaseOperations:
     """Database operations for the personal agent."""
     
-    def __init__(self):
-        self.engine = create_engine(settings.database_url, pool_pre_ping=True)
+    def __init__(self, database_url: Optional[str] = None):
+        url = database_url or settings.database_url
+        self.engine = create_engine(url, pool_pre_ping=True)
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
         self.init_database()
     
@@ -629,6 +631,186 @@ class DatabaseOperations:
                 query = query.filter(RuntimeCounter.key.like(f"{prefix}%"))
             rows = query.order_by(RuntimeCounter.key.asc()).all()
             return {row.key: row.value for row in rows}
+        finally:
+            session.close()
+
+
+    # -------------------------------------------------------------------------
+    # Scheduled task operations
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def _serialize_scheduled_task(task: ScheduledTask) -> Dict[str, Any]:
+        return {
+            "id": task.id,
+            "name": task.name,
+            "conversation_id": task.conversation_id,
+            "message": task.message,
+            "cron_expr": task.cron_expr,
+            "enabled": task.enabled,
+            "next_run_at": DatabaseOperations._to_iso(task.next_run_at),
+            "last_run_at": DatabaseOperations._to_iso(task.last_run_at),
+            "last_run_id": task.last_run_id,
+            "created_at": DatabaseOperations._to_iso(task.created_at),
+            "updated_at": DatabaseOperations._to_iso(task.updated_at),
+        }
+
+    def create_scheduled_task(
+        self,
+        *,
+        name: str,
+        conversation_id: str,
+        message: str,
+        cron_expr: str,
+        next_run_at: datetime,
+    ) -> Dict[str, Any]:
+        """Create and return a scheduled task."""
+        session = self.get_session()
+        try:
+            task = ScheduledTask(
+                name=name,
+                conversation_id=conversation_id,
+                message=message,
+                cron_expr=cron_expr,
+                next_run_at=next_run_at,
+            )
+            session.add(task)
+            session.commit()
+            session.refresh(task)
+            return self._serialize_scheduled_task(task)
+        finally:
+            session.close()
+
+    def get_scheduled_task(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Fetch a scheduled task by ID."""
+        session = self.get_session()
+        try:
+            task = session.query(ScheduledTask).filter(ScheduledTask.id == task_id).first()
+            if not task:
+                return None
+            return self._serialize_scheduled_task(task)
+        finally:
+            session.close()
+
+    def list_scheduled_tasks(self, *, enabled_only: bool = False) -> List[Dict[str, Any]]:
+        """List scheduled tasks, optionally filtering to enabled only."""
+        session = self.get_session()
+        try:
+            query = session.query(ScheduledTask)
+            if enabled_only:
+                query = query.filter(ScheduledTask.enabled == True)  # noqa: E712
+            tasks = query.order_by(ScheduledTask.created_at.asc()).all()
+            return [self._serialize_scheduled_task(t) for t in tasks]
+        finally:
+            session.close()
+
+    def get_due_scheduled_tasks(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Return enabled tasks whose next_run_at is in the past (index-scanned)."""
+        session = self.get_session()
+        try:
+            rows = (
+                session.execute(
+                    text(
+                        """
+                        SELECT id, name, conversation_id, message, cron_expr,
+                               enabled, next_run_at, last_run_at, last_run_id,
+                               created_at, updated_at
+                        FROM scheduled_tasks
+                        WHERE enabled = TRUE
+                          AND next_run_at <= NOW()
+                        ORDER BY next_run_at ASC
+                        LIMIT :limit
+                        """
+                    ),
+                    {"limit": limit},
+                )
+                .mappings()
+                .all()
+            )
+            return [dict(row) for row in rows]
+        finally:
+            session.close()
+
+    def advance_scheduled_task(
+        self,
+        task_id: str,
+        *,
+        last_run_at: datetime,
+        last_run_id: Optional[str],
+        next_run_at: datetime,
+    ) -> Optional[Dict[str, Any]]:
+        """Update post-dispatch fields after a scheduled task fires."""
+        session = self.get_session()
+        try:
+            task = session.query(ScheduledTask).filter(ScheduledTask.id == task_id).first()
+            if not task:
+                return None
+            task.last_run_at = last_run_at
+            task.last_run_id = last_run_id or None
+            task.next_run_at = next_run_at
+            task.updated_at = datetime.now(timezone.utc)
+            session.commit()
+            session.refresh(task)
+            return self._serialize_scheduled_task(task)
+        finally:
+            session.close()
+
+    def update_scheduled_task(self, task_id: str, **kwargs: Any) -> Optional[Dict[str, Any]]:
+        """Patch arbitrary fields on a scheduled task."""
+        allowed = {"name", "message", "cron_expr", "enabled", "next_run_at"}
+        invalid = set(kwargs) - allowed
+        if invalid:
+            raise ValueError(f"Cannot update fields: {invalid}")
+
+        session = self.get_session()
+        try:
+            task = session.query(ScheduledTask).filter(ScheduledTask.id == task_id).first()
+            if not task:
+                return None
+            for field, value in kwargs.items():
+                setattr(task, field, value)
+            task.updated_at = datetime.now(timezone.utc)
+            session.commit()
+            session.refresh(task)
+            return self._serialize_scheduled_task(task)
+        finally:
+            session.close()
+
+    def delete_scheduled_task(self, task_id: str) -> bool:
+        """Delete a scheduled task. Returns True if it existed."""
+        session = self.get_session()
+        try:
+            deleted = (
+                session.query(ScheduledTask)
+                .filter(ScheduledTask.id == task_id)
+                .delete()
+            )
+            session.commit()
+            return deleted > 0
+        finally:
+            session.close()
+
+    def find_orphaned_runs(self) -> List[Dict[str, Any]]:
+        """Return running/retrying runs whose conversation lease has expired or is missing."""
+        session = self.get_session()
+        try:
+            rows = (
+                session.execute(
+                    text(
+                        """
+                        SELECT r.id, r.conversation_id, r.status
+                        FROM runs r
+                        LEFT JOIN leases l
+                          ON l.lease_key = 'session:' || r.conversation_id  -- ANSI SQL; PostgreSQL-only project
+                        WHERE r.status IN ('running', 'retrying')
+                          AND (l.lease_key IS NULL OR l.expires_at <= NOW())
+                        """
+                    )
+                )
+                .mappings()
+                .all()
+            )
+            return [dict(row) for row in rows]
         finally:
             session.close()
 

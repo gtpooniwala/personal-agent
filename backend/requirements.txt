@@ -32,3 +32,6 @@ pypdf==6.7.5
 numpy==2.4.2
 openai==2.26.0
 requests==2.32.5
+
+# Scheduler
+croniter==3.0.0

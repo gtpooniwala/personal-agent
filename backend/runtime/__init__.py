@@ -21,10 +21,13 @@ from .lifecycle import (
     RUN_STATUS_SET,
     TERMINAL_RUN_STATUSES as LIFECYCLE_TERMINAL_RUN_STATUSES,
 )
+from .heartbeat import HeartbeatService
+from .scheduler import SchedulerService
 
 __all__ = [
     "DEFAULT_EVENTS_LIMIT",
     "DbRunStore",
+    "HeartbeatService",
     "InMemoryRunStore",
     "InvalidEventsCursorError",
     "MAX_EVENTS_LIMIT",
@@ -36,5 +39,6 @@ __all__ = [
     "RUN_STATUS_SET",
     "RUN_EVENT_TYPES",
     "RUN_EVENT_TYPE_SET",
+    "SchedulerService",
     "SqliteRunStorePlaceholder",
 ]

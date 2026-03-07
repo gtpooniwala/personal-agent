@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from backend.api.routes import router as versioned_router
 from backend.api.runtime_routes import runtime_router
+from backend.api.scheduler_routes import scheduler_router
 from backend.config import settings
 from backend.observability import configure_logging, langfuse_manager, push_context
 import logging
@@ -34,11 +35,17 @@ async def lifespan(app: FastAPI):
     if not settings.gemini_api_key and not settings.openai_api_key:
         raise RuntimeError("Either GEMINI_API_KEY or OPENAI_API_KEY must be configured.")
     langfuse_manager.initialize()
-    
+
+    from backend.api.state import heartbeat_service, scheduler_service
+    await heartbeat_service.start()
+    await scheduler_service.start()
+
     yield
-    
+
     # Shutdown
     logger.info("Personal Agent API shutting down...")
+    await scheduler_service.stop()
+    await heartbeat_service.stop()
     langfuse_manager.shutdown()
 
 # Create FastAPI app
@@ -102,6 +109,7 @@ async def request_context_middleware(request, call_next):
 # Include API routes
 app.include_router(versioned_router, prefix="/api/v1")
 app.include_router(runtime_router)
+app.include_router(scheduler_router)
 
 # Serve static files (for serving the frontend if needed)
 # app.mount("/", StaticFiles(directory="../frontend", html=True), name="frontend")
