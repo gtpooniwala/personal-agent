@@ -126,7 +126,7 @@ class TestScheduledTaskDbOps(unittest.TestCase):
         )
         now = _utcnow()
         new_next = now + timedelta(hours=1)
-        run = self.db.create_run(conversation_id=self.conversation_id, status="completed")
+        run = self.db.create_run(conversation_id=self.conversation_id)
         updated = self.db.advance_scheduled_task(
             task["id"],
             last_run_at=now,
