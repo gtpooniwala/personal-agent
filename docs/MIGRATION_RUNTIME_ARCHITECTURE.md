@@ -47,6 +47,32 @@ Expected semantics:
 - A failed run preserves partial result context for debugging and user messaging.
 - Retry path is bounded and visible via status/events.
 
+## #15 schema contract (implemented)
+Lifecycle vocabulary is frozen in `backend/runtime/lifecycle.py` and reused by schema constraints.
+
+### `runs`
+- durable per-run state row keyed by `id`
+- `status` constrained to canonical run statuses
+- indexed for polling/query patterns:
+  - `(status, created_at)`
+  - `(conversation_id, created_at)`
+
+### `run_events`
+- append-only log keyed by autoincrement event `id`
+- each row links to `run_id`, includes `event_type`, `status`, optional `message`/`tool`/`error`/`payload`
+- constraints enforce canonical event/status vocabulary
+- indexed by `(run_id, id)` for ordered event retrieval and by `(status, created_at)` for status-driven debugging
+
+### `leases`
+- key/value lease ownership table for worker serialization primitives
+- one row per `lease_key`, with `owner_id`, `fencing_token`, `acquired_at`, `expires_at`
+- safety rules:
+  - acquire succeeds only when lease is expired or already held by same owner
+  - renew requires current owner and unexpired lease
+  - release requires current owner
+  - `fencing_token` increments on takeover/reacquire updates
+  - index on `expires_at` supports expiry sweeps/observability
+
 ## Failure and resilience
 - Worker exceptions transition the run to `failed` and emit a terminal event with classification:
   - input validation

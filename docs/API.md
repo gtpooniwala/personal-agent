@@ -212,6 +212,28 @@ Response body:
 
 ### Runtime Models
 
+Lifecycle vocabulary is frozen in code at `backend/runtime/lifecycle.py` and must stay consistent across API, worker, and schema layers.
+
+Run statuses:
+- `queued`
+- `running`
+- `retrying`
+- `succeeded`
+- `failed`
+- `cancelling`
+- `cancelled`
+
+Run event types:
+- `queued`
+- `started`
+- `tool_call`
+- `tool_result`
+- `retrying`
+- `failed`
+- `succeeded`
+- `cancelling`
+- `cancelled`
+
 #### Run
 ```json
 {
@@ -229,11 +251,23 @@ Response body:
 ```json
 {
   "event_id": "string cursor",
-  "type": "queued|started|tool_result|retrying|failed|succeeded|cancelled",
+  "type": "queued|started|tool_call|tool_result|retrying|failed|succeeded|cancelling|cancelled",
   "status": "queued|running|retrying|succeeded|failed|cancelling|cancelled",
   "message": "string",
   "tool": "string|null",
   "created_at": "ISO-8601 datetime"
+}
+```
+
+#### Lease
+```json
+{
+  "lease_key": "string",
+  "owner_id": "string",
+  "fencing_token": "number",
+  "acquired_at": "ISO-8601 datetime",
+  "expires_at": "ISO-8601 datetime",
+  "updated_at": "ISO-8601 datetime"
 }
 ```
 
