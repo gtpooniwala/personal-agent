@@ -31,6 +31,8 @@ class _SchedulerRequest:
 class SchedulerService:
     """Background service that fires agent runs on cron schedules."""
 
+    DISPATCH_LEASE_TTL_SECONDS: int = 120  # Max expected task dispatch + run-enqueue time
+
     def __init__(self, runtime_service, poll_interval_seconds: int = 30, db_ops=None):
         self._runtime_service = runtime_service
         self._poll_interval = poll_interval_seconds
@@ -85,7 +87,7 @@ class SchedulerService:
         owner_id = str(uuid.uuid4())
 
         # Prevent double-dispatch across concurrent workers
-        lease = db.acquire_lease(lease_key, owner_id, ttl_seconds=120)
+        lease = db.acquire_lease(lease_key, owner_id, ttl_seconds=self.DISPATCH_LEASE_TTL_SECONDS)
         if lease is None:
             logger.info(
                 "Skipping task — dispatch lease held by another worker",

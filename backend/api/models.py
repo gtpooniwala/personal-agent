@@ -138,7 +138,7 @@ class ScheduledTaskCreate(BaseModel):
     name: str = Field(..., description="Unique human-readable label")
     conversation_id: str = Field(..., description="Target conversation ID")
     message: str = Field(..., description="Prompt injected as user message")
-    cron_expr: str = Field(..., description="Standard cron expression, e.g. '0 * * * *'")
+    cron_expr: str = Field(..., description="Standard cron expression, e.g. '0 * * * *' (every hour at minute 0)")
 
 
 class ScheduledTaskUpdate(BaseModel):

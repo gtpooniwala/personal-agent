@@ -801,7 +801,7 @@ class DatabaseOperations:
                         SELECT r.id, r.conversation_id, r.status
                         FROM runs r
                         LEFT JOIN leases l
-                          ON l.lease_key = 'session:' || r.conversation_id
+                          ON l.lease_key = 'session:' || r.conversation_id  -- ANSI SQL; PostgreSQL-only project
                         WHERE r.status IN ('running', 'retrying')
                           AND (l.lease_key IS NULL OR l.expires_at <= NOW())
                         """
