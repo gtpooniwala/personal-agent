@@ -1,0 +1,23 @@
+backend/runtime/store.py
+  85f91b2c7c7bdb35 275-282,306-309,334-337
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "525d9745dc3b1db666908db27e05fc7a10bc1c98",
+  "prompts": {
+    "85f91b2c7c7bdb35": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9e846c3a-5e8a-401b-bd5d-1b1bfc53d852",
+        "model": "claude-haiku-4-5-20251001"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 16,
+      "total_deletions": 6,
+      "accepted_lines": 16,
+      "overriden_lines": 0
+    }
+  }
+}
