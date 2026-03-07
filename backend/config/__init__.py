@@ -53,8 +53,8 @@ class Settings(BaseSettings):
         default=8000,
         validation_alias=AliasChoices("API_PORT", "PORT"),
     )
-    allowed_origins: str = "http://127.0.0.1:8081,http://localhost:8081"
-    frontend_url: Optional[str] = None
+    allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    frontend_url: Optional[str] = "http://localhost:3000"
 
     # Optional integration settings
     gmail_client_id: Optional[str] = None
@@ -85,11 +85,13 @@ settings = Settings()
 # Load LLM config as a separate global variable (not as a field on settings)
 LLM_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "llm_config.yaml")
 
+
 def load_llm_config():
     if os.path.exists(LLM_CONFIG_PATH):
         with open(LLM_CONFIG_PATH, "r") as f:
             return yaml.safe_load(f)
     return {}
+
 
 llm_config = load_llm_config()
 
