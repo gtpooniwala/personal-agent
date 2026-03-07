@@ -1,0 +1,25 @@
+frontend/tests/sendMessage.test.jsx
+  cb6f0e8bb2b3c83b 36-89
+frontend/app/page.js
+  cb6f0e8bb2b3c83b 201,301,465
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "815c55be6552f4e7660df08ac6567e7172b80d38",
+  "prompts": {
+    "cb6f0e8bb2b3c83b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b245f5c0-311f-4519-a7a8-e1e43548343f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 57,
+      "total_deletions": 3,
+      "accepted_lines": 57,
+      "overriden_lines": 0
+    }
+  }
+}
