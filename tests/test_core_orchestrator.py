@@ -171,6 +171,29 @@ class TestCoreOrchestrator(unittest.TestCase):
         self.assertIn("User: Earlier question", prompt)
         self.assertIn("What should I do next?", prompt)
 
+    def test_short_circuit_unselected_document_request_returns_explicit_guidance(self):
+        response = self.orchestrator._maybe_short_circuit_unselected_document_request(
+            user_request="What does my uploaded contract say about termination?",
+            selected_documents=[],
+        )
+        self.assertIn("contract", response.lower())
+        self.assertIn(
+            "No documents are currently selected. Please select one or more documents to enable document search.",
+            response,
+        )
+
+    def test_format_document_status_prefers_selected_document_state(self):
+        status = self.orchestrator._format_document_status(
+            {
+                "has_documents": False,
+                "document_count": 0,
+                "selected_count": 1,
+                "context_message": "Metadata unavailable.",
+            }
+        )
+        self.assertIn("selected for this conversation", status)
+        self.assertIn("use search_documents", status.lower())
+
 
 if __name__ == '__main__':
     unittest.main()

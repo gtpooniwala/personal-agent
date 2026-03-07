@@ -473,12 +473,21 @@ class DocumentProcessor:
                 documents = query_filter.all()
                 
                 if not documents:
+                    selected_count = len(selected_documents or [])
+                    if selected_count > 0:
+                        context_message = (
+                            f"{selected_count} document reference(s) are selected, but processed document metadata "
+                            "is unavailable. Document search may still be attempted if the selected IDs are valid."
+                        )
+                    else:
+                        context_message = "No documents are currently available for search."
                     return {
                         "has_documents": False,
                         "document_count": 0,
+                        "selected_count": selected_count,
                         "total_chunks": 0,
                         "document_summaries": [],
-                        "context_message": "No documents are currently available for search."
+                        "context_message": context_message,
                     }
                 
                 # Collect document information
@@ -504,6 +513,7 @@ class DocumentProcessor:
                 return {
                     "has_documents": True,
                     "document_count": len(documents),
+                    "selected_count": len(selected_documents or []),
                     "total_chunks": total_chunks,
                     "document_summaries": document_summaries,
                     "context_message": context_message
@@ -517,6 +527,7 @@ class DocumentProcessor:
             return {
                 "has_documents": False,
                 "document_count": 0,
+                "selected_count": len(selected_documents or []),
                 "total_chunks": 0,
                 "document_summaries": [],
                 "context_message": "Error retrieving document information."

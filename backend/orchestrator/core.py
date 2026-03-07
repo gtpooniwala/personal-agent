@@ -25,6 +25,11 @@ _TITLE_CONTEXT_MESSAGES: int = _NAMING_CFG.get("context_messages", 6)
 
 logger = logging.getLogger(__name__)
 
+NO_SELECTED_DOCUMENTS_MESSAGE = (
+    "No documents are currently selected. Please select one or more documents "
+    "to enable document search."
+)
+
 
 class CoreOrchestrator:
     """
@@ -206,6 +211,28 @@ class CoreOrchestrator:
 
                 # Save user message to database
                 db_ops.save_message(conversation_id, "user", user_request)
+
+                no_document_response = self._maybe_short_circuit_unselected_document_request(
+                    user_request=user_request,
+                    selected_documents=selected_documents,
+                )
+                if no_document_response is not None:
+                    db_ops.save_message(conversation_id, "assistant", no_document_response)
+                    update_observation(
+                        operation_observation,
+                        output={
+                            "tool_actions_count": 0,
+                            "token_usage": None,
+                            "fallback_used": False,
+                            "short_circuit": "no_selected_documents",
+                        },
+                    )
+                    return {
+                        "response": no_document_response,
+                        "conversation_id": conversation_id,
+                        "orchestration_actions": [],
+                        "token_usage": None,
+                    }
 
                 # Use condensed conversation history for agent context
                 condensed_history = self.get_condensed_conversation_history(conversation_id)
@@ -411,6 +438,33 @@ class CoreOrchestrator:
         )
         return await predict_text(self.llm, prompt)
 
+    def _maybe_short_circuit_unselected_document_request(
+        self,
+        *,
+        user_request: str,
+        selected_documents: Optional[List[str]],
+    ) -> Optional[str]:
+        """Return explicit guidance when the user asks about docs but none are selected."""
+        if selected_documents is None or len(selected_documents) > 0:
+            return None
+
+        query = (user_request or "").strip().lower()
+        document_intent = any(token in query for token in ("document", "uploaded", "file", "contract", "pdf"))
+        if not document_intent:
+            return None
+
+        return self._build_no_selected_documents_response(user_request)
+
+    def _build_no_selected_documents_response(self, user_request: str) -> str:
+        """Keep fallback guidance explicit while acknowledging the requested document topic."""
+        query = (user_request or "").strip()
+        query_lower = query.lower()
+
+        if "contract" in query_lower:
+            return f"I can't answer what your contract says because {NO_SELECTED_DOCUMENTS_MESSAGE}"
+
+        return f"I can't answer questions about your uploaded documents because {NO_SELECTED_DOCUMENTS_MESSAGE}"
+
     def _run_rule_based_fallback(self, user_request: str) -> Optional[List[Dict[str, Any]]]:
         """
         Deterministic fallback routing when graph execution fails.
@@ -464,7 +518,7 @@ class CoreOrchestrator:
                 if search_tool:
                     output = search_tool._run(query=query, max_results=3)
                 else:
-                    output = "No documents are currently selected. Please select one or more documents to enable document search."
+                    output = self._build_no_selected_documents_response(query)
                 actions.append({
                     "tool": "search_documents",
                     "input": json.dumps({"query": query, "max_results": 3}, ensure_ascii=False),
@@ -666,24 +720,33 @@ class CoreOrchestrator:
     
     def _format_document_status(self, document_context: Dict[str, Any]) -> str:
         """Format document status information for the system prompt."""
-        if not document_context.get('has_documents', False):
-            return """❌ NO DOCUMENTS AVAILABLE
-- No documents have been uploaded or selected
-- Document search is NOT possible
-- For document-related queries, inform user that no documents are available
-- Do NOT attempt to use tools for document search"""
-        
-        selected_count = document_context.get('selected_count', 0)
-        total_count = document_context.get('document_count', 0)
-        
-        if selected_count > 0:
+        selected_count = int(document_context.get('selected_count', 0) or 0)
+        total_count = int(document_context.get('document_count', 0) or 0)
+        context_message = document_context.get("context_message", "")
+
+        if selected_count > 0 and document_context.get('has_documents', False):
             return f"""✅ DOCUMENTS AVAILABLE FOR SEARCH
 - {selected_count} document(s) currently selected
-- {total_count} total documents uploaded
+- {total_count} total matching document(s) available
 - Document search is ENABLED via search_documents tool
-- Use search_documents tool for any document-related queries"""
-        else:
-            return f"""⚠️ DOCUMENTS UPLOADED BUT NONE SELECTED
+- Use search_documents for document-related queries"""
+
+        if selected_count > 0:
+            return f"""⚠️ DOCUMENT SEARCH REQUESTED WITH SELECTED IDS
+- {selected_count} document reference(s) are selected for this conversation
+- Document metadata is unavailable or no processed documents matched the selected IDs
+- You may still use search_documents if the user is clearly asking about the selected files
+- If search_documents returns no results, explain that you could not find relevant content in the selected documents
+- Context detail: {context_message or 'No additional metadata available.'}"""
+
+        if not document_context.get('has_documents', False):
+            return f"""❌ NO DOCUMENTS AVAILABLE
+- No documents have been uploaded or selected
+- Document search is NOT possible
+- For document-related queries, say exactly: "{NO_SELECTED_DOCUMENTS_MESSAGE}"
+- Do NOT attempt to use tools for document search"""
+
+        return f"""⚠️ DOCUMENTS UPLOADED BUT NONE SELECTED
 - {total_count} document(s) uploaded but none selected
 - Document search is currently DISABLED
-- Inform user they need to select documents to enable search"""
+- If the user asks about uploaded documents, say exactly: "{NO_SELECTED_DOCUMENTS_MESSAGE}"."""
