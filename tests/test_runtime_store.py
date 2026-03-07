@@ -50,10 +50,17 @@ class TestInMemoryRunStore(unittest.TestCase):
         original_max = InMemoryRunStore.MAX_STORED_RUNS
         InMemoryRunStore.MAX_STORED_RUNS = 2
         try:
+            # Create and mark as terminal to allow pruning
             run1 = self.store.create_run(conversation_id="conv-1", message="m1", selected_documents=[])
+            self.store.update_run(run_id=run1.run_id, status="succeeded", result="done")
+
             run2 = self.store.create_run(conversation_id="conv-2", message="m2", selected_documents=[])
+            self.store.update_run(run_id=run2.run_id, status="succeeded", result="done")
+
+            # Third run triggers pruning of oldest terminal run (run1)
             run3 = self.store.create_run(conversation_id="conv-3", message="m3", selected_documents=[])
 
+            # run1 should be pruned, run2 and run3 remain
             with self.assertRaises(RunNotFoundError):
                 self.store.get_run(run1.run_id)
             self.assertEqual(self.store.get_run(run2.run_id).conversation_id, "conv-2")
