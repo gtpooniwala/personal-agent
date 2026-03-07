@@ -55,13 +55,13 @@ Current runtime path:
 | Scratchpad tool | Implemented | Persistent per-user notes |
 | User profile tool | Implemented | Long-term profile memory (JSON + LLM merge) |
 | Internet search tool | Implemented | DuckDuckGo default, optional Bing/Google/SerpAPI |
-| Gmail read tool | Conditional | Hidden by default; enable with `ENABLE_GMAIL_INTEGRATION=true` + valid `GMAIL_CREDENTIALS_PATH` and Gmail dependencies |
+| Gmail read tool | Conditional | Available by default when Gmail credentials and dependencies are present; disable with `ENABLE_GMAIL_INTEGRATION=false` |
 | Calendar/Todoist tools | Placeholder | Scaffold exists, not wired into active tool set |
 
 ## Stack
 
 - Backend: Python, FastAPI, LangChain, LangGraph, SQLAlchemy
-- LLM/Embeddings: Gemini by default (`gemini-2.5-flash` + `text-embedding-004`), OpenAI optional via config
+- LLM/Embeddings: Gemini by default (`gemini-2.5-flash` + `gemini-embedding-001`), OpenAI optional via config
 - Frontend: Next.js + React
 - Storage: PostgreSQL + local filesystem (`data/`)
 

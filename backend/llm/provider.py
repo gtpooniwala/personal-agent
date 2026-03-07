@@ -15,7 +15,7 @@ DEFAULT_CHAT_MODELS: Dict[str, str] = {
     "openai": "gpt-4.1-mini",
 }
 DEFAULT_EMBEDDING_MODELS: Dict[str, str] = {
-    "gemini": "models/text-embedding-004",
+    "gemini": "models/gemini-embedding-001",
     "openai": "text-embedding-3-small",
 }
 
