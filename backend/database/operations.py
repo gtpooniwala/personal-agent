@@ -19,6 +19,10 @@ import atexit
 
 from backend.runtime import RUN_EVENT_TYPE_SET, RUN_STATUS_SET
 
+# Title prefixes that identify a conversation that still has an auto-generated placeholder.
+# Imported by other modules to avoid pattern duplication.
+UNTITLED_CONVERSATION_PREFIXES: tuple = ("Conversation ", "New Conversation", "Chat ")
+
 _UNSET = object()
 
 
@@ -270,14 +274,9 @@ class DatabaseOperations:
             if not conversation:
                 return False
             
-            # Check if title looks like a default generated one
-            default_patterns = [
-                "Conversation ",
-                "New Conversation",
-                "Chat "
-            ]
-            
-            return any(conversation.title.startswith(pattern) for pattern in default_patterns)
+            return any(
+                conversation.title.startswith(p) for p in UNTITLED_CONVERSATION_PREFIXES
+            )
         finally:
             session.close()
 

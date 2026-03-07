@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 import asyncio
 import logging
 from backend.api.state import orchestrator
-from backend.database.operations import db_ops
+from backend.database.operations import db_ops, UNTITLED_CONVERSATION_PREFIXES
 from backend.observability import observe_operation, update_observation, increment_counter
 
 logger = logging.getLogger(__name__)
@@ -25,9 +25,8 @@ _NAMING_DELAY_MINUTES: int = _NAMING_CFG.get("delay_minutes", 5)
 _NAMING_RETRY_DELAY_MINUTES: int = _NAMING_CFG.get("retry_delay_minutes", 2)
 _NAMING_MAX_RETRIES: int = _NAMING_CFG.get("max_retries", 3)
 
-# Patterns that identify a conversation with an auto-generated (non-user) title.
-# Must stay in sync with DatabaseOperations.is_conversation_untitled.
-_UNTITLED_PREFIXES = ("Conversation ", "New Conversation", "Chat ")
+# Canonical untitled-title patterns, sourced from database.operations.
+_UNTITLED_PREFIXES = UNTITLED_CONVERSATION_PREFIXES
 
 
 def _average(total: int, count: int) -> float | None:
