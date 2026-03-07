@@ -1,0 +1,25 @@
+docs/API.md
+  981ff5bc3a68cf51 238,241,252,255-256,261-262
+backend/database/operations.py
+  981ff5bc3a68cf51 380-381,384-385,467,473-476,483,514,517,524
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "46017c103d6f1ef0d2b1580ffbd445111bbba364",
+  "prompts": {
+    "981ff5bc3a68cf51": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c55d2cea-11de-4c58-82a6-08ce6fd12baf",
+        "model": "claude-haiku-4-5-20251001"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 20,
+      "total_deletions": 17,
+      "accepted_lines": 20,
+      "overriden_lines": 0
+    }
+  }
+}
