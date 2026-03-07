@@ -1,0 +1,23 @@
+tests/test_agent_tools.py
+  5e59a067350fcf36 145,149,160,170,180,197,210,222,235
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "2f82f316d5012de2c68cd351bafc4c6f9b9d5867",
+  "prompts": {
+    "5e59a067350fcf36": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d3ec59b2-a1df-463e-a077-85da012d2259",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 8,
+      "accepted_lines": 9,
+      "overriden_lines": 0
+    }
+  }
+}
