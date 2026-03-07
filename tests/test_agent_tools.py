@@ -1,5 +1,4 @@
 """Behavioral tests for core tool modules."""
-import asyncio
 import datetime
 import os
 import shutil
@@ -147,7 +146,7 @@ _summarisation_module = None
 try:
     from backend.orchestrator.tools.summarisation_agent import SummarisationAgent
     _summarisation_module = sys.modules["backend.orchestrator.tools.summarisation_agent"]
-except Exception as exc:
+except ImportError as exc:
     SUMMARISATION_AVAILABLE = False
     SUMMARISATION_IMPORT_ERROR = str(exc)
 
@@ -187,6 +186,19 @@ class TestSummarisationAgentSync(unittest.TestCase):
         tool._run("special history content")
         call_args = mock_llm.invoke.call_args[0][0]
         self.assertIn("special history content", call_args)
+
+    @patch.object(_summarisation_module or object(), "create_chat_model", create=True)
+    def test_run_respects_max_tokens(self, mock_create):
+        mock_llm = Mock()
+        mock_llm.invoke.return_value = Mock(content="short")
+        mock_create.return_value = mock_llm
+
+        tool = SummarisationAgent()
+        tool._run("history", max_tokens=256)
+
+        mock_create.assert_called_once_with(
+            "summarisation_agent", temperature=0.2, max_tokens=256
+        )
 
 
 @unittest.skipUnless(
