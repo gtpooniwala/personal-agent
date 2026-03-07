@@ -57,6 +57,7 @@ RuntimeService = None
 InMemoryRunStore = None
 SESSION_BUSY_MESSAGE = None
 RUN_STATUS_SUCCEEDED = RUN_STATUS_FAILED = None
+RUN_TERMINAL_STATUSES = None
 RUN_EVENT_QUEUED = RUN_EVENT_STARTED = RUN_EVENT_RETRYING = None
 RUN_EVENT_FAILED = RUN_EVENT_SUCCEEDED = None
 
@@ -66,6 +67,7 @@ try:
     from backend.runtime.contracts import (
         RUN_STATUS_SUCCEEDED,  # type: ignore[assignment]
         RUN_STATUS_FAILED,  # type: ignore[assignment]
+        RUN_TERMINAL_STATUSES,  # type: ignore[assignment]
         RUN_EVENT_QUEUED,  # type: ignore[assignment]
         RUN_EVENT_STARTED,  # type: ignore[assignment]
         RUN_EVENT_RETRYING,  # type: ignore[assignment]
@@ -151,11 +153,10 @@ async def _wait_terminal(
     run_id: str,
     timeout: float = 10.0,
 ) -> Dict[str, Any]:
-    terminal = {"succeeded", "failed", "cancelled"}
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         status = await service.get_run_status(run_id)
-        if status["status"] in terminal:
+        if status["status"] in RUN_TERMINAL_STATUSES:
             return status
         await asyncio.sleep(0.02)
     raise TimeoutError(f"Run {run_id} did not reach terminal state within {timeout}s")
