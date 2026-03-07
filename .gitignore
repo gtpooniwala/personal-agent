@@ -171,3 +171,6 @@ tests/repo_checks/results.json
 # OS-specific artifacts
 Thumbs.db
 backend/data/gmail/
+
+# Local support/config files (e.g. Claude Desktop MCP config)
+Support/
