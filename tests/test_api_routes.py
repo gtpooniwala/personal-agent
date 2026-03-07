@@ -15,7 +15,7 @@ API_IMPORT_ERROR = ""
 
 try:
     from fastapi.testclient import TestClient
-    from backend.api import routes
+    from backend.api import routes, runtime_routes
     from backend.main import app
 except Exception as exc:
     API_TESTS_AVAILABLE = False
@@ -35,24 +35,70 @@ class TestAPIRoutes(unittest.TestCase):
         self.assertEqual(payload["version"], "1.0.0")
         self.assertIn("timestamp", payload)
 
-    @patch("backend.api.routes.orchestrator.process_request", new_callable=AsyncMock)
-    def test_chat_endpoint(self, mock_process_request):
-        mock_process_request.return_value = {
-            "response": "hello",
+    @patch("backend.api.runtime_routes.runtime_service.submit_run", new_callable=AsyncMock)
+    def test_runtime_chat_submit_endpoint(self, mock_submit_run):
+        mock_submit_run.return_value = {
+            "run_id": "run-1",
+            "status": "queued",
             "conversation_id": "conv-1",
-            "orchestration_actions": [{"tool": "calculator", "input": "2+2", "output": "4"}],
-            "token_usage": 42,
-            "cost": 0.001,
         }
         response = self.client.post(
-            "/api/v1/chat",
+            "/chat",
             json={"message": "hi", "conversation_id": "conv-1", "selected_documents": []},
         )
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload["response"], "hello")
+        self.assertEqual(payload["run_id"], "run-1")
+        self.assertEqual(payload["status"], "queued")
         self.assertEqual(payload["conversation_id"], "conv-1")
-        self.assertEqual(payload["token_usage"], 42)
+
+    def test_versioned_chat_endpoint_removed(self):
+        response = self.client.post(
+            "/api/v1/chat",
+            json={"message": "hi", "conversation_id": "conv-1", "selected_documents": []},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    @patch("backend.api.runtime_routes.runtime_service.get_run_status", new_callable=AsyncMock)
+    def test_runtime_run_status_endpoint(self, mock_get_status):
+        mock_get_status.return_value = {
+            "run_id": "run-1",
+            "status": "running",
+            "conversation_id": "conv-1",
+            "created_at": "2026-03-06T10:00:00Z",
+            "updated_at": "2026-03-06T10:00:01Z",
+            "error": None,
+            "result": None,
+        }
+        response = self.client.get("/runs/run-1/status")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "running")
+
+    @patch("backend.api.runtime_routes.runtime_service.get_run_events", new_callable=AsyncMock)
+    def test_runtime_run_events_endpoint(self, mock_get_events):
+        mock_get_events.return_value = {
+            "run_id": "run-1",
+            "events": [
+                {
+                    "event_id": "1",
+                    "type": "started",
+                    "status": "running",
+                    "message": "Run started",
+                    "created_at": "2026-03-06T10:00:01Z",
+                    "tool": None,
+                    "metadata": None,
+                }
+            ],
+            "next_after": "1",
+            "has_more": False,
+        }
+        response = self.client.get("/runs/run-1/events?limit=10")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["run_id"], "run-1")
+        self.assertEqual(payload["next_after"], "1")
+        self.assertEqual(len(payload["events"]), 1)
 
     @patch("backend.api.routes.orchestrator.get_conversations")
     @patch("backend.api.routes.check_conversation_maintenance")
