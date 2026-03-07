@@ -272,12 +272,14 @@ class DbRunStore(RunStore):
         error: Optional[str] = _UNSET,
         result: Optional[str] = _UNSET,
     ) -> RunRecord:
-        db_record = self._db_ops.update_run(
-            run_id=run_id,
-            status=status,
-            error=error if error is not _UNSET else _UNSET,
-            result=result if result is not _UNSET else _UNSET,
-        )
+        # Build kwargs for db_ops, only including explicitly-set fields
+        update_kwargs = {"run_id": run_id, "status": status}
+        if error is not _UNSET:
+            update_kwargs["error"] = error
+        if result is not _UNSET:
+            update_kwargs["result"] = result
+
+        db_record = self._db_ops.update_run(**update_kwargs)
         if db_record is None:
             raise RunNotFoundError(f"Run '{run_id}' was not found")
         return RunRecord(
@@ -301,6 +303,10 @@ class DbRunStore(RunStore):
         message: str,
         tool: Optional[str] = None,
     ) -> RunEventRecord:
+        # Verify run exists before appending event
+        if not self._db_ops.get_run(run_id):
+            raise RunNotFoundError(f"Run '{run_id}' was not found")
+
         db_event = self._db_ops.append_run_event(
             run_id=run_id,
             event_type=event_type,
@@ -325,6 +331,10 @@ class DbRunStore(RunStore):
         after: Optional[str],
         limit: int,
     ) -> Tuple[List[RunEventRecord], Optional[str], bool]:
+        # Verify run exists before listing events
+        if not self._db_ops.get_run(run_id):
+            raise RunNotFoundError(f"Run '{run_id}' was not found")
+
         after_event_id = None
         if after is not None:
             try:
