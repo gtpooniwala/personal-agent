@@ -26,6 +26,7 @@ EVAL_ROOT = ROOT / "tests" / "llm_evals"
 CASES_DIR = EVAL_ROOT / "cases"
 RESULTS_DIR = EVAL_ROOT / "results"
 MAX_SAFE_EXPONENT = 64
+DOTENV_PATH = ROOT / ".env"
 
 
 @dataclass
@@ -73,9 +74,35 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _read_env_file_value(name: str) -> Optional[str]:
+    """Read a variable from the repository .env without importing backend settings."""
+    if not DOTENV_PATH.exists():
+        return None
+
+    for line in DOTENV_PATH.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        if key.strip() != name:
+            continue
+        return value.strip().strip('"').strip("'")
+    return None
+
+
+def _env_or_file(name: str) -> Optional[str]:
+    value = os.environ.get(name)
+    if value is not None and value.strip():
+        return value.strip()
+    file_value = _read_env_file_value(name)
+    if file_value is not None and file_value.strip():
+        return file_value.strip()
+    return None
+
+
 def _resolve_live_eval_database_url() -> Tuple[Optional[str], Optional[str]]:
     """Return an isolated Postgres URL for live evals or a blocking message."""
-    database_url = (os.environ.get("EVAL_DATABASE_URL") or os.environ.get("TEST_DATABASE_URL") or "").strip()
+    database_url = (_env_or_file("EVAL_DATABASE_URL") or _env_or_file("TEST_DATABASE_URL") or "").strip()
     if not database_url:
         return None, (
             "Live evals require EVAL_DATABASE_URL or TEST_DATABASE_URL to point to a dedicated "

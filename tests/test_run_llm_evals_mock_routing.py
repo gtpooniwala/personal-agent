@@ -3,6 +3,7 @@
 import importlib.util
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -80,6 +81,17 @@ class TestRunLLMEvalsMockRouting(unittest.TestCase):
             error = self.harness._configure_live_eval_environment()
             self.assertIsNone(error)
             self.assertEqual(os.environ["DATABASE_URL"], test_url)
+
+    def test_live_eval_env_reads_eval_db_from_dotenv(self):
+        test_url = "postgresql+psycopg://user:pass@127.0.0.1:5432/personal_agent_test"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dotenv_path = Path(tmpdir) / ".env"
+            dotenv_path.write_text(f"EVAL_DATABASE_URL={test_url}\n", encoding="utf-8")
+            with patch.object(self.harness, "DOTENV_PATH", dotenv_path):
+                with patch.dict(os.environ, {}, clear=True):
+                    error = self.harness._configure_live_eval_environment()
+                    self.assertIsNone(error)
+                    self.assertEqual(os.environ["DATABASE_URL"], test_url)
 
 
 if __name__ == "__main__":
