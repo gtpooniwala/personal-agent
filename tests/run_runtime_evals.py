@@ -308,7 +308,7 @@ async def _case_retry_transient_then_success() -> Tuple[bool, List[str]]:
         event_types = await _get_event_types(service, run_id)
 
         retrying_count = event_types.count(RUN_EVENT_RETRYING)
-        if retrying_count < 2:
+        if retrying_count != 2:
             failures.append(
                 f"expected at least 2 '{RUN_EVENT_RETRYING}' events, got {retrying_count} "
                 f"(events={event_types})"

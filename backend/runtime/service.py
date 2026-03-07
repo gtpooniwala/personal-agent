@@ -3,8 +3,14 @@ from __future__ import annotations
 import asyncio
 import logging
 from typing import Dict, Optional
-from backend.observability import increment_counter, observe_operation, push_context, update_observation
+from backend.observability import (
+    increment_counter,
+    observe_operation,
+    push_context,
+    update_observation,
+)
 from backend.runtime.contracts import (
+    RUN_TERMINAL_STATUSES,
     RUN_EVENT_FAILED,
     RUN_EVENT_QUEUED,
     RUN_EVENT_RETRYING,
@@ -34,7 +40,9 @@ class RuntimeService:
         self._background_tasks: set[asyncio.Task] = set()
 
     async def submit_run(self, request) -> Dict[str, str]:
-        conversation_id = request.conversation_id or self._orchestrator.create_conversation()
+        conversation_id = (
+            request.conversation_id or self._orchestrator.create_conversation()
+        )
         selected_documents = request.selected_documents or []
 
         with observe_operation(
@@ -60,7 +68,9 @@ class RuntimeService:
                 message="Run accepted and queued",
             )
             increment_counter("runtime.runs.queued_total")
-            update_observation(observation, output={"run_id": run.run_id, "status": run.status})
+            update_observation(
+                observation, output={"run_id": run.run_id, "status": run.status}
+            )
 
         # TODO(#16): Attach cancellation endpoint + worker-queue cancellation handling here.
         task = asyncio.create_task(
@@ -84,8 +94,12 @@ class RuntimeService:
         run = self._run_store.get_run(run_id)
         return run.to_status_payload()
 
-    async def get_run_events(self, *, run_id: str, after: Optional[str], limit: int) -> Dict[str, object]:
-        events, next_after, has_more = self._run_store.list_events(run_id=run_id, after=after, limit=limit)
+    async def get_run_events(
+        self, *, run_id: str, after: Optional[str], limit: int
+    ) -> Dict[str, object]:
+        events, next_after, has_more = self._run_store.list_events(
+            run_id=run_id, after=after, limit=limit
+        )
         return {
             "run_id": run_id,
             "events": [event.to_payload() for event in events],
@@ -114,7 +128,9 @@ class RuntimeService:
         ) as observation:
             try:
                 # 1. Acquire lease with retry backoff
-                lease = await self._acquire_lease_with_retry(lease_key, owner_id, max_attempts=3)
+                lease = await self._acquire_lease_with_retry(
+                    lease_key, owner_id, max_attempts=3
+                )
                 if lease is None:
                     # Another run is active for this conversation
                     self._run_store.update_run(
@@ -139,26 +155,49 @@ class RuntimeService:
 
                 # 2. Start background lease renewal task
                 renewal_task = asyncio.create_task(
-                    self._renew_lease_periodically(lease_key, owner_id, LEASE_RENEWAL_INTERVAL_SECONDS)
+                    self._renew_lease_periodically(
+                        lease_key, owner_id, LEASE_RENEWAL_INTERVAL_SECONDS
+                    )
                 )
 
                 # 3. Execute with retry cap
                 for attempt in range(1, MAX_RETRY_ATTEMPTS + 1):
                     try:
-                        await self._execute_attempt(run_id, conversation_id, message, selected_documents, attempt)
+                        await self._execute_attempt(
+                            run_id,
+                            conversation_id,
+                            message,
+                            selected_documents,
+                            attempt,
+                        )
                         # Success path
                         break
                     except RunNotFoundError:
                         raise
                     except Exception as exc:
                         if attempt == MAX_RETRY_ATTEMPTS:
-                            logger.exception("Run execution failed after max retries", extra={"event": "runtime.run_crash", "run_id": run_id, "attempt": attempt})
+                            logger.exception(
+                                "Run execution failed after max retries",
+                                extra={
+                                    "event": "runtime.run_crash",
+                                    "run_id": run_id,
+                                    "attempt": attempt,
+                                },
+                            )
                             raise
                         else:
-                            logger.warning(f"Attempt {attempt} failed, retrying...", extra={"event": "runtime.run_retry", "run_id": run_id, "attempt": attempt}, exc_info=True)
+                            logger.warning(
+                                f"Attempt {attempt} failed, retrying...",
+                                extra={
+                                    "event": "runtime.run_retry",
+                                    "run_id": run_id,
+                                    "attempt": attempt,
+                                },
+                                exc_info=True,
+                            )
                             # Only update status to RETRYING if not already in a terminal state
                             current_run = self._run_store.get_run(run_id)
-                            if current_run.status not in {"succeeded", "failed", "cancelled"}:
+                            if current_run.status not in RUN_TERMINAL_STATUSES:
                                 self._run_store.update_run(
                                     run_id=run_id,
                                     status=RUN_STATUS_RETRYING,
@@ -176,15 +215,26 @@ class RuntimeService:
                     update_observation(
                         observation,
                         output={"status": final_run.status, "run_id": run_id},
-                        status_message=final_run.error if final_run.status == RUN_STATUS_FAILED else None,
+                        status_message=final_run.error
+                        if final_run.status == RUN_STATUS_FAILED
+                        else None,
                     )
                 except RunNotFoundError:
-                    logger.warning("Run disappeared before updating final observation", extra={"event": "runtime.run_missing", "run_id": run_id})
+                    logger.warning(
+                        "Run disappeared before updating final observation",
+                        extra={"event": "runtime.run_missing", "run_id": run_id},
+                    )
 
             except RunNotFoundError:
-                logger.warning("Run disappeared during execution", extra={"event": "runtime.run_missing", "run_id": run_id})
+                logger.warning(
+                    "Run disappeared during execution",
+                    extra={"event": "runtime.run_missing", "run_id": run_id},
+                )
             except Exception as exc:
-                logger.exception("Unexpected run execution failure", extra={"event": "runtime.run_crash", "run_id": run_id})
+                logger.exception(
+                    "Unexpected run execution failure",
+                    extra={"event": "runtime.run_crash", "run_id": run_id},
+                )
                 try:
                     self._run_store.update_run(
                         run_id=run_id,
@@ -199,7 +249,10 @@ class RuntimeService:
                         message=GENERIC_RUNTIME_FAILURE_MESSAGE,
                     )
                 except RunNotFoundError:
-                    logger.warning("Run disappeared while storing failure", extra={"event": "runtime.run_missing", "run_id": run_id})
+                    logger.warning(
+                        "Run disappeared while storing failure",
+                        extra={"event": "runtime.run_missing", "run_id": run_id},
+                    )
                 increment_counter("runtime.runs.failed_total")
                 update_observation(
                     observation,
@@ -217,11 +270,20 @@ class RuntimeService:
                         pass
                 try:
                     from backend.database.operations import db_ops
+
                     db_ops.release_lease(lease_key, owner_id)
                 except Exception:
-                    logger.exception("Failed to release lease", extra={"event": "runtime.lease_release_failed", "lease_key": lease_key})
+                    logger.exception(
+                        "Failed to release lease",
+                        extra={
+                            "event": "runtime.lease_release_failed",
+                            "lease_key": lease_key,
+                        },
+                    )
 
-    async def _acquire_lease_with_retry(self, lease_key: str, owner_id: str, max_attempts: int = 3) -> Optional[Dict]:
+    async def _acquire_lease_with_retry(
+        self, lease_key: str, owner_id: str, max_attempts: int = 3
+    ) -> Optional[Dict]:
         """Try to acquire a lease with exponential backoff."""
         from backend.database.operations import db_ops
 
@@ -231,16 +293,21 @@ class RuntimeService:
                 if lease is not None:
                     return lease
             except Exception as exc:
-                logger.warning(f"Exception acquiring lease (attempt {attempt + 1}/{max_attempts})", exc_info=True)
+                logger.warning(
+                    f"Exception acquiring lease (attempt {attempt + 1}/{max_attempts})",
+                    exc_info=True,
+                )
                 if attempt == max_attempts - 1:
                     # On final attempt, raise to fail the run
                     raise
             if attempt < max_attempts - 1:
                 # Exponential backoff: 0.5s, 1s, etc.
-                await asyncio.sleep(0.5 * (2 ** attempt))
+                await asyncio.sleep(0.5 * (2**attempt))
         return None
 
-    async def _renew_lease_periodically(self, lease_key: str, owner_id: str, interval_seconds: int) -> None:
+    async def _renew_lease_periodically(
+        self, lease_key: str, owner_id: str, interval_seconds: int
+    ) -> None:
         """Periodically renew the lease."""
         from backend.database.operations import db_ops
 
@@ -249,7 +316,13 @@ class RuntimeService:
                 await asyncio.sleep(interval_seconds)
                 result = db_ops.renew_lease(lease_key, owner_id, LEASE_TTL_SECONDS)
                 if result is None:
-                    logger.warning("Failed to renew lease", extra={"event": "runtime.lease_renew_failed", "lease_key": lease_key})
+                    logger.warning(
+                        "Failed to renew lease",
+                        extra={
+                            "event": "runtime.lease_renew_failed",
+                            "lease_key": lease_key,
+                        },
+                    )
                     break
         except asyncio.CancelledError:
             pass

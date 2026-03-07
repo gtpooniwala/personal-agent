@@ -1,0 +1,61 @@
+{
+  "generated_at": "2026-03-07T13:54:36.799374+00:00",
+  "mode": "runtime",
+  "summary": {
+    "total": 6,
+    "passed": 6,
+    "failed": 0,
+    "pass_rate": 100.0
+  },
+  "suite_summaries": {
+    "runtime": {
+      "total": 6,
+      "passed": 6,
+      "failed": 0
+    }
+  },
+  "results": [
+    {
+      "suite": "runtime",
+      "case_id": "lifecycle_queued_to_succeeded",
+      "passed": true,
+      "failures": [],
+      "duration_ms": 168
+    },
+    {
+      "suite": "runtime",
+      "case_id": "lifecycle_queued_to_failed",
+      "passed": true,
+      "failures": [],
+      "duration_ms": 20
+    },
+    {
+      "suite": "runtime",
+      "case_id": "retry_transient_then_success",
+      "passed": true,
+      "failures": [],
+      "duration_ms": 20
+    },
+    {
+      "suite": "runtime",
+      "case_id": "retry_exhaustion",
+      "passed": true,
+      "failures": [],
+      "duration_ms": 20
+    },
+    {
+      "suite": "runtime",
+      "case_id": "session_isolation_different_sessions",
+      "passed": true,
+      "failures": [],
+      "duration_ms": 0
+    },
+    {
+      "suite": "runtime",
+      "case_id": "session_isolation_same_session_blocked",
+      "passed": true,
+      "failures": [],
+      "duration_ms": 1543
+    }
+  ]
+}
