@@ -235,9 +235,10 @@ Run event types:
 - `cancelled`
 
 #### Run
+API-facing run record. The `run_id` field is the identifier (mapped to the `runs.id` column in the database).
 ```json
 {
-  "run_id": "string",
+  "run_id": "string (unique identifier, maps to runs.id)",
   "status": "queued|running|retrying|succeeded|failed|cancelling|cancelled",
   "conversation_id": "string",
   "created_at": "ISO-8601 datetime",
@@ -248,13 +249,17 @@ Run event types:
 ```
 
 #### RunEvent
+API-facing run event record. Subset of the full database record; includes essential fields for progress tracking.
 ```json
 {
-  "event_id": "string cursor",
+  "event_id": "string (cursor for pagination, maps to run_events.id)",
+  "run_id": "string (foreign key, maps to runs.id)",
   "type": "queued|started|tool_call|tool_result|retrying|failed|succeeded|cancelling|cancelled",
   "status": "queued|running|retrying|succeeded|failed|cancelling|cancelled",
   "message": "string",
   "tool": "string|null",
+  "error": "string|null (optional, set on error events)",
+  "payload": "string|null (optional, for structured event metadata)",
   "created_at": "ISO-8601 datetime"
 }
 ```

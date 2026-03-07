@@ -377,8 +377,12 @@ class DatabaseOperations:
             if attempt_count is not None:
                 run.attempt_count = attempt_count
             if started_at is not _UNSET:
+                if started_at is not None and not (isinstance(started_at, datetime) and started_at.tzinfo is not None):
+                    raise ValueError("started_at must be a timezone-aware datetime or None")
                 run.started_at = started_at
             if completed_at is not _UNSET:
+                if completed_at is not None and not (isinstance(completed_at, datetime) and completed_at.tzinfo is not None):
+                    raise ValueError("completed_at must be a timezone-aware datetime or None")
                 run.completed_at = completed_at
             run.updated_at = datetime.now(timezone.utc)
 
@@ -450,8 +454,6 @@ class DatabaseOperations:
         if ttl_seconds <= 0:
             raise ValueError("ttl_seconds must be positive")
 
-        now = datetime.now(timezone.utc)
-        expires_at = now + timedelta(seconds=ttl_seconds)
         session = self.get_session()
         try:
             row = (
@@ -462,24 +464,23 @@ class DatabaseOperations:
                             lease_key, owner_id, fencing_token, acquired_at, expires_at, updated_at
                         )
                         VALUES (
-                            :lease_key, :owner_id, 1, :now, :expires_at, :now
+                            :lease_key, :owner_id, 1, NOW(), NOW() + INTERVAL :ttl_seconds, NOW()
                         )
                         ON CONFLICT (lease_key)
                         DO UPDATE SET
                             owner_id = :owner_id,
                             fencing_token = leases.fencing_token + 1,
-                            acquired_at = :now,
-                            expires_at = :expires_at,
-                            updated_at = :now
-                        WHERE leases.expires_at <= :now OR leases.owner_id = :owner_id
+                            acquired_at = NOW(),
+                            expires_at = NOW() + INTERVAL :ttl_seconds,
+                            updated_at = NOW()
+                        WHERE leases.expires_at <= NOW() OR leases.owner_id = :owner_id
                         RETURNING lease_key, owner_id, fencing_token, acquired_at, expires_at, updated_at
                         """
                     ),
                     {
                         "lease_key": lease_key,
                         "owner_id": owner_id,
-                        "now": now,
-                        "expires_at": expires_at,
+                        "ttl_seconds": f"{ttl_seconds} seconds",
                     },
                 )
                 .mappings()
@@ -503,8 +504,6 @@ class DatabaseOperations:
         if ttl_seconds <= 0:
             raise ValueError("ttl_seconds must be positive")
 
-        now = datetime.now(timezone.utc)
-        expires_at = now + timedelta(seconds=ttl_seconds)
         session = self.get_session()
         try:
             row = (
@@ -512,18 +511,17 @@ class DatabaseOperations:
                     text(
                         """
                         UPDATE leases
-                        SET expires_at = :expires_at, updated_at = :now
+                        SET expires_at = NOW() + INTERVAL :ttl_seconds, updated_at = NOW()
                         WHERE lease_key = :lease_key
                           AND owner_id = :owner_id
-                          AND expires_at > :now
+                          AND expires_at > NOW()
                         RETURNING lease_key, owner_id, fencing_token, acquired_at, expires_at, updated_at
                         """
                     ),
                     {
                         "lease_key": lease_key,
                         "owner_id": owner_id,
-                        "expires_at": expires_at,
-                        "now": now,
+                        "ttl_seconds": f"{ttl_seconds} seconds",
                     },
                 )
                 .mappings()
