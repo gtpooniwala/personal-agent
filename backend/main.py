@@ -30,10 +30,8 @@ async def lifespan(app: FastAPI):
     logger.info("Personal Agent API starting up...")
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Database URL: {_safe_database_url()}")
-    if not settings.gemini_api_key:
-        logger.warning(
-            "GEMINI_API_KEY is not configured; Gemini-backed requests may fail at runtime."
-        )
+    if not settings.gemini_api_key and not settings.openai_api_key:
+        raise RuntimeError("Either GEMINI_API_KEY or OPENAI_API_KEY must be configured.")
     langfuse_manager.initialize()
     
     yield
