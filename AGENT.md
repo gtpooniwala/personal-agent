@@ -26,8 +26,10 @@ Canonical workflow contract for AI coding agents in this repository.
 ## Required Checks
 - `CI / tests-and-repo-checks`
 - `PR Policy / enforce-pr-policy`
+- Automated Code Review: `cubic review --base main` (must pass with no issues)
 
 ## Required Commands
+- Code Review: Use `cubic cli` and `cubic mcp` for code reviews. Run `cubic review --base main` (or `cubic review --base <branch>` or auto-detect with `cubic review --base`) to review changes against the base branch. Repeat until no issues remain before merging.
 - New worktree: `scripts/new_worktree.sh <agent:codex|claude> <type> <issue> <slug>`
 - Sync with main: `scripts/sync_main.sh`
 - Sync repo-managed skills into Codex home: `scripts/sync_skills.sh`
