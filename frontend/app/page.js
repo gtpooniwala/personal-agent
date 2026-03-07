@@ -198,7 +198,7 @@ export default function HomePage() {
     const trimmedMessage = messageInput.trim();
     const requestConversationId = currentConversationId;
 
-    if (!trimmedMessage || sendingConversationId === requestConversationId) {
+    if (!trimmedMessage || (sendingConversationId !== null && sendingConversationId === requestConversationId)) {
       return;
     }
 
@@ -298,7 +298,7 @@ export default function HomePage() {
         setChatError("Failed to send message.");
       }
     } finally {
-      setSendingConversationId(null);
+      setSendingConversationId((current) => current === requestConversationId ? null : current);
     }
   }, [
     loadConversations,
@@ -462,7 +462,7 @@ export default function HomePage() {
         isLoadingMessages={loadingMessages}
         chatError={chatError}
         messageInput={messageInput}
-        isSending={sendingConversationId === currentConversationId}
+        isSending={sendingConversationId !== null && sendingConversationId === currentConversationId}
         onChangeMessage={setMessageInput}
         onSendMessage={sendMessage}
       />

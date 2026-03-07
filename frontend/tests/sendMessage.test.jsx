@@ -33,6 +33,60 @@ function setupApiMocks({ runtimeChatResponse = async () => ({ run_id: 'run-1' })
   });
 }
 
+describe('initial render state', () => {
+  test('send button is enabled before conversations load', async () => {
+    // Delay conversations so the component renders with null currentConversationId first
+    apiCall.mockImplementation(async (path) => {
+      if (path === '/conversations') {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return [];
+      }
+      if (path === '/tools') return [];
+      if (path === '/documents') return { documents: [] };
+      return {};
+    });
+    runtimeApiCall.mockResolvedValue({});
+
+    await act(async () => {
+      render(<HomePage />);
+    });
+
+    // On first render, both sendingConversationId and currentConversationId are null.
+    // isSending must be false (not null === null).
+    expect(screen.getByRole('button', { name: /^send$/i })).not.toBeDisabled();
+  });
+});
+
+describe('sendMessage error path', () => {
+  test('shows error when no conversation exists and user tries to send', async () => {
+    const user = userEvent.setup();
+
+    apiCall.mockImplementation(async (path) => {
+      if (path === '/conversations') return [];  // no conversations
+      if (path === '/tools') return [];
+      if (path === '/documents') return { documents: [] };
+      return {};
+    });
+    runtimeApiCall.mockResolvedValue({});
+
+    await act(async () => {
+      render(<HomePage />);
+    });
+
+    // Wait for load to settle (no conversations)
+    await waitFor(() => screen.getByText('No conversations yet.'));
+
+    const input = screen.getByRole('textbox');
+    await user.type(input, 'hello');
+    await user.click(screen.getByRole('button', { name: /^send$/i }));
+
+    // Should show the "no conversation" error, not silently no-op
+    await waitFor(() => {
+      expect(screen.getByText('Create a conversation before sending a message.')).toBeInTheDocument();
+    });
+  });
+});
+
 describe('sendMessage conversation scoping (issue #31)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
