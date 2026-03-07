@@ -44,6 +44,23 @@ Success criteria:
 - Production deployment path documented and validated.
 - Runtime observability sufficient for incident debugging.
 
+## Cloud Deployment (GCP)
+- Architecture decision record and deployment plan ([#79](https://github.com/gtpooniwala/personal-agent/issues/79))
+- GCS document storage migration — replace ephemeral `./data` volume ([#80](https://github.com/gtpooniwala/personal-agent/issues/80))
+- Cloud SQL setup and production database configuration ([#81](https://github.com/gtpooniwala/personal-agent/issues/81))
+- Cloud Run service definitions for backend and frontend ([#82](https://github.com/gtpooniwala/personal-agent/issues/82))
+- Secret Manager integration for all production API keys ([#83](https://github.com/gtpooniwala/personal-agent/issues/83))
+- IAP setup for personal cloud authentication ([#85](https://github.com/gtpooniwala/personal-agent/issues/85))
+- GitHub Actions CI/CD pipeline for Cloud Run deployment ([#86](https://github.com/gtpooniwala/personal-agent/issues/86))
+- Cold start optimization and min-instances strategy ([#87](https://github.com/gtpooniwala/personal-agent/issues/87))
+
+## Event-Driven Triggers + Mobile
+- Event trigger framework — unified infrastructure for all trigger types ([#88](https://github.com/gtpooniwala/personal-agent/issues/88))
+- Task-to-task chaining — trigger_run tool for agent-spawned runs ([#89](https://github.com/gtpooniwala/personal-agent/issues/89))
+- Scheduled task runner — cron-like recurring agent runs ([#90](https://github.com/gtpooniwala/personal-agent/issues/90))
+- Email-triggered task execution ([#91](https://github.com/gtpooniwala/personal-agent/issues/91))
+- Telegram bot integration for mobile task monitoring and triggering ([#92](https://github.com/gtpooniwala/personal-agent/issues/92))
+
 ## Idea Backlog (Potential New Features)
 - Calendar and task integrations beyond placeholder level.
 - Better long-term memory controls (review/edit/delete profile facts).
@@ -59,3 +76,6 @@ Success criteria:
 - Completed core migration implementation: [#15](https://github.com/gtpooniwala/personal-agent/issues/15) (run lifecycle schema), [#16](https://github.com/gtpooniwala/personal-agent/issues/16) (worker queue + per-session serialization), [#17](https://github.com/gtpooniwala/personal-agent/issues/17) (async contracts)
 - Remaining migration items: [#19](https://github.com/gtpooniwala/personal-agent/issues/19) (runtime evals), [#18](https://github.com/gtpooniwala/personal-agent/issues/18) (scheduler/heartbeat)
 - Active migration/frontend follow-ups: [#28](https://github.com/gtpooniwala/personal-agent/issues/28), [#29](https://github.com/gtpooniwala/personal-agent/issues/29), [#31](https://github.com/gtpooniwala/personal-agent/issues/31), [#30](https://github.com/gtpooniwala/personal-agent/issues/30), [#40](https://github.com/gtpooniwala/personal-agent/issues/40)
+- GCP deployment planning tracking: [#78](https://github.com/gtpooniwala/personal-agent/issues/78)
+- GCP deployment sub-issues: [#79](https://github.com/gtpooniwala/personal-agent/issues/79), [#80](https://github.com/gtpooniwala/personal-agent/issues/80), [#81](https://github.com/gtpooniwala/personal-agent/issues/81), [#82](https://github.com/gtpooniwala/personal-agent/issues/82), [#83](https://github.com/gtpooniwala/personal-agent/issues/83), [#85](https://github.com/gtpooniwala/personal-agent/issues/85), [#86](https://github.com/gtpooniwala/personal-agent/issues/86), [#87](https://github.com/gtpooniwala/personal-agent/issues/87)
+- Event-driven triggers sub-issues: [#88](https://github.com/gtpooniwala/personal-agent/issues/88), [#89](https://github.com/gtpooniwala/personal-agent/issues/89), [#90](https://github.com/gtpooniwala/personal-agent/issues/90), [#91](https://github.com/gtpooniwala/personal-agent/issues/91), [#92](https://github.com/gtpooniwala/personal-agent/issues/92)
