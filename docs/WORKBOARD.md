@@ -19,6 +19,7 @@ Workflow:
 - `done`
 
 ## Now
+- [ ] `in_progress` Adopt PostgreSQL as default runtime and test database baseline ([#46](https://github.com/gtpooniwala/personal-agent/issues/46))
 - [ ] `todo` Fix Gmail auth flow and dependency packaging ([#40](https://github.com/gtpooniwala/personal-agent/issues/40))
 - [ ] `in_progress` Add run lifecycle schema (`runs`, `run_events`, `leases`) ([#15](https://github.com/gtpooniwala/personal-agent/issues/15))
 - [ ] `in_progress` Deliver async submission contracts for `/chat` and `/runs` plus status/events endpoints ([#17](https://github.com/gtpooniwala/personal-agent/issues/17))

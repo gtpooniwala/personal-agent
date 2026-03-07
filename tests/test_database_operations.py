@@ -15,6 +15,7 @@ DB_IMPORT_ERROR = ""
 
 try:
     from sqlalchemy import create_engine
+    from sqlalchemy.engine import make_url
     from sqlalchemy.orm import sessionmaker
     from backend.database.models import Base
     from backend.database.operations import DatabaseOperations
@@ -29,15 +30,24 @@ class TestDatabaseOperations(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
-        # Create an in-memory database for testing
-        self.engine = create_engine("sqlite:///:memory:")
+        database_url = os.environ.get("TEST_DATABASE_URL")
+        if not database_url:
+            self.skipTest("TEST_DATABASE_URL is required for database tests.")
+        if not database_url.startswith("postgresql"):
+            self.skipTest("TEST_DATABASE_URL must use PostgreSQL for this suite.")
+        db_name = make_url(database_url).database or ""
+        if not db_name.endswith("_test"):
+            self.skipTest(
+                "TEST_DATABASE_URL must target a dedicated *_test database for destructive DB tests."
+            )
+
+        self.engine = create_engine(database_url)
+        Base.metadata.drop_all(bind=self.engine)
         Base.metadata.create_all(bind=self.engine)
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
         
-        # Create a mock database operations instance
-        self.db_ops = DatabaseOperations()
-        self.db_ops.close()
-        # Replace the engine and session with our test ones
+        # Construct instance without running __init__ so tests never touch runtime DB settings.
+        self.db_ops = DatabaseOperations.__new__(DatabaseOperations)
         self.db_ops.engine = self.engine
         self.db_ops.SessionLocal = SessionLocal
         

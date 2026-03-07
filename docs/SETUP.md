@@ -57,7 +57,9 @@ PORT=8000
 DEBUG=true
 
 # Database Configuration
-DATABASE_URL=sqlite:///./data/agent.db
+DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent
+DATABASE_URL_DOCKER=postgresql+psycopg://personal_agent:personal_agent@postgres:5432/personal_agent
+TEST_DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent_test
 
 # CORS Configuration
 CORS_ORIGINS=http://localhost:3000,http://localhost:8080
@@ -127,7 +129,9 @@ python test_basic_agent.py
 | `HOST` | Server bind address | localhost | No |
 | `PORT` | Server port number | 8000 | No |
 | `DEBUG` | Enable debug mode | false | No |
-| `DATABASE_URL` | Database connection string | sqlite:///./data/agent.db | No |
+| `DATABASE_URL` | Database connection string | postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent | Yes |
+| `DATABASE_URL_DOCKER` | DB URL used by backend container in docker compose | postgresql+psycopg://personal_agent:personal_agent@postgres:5432/personal_agent | No |
+| `TEST_DATABASE_URL` | Dedicated destructive test DB URL | postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent_test | No |
 | `CORS_ORIGINS` | Allowed CORS origins (comma-separated) | * | No |
 | `LOG_LEVEL` | Logging level (DEBUG/INFO/WARNING/ERROR) | INFO | No |
 | `MAX_FILE_SIZE` | Maximum upload file size (bytes) | 10485760 | No |
@@ -139,9 +143,9 @@ python test_basic_agent.py
 To use custom AI model mappings, modify `backend/config/llm_config.yaml`.
 
 #### Database Configuration
-For production environments, consider using PostgreSQL:
+PostgreSQL is the default runtime database:
 ```env
-DATABASE_URL=postgresql://username:password@localhost:5432/personal_agent
+DATABASE_URL=postgresql+psycopg://username:password@localhost:5432/personal_agent
 ```
 
 #### CORS Configuration
@@ -165,12 +169,14 @@ pip install -r requirements.txt
 ```
 
 #### 2. Database Connection Issues
-**Problem**: SQLite database errors
+**Problem**: PostgreSQL connection errors
 **Solution**:
 ```bash
-# Recreate the database
-rm data/agent.db
-python -c "from database.models import init_db; init_db()"
+# Verify PostgreSQL is running and reachable
+pg_isready -h localhost -p 5432 -U personal_agent -d personal_agent
+
+# Validate DATABASE_URL credentials manually
+psql postgresql://personal_agent:personal_agent@localhost:5432/personal_agent -c "SELECT 1;"
 ```
 
 #### 3. OpenAI API Errors
@@ -217,9 +223,9 @@ tail -f logs/error.log
 #### Database Debugging
 ```bash
 # Check database contents
-sqlite3 data/agent.db
-.tables
-.schema conversations
+psql postgresql://personal_agent:personal_agent@localhost:5432/personal_agent
+\dt
+\d conversations
 SELECT * FROM conversations LIMIT 5;
 ```
 

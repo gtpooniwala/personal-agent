@@ -30,7 +30,7 @@ flowchart LR
     REG --> PROFILE["User Profile"]
     REG --> GMAIL["Gmail Read (OAuth)"]
 
-    API --> DB["SQLite (SQLAlchemy)"]
+    API --> DB["PostgreSQL (SQLAlchemy)"]
     API --> DOCPROC["PDF Processing + Embeddings"]
     DOCPROC --> DB
 ```
@@ -51,7 +51,7 @@ Target runtime path (rolling out soon):
 
 | Capability | Status | Notes |
 |---|---|---|
-| Conversation API + persistence | Implemented | SQLite-backed conversations/messages |
+| Conversation API + persistence | Implemented | PostgreSQL-backed conversations/messages |
 | Tool orchestration (LangGraph ReAct) | Implemented | Dynamic tool availability by context |
 | Calculator tool | Implemented | Input-validated arithmetic evaluation |
 | Time tool | Implemented | Current date/time responses |
@@ -67,7 +67,7 @@ Target runtime path (rolling out soon):
 - Backend: Python, FastAPI, LangChain, LangGraph, SQLAlchemy
 - LLM/Embeddings: Gemini by default (`gemini-2.5-flash` + `text-embedding-004`), OpenAI optional via config
 - Frontend: Next.js + React
-- Storage: SQLite + local filesystem (`data/`)
+- Storage: PostgreSQL + local filesystem (`data/`)
 
 ## LangChain/LangGraph Migration Baseline
 
@@ -97,6 +97,8 @@ cd personal-agent
 cp .env.example .env
 # Edit .env and set GEMINI_API_KEY
 # Optional observability: set LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_BASE_URL
+# `DATABASE_URL` is used for local host runtime.
+# `DATABASE_URL_DOCKER` is used by the backend container in docker compose.
 ```
 
 ### 3) Start backend + frontend
@@ -186,6 +188,8 @@ This command:
 - runs guarded unit tests (`tests/run_unit_tests.py`)
 - runs deterministic repository checks (`tests/run_repo_checks.py`)
 
+Note: `scripts/run_local_checks.sh` forces tests onto `TEST_DATABASE_URL` to avoid touching runtime data.
+
 Guardrails:
 - no discovered tests = non-pass
 - skip-only unit test runs = non-pass
@@ -215,7 +219,7 @@ python tests/run_repo_checks.py
 ## Observability Baseline
 
 - Structured JSON logs are emitted by the backend (request ID + route + latency fields).
-- Runtime counters are stored in SQLite (`runtime_counters` table).
+- Runtime counters are stored in PostgreSQL (`runtime_counters` table).
 - Langfuse tracing is enabled when the following env vars are set:
   - `LANGFUSE_PUBLIC_KEY`
   - `LANGFUSE_SECRET_KEY`
@@ -309,14 +313,14 @@ Design choices reflected in this implementation:
 ## Current Limitations
 
 - Single-user default (`user_id="default"`) across most flows.
-- Document retrieval computes similarity from stored embeddings in SQLite; not yet an external vector DB.
+- Document retrieval computes similarity from embeddings stored in PostgreSQL; not yet an external vector DB.
 - Tool/model config exists, but some model selections are still hardcoded in tool/orchestrator paths.
 - Integration tools (Gmail/Calendar/Todoist) have different maturity levels and setup requirements.
 
 ## Roadmap (High-Impact)
 
 - Multi-user auth + tenant isolation
-- PostgreSQL + managed vector store option
+- Managed vector store option
 - Expand eval coverage for tool-selection accuracy and regression checks
 - Observability for latency/token/tool metrics
 - Production deployment profile (secrets, health checks, structured logging)

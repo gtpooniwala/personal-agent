@@ -60,6 +60,23 @@ jobs:
     runs-on: ubuntu-latest
     needs: detect_changes
     if: needs.detect_changes.outputs.run_backend_tests == 'true'
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: personal_agent_test
+          POSTGRES_USER: personal_agent
+          POSTGRES_PASSWORD: personal_agent
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U personal_agent -d personal_agent_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DATABASE_URL: postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent_test
+      TEST_DATABASE_URL: postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent_test
     steps:
       - name: Checkout
         uses: actions/checkout@v4

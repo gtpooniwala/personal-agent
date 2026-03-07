@@ -32,14 +32,13 @@ class Settings(BaseSettings):
     langfuse_sample_rate: float = 1.0
 
     # Core application settings
-    database_path: str = "data/personal_agent.db"
+    database_url: str = "postgresql+psycopg://personal_agent:personal_agent@127.0.0.1:5432/personal_agent"
     log_level: str = "INFO"
     debug: bool = False
 
     # Future settings with defaults for cloud deployment
     environment: str = "local"
     redis_url: Optional[str] = None
-    database_url: Optional[str] = None
     jwt_secret: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("JWT_SECRET", "SECRET_KEY"),
@@ -94,7 +93,5 @@ def load_llm_config():
 
 llm_config = load_llm_config()
 
-# Ensure data directory exists
-database_dir = os.path.dirname(settings.database_path)
-if database_dir:
-    os.makedirs(database_dir, exist_ok=True)
+# Ensure local data directory exists for uploads and local tool files.
+os.makedirs(os.path.join(PROJECT_ROOT, "data"), exist_ok=True)
