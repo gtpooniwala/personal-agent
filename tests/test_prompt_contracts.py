@@ -1,37 +1,26 @@
 """Tests for shared prompt contracts used by LLM-backed components."""
 
-import sys
 import os
+import sys
 import unittest
 
 # Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-PROMPT_TESTS_AVAILABLE = True
-PROMPT_IMPORT_ERROR = ""
-
-try:
-    from backend.orchestrator.prompts import (
-        build_direct_response_prompt,
-        build_document_summary_prompt,
-        build_orchestrator_system_prompt,
-        build_response_agent_prompt,
-        build_summarisation_prompt,
-        build_title_prompt,
-        build_user_profile_prompt,
-        format_conversation_history,
-        format_tool_results,
-    )
-except Exception as exc:
-    PROMPT_TESTS_AVAILABLE = False
-    PROMPT_IMPORT_ERROR = str(exc)
-
-
-@unittest.skipUnless(
-    PROMPT_TESTS_AVAILABLE,
-    f"Prompt contract test dependencies unavailable: {PROMPT_IMPORT_ERROR}",
+from backend.orchestrator.prompts import (
+    build_direct_response_prompt,
+    build_document_summary_prompt,
+    build_orchestrator_system_prompt,
+    build_response_agent_prompt,
+    build_summarisation_prompt,
+    build_title_prompt,
+    build_user_profile_prompt,
+    format_conversation_history,
+    format_tool_results,
 )
+
+
 class TestPromptContracts(unittest.TestCase):
     def test_orchestrator_prompt_includes_tool_policy_and_document_context(self):
         prompt = build_orchestrator_system_prompt("Documents are selected.")

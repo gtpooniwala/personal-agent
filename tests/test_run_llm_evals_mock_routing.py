@@ -98,6 +98,13 @@ class TestRunLLMEvalsMockRouting(unittest.TestCase):
             self.assertIsNone(error)
             self.assertEqual(os.environ["DATABASE_URL"], eval_url)
 
+    def test_live_eval_env_accepts_query_string_on_dedicated_database(self):
+        eval_url = "postgresql+psycopg://user:pass@127.0.0.1:5432/personal_agent_test?sslmode=require"
+        with patch.dict(os.environ, {"EVAL_DATABASE_URL": eval_url}, clear=True):
+            error = self.harness._configure_live_eval_environment()
+            self.assertIsNone(error)
+            self.assertEqual(os.environ["DATABASE_URL"], eval_url)
+
     def test_live_eval_env_reads_eval_db_from_dotenv(self):
         test_url = "postgresql+psycopg://user:pass@127.0.0.1:5432/personal_agent_test"
         with tempfile.TemporaryDirectory() as tmpdir:

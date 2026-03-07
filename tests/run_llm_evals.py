@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -112,7 +113,7 @@ def _resolve_live_eval_database_url() -> Tuple[Optional[str], Optional[str]]:
         )
     if not database_url.startswith("postgresql"):
         return None, "Live eval database must use PostgreSQL."
-    database_name = database_url.rsplit("/", 1)[-1]
+    database_name = urlsplit(database_url).path.rsplit("/", 1)[-1]
     if eval_database_url:
         if not (database_name.endswith("_eval") or database_name.endswith("_test")):
             return None, "EVAL_DATABASE_URL must target a dedicated PostgreSQL *_eval or *_test database."

@@ -16,6 +16,7 @@ from typing import List, Optional, Dict, Any
 import json
 from datetime import datetime, timedelta, timezone
 import atexit
+import threading
 
 from backend.runtime import RUN_EVENT_TYPE_SET, RUN_STATUS_SET
 
@@ -884,10 +885,13 @@ class LazyDatabaseOperations:
 
     def __init__(self) -> None:
         self._instance: Optional[DatabaseOperations] = None
+        self._lock = threading.Lock()
 
     def _get_instance(self) -> DatabaseOperations:
         if self._instance is None:
-            self._instance = DatabaseOperations()
+            with self._lock:
+                if self._instance is None:
+                    self._instance = DatabaseOperations()
         return self._instance
 
     def close(self) -> None:
@@ -896,12 +900,20 @@ class LazyDatabaseOperations:
 
     def reset(self) -> None:
         """Dispose the current instance so a later access re-reads settings."""
-        if self._instance is not None:
-            self._instance.close()
-            self._instance = None
+        with self._lock:
+            if self._instance is not None:
+                self._instance.close()
+                self._instance = None
 
     def __getattr__(self, item: str) -> Any:
         if item in {"engine", "SessionLocal"}:
+            return getattr(self._get_instance(), item)
+
+        target = getattr(DatabaseOperations, item, None)
+        if target is None:
+            raise AttributeError(f"{self.__class__.__name__!s} has no attribute {item!r}")
+
+        if not callable(target):
             return getattr(self._get_instance(), item)
 
         def _lazy_method(*args: Any, **kwargs: Any) -> Any:
