@@ -12,8 +12,7 @@ ORPHAN_ERROR_MESSAGE = "Run abandoned: process crashed or lease expired"
 class HeartbeatService:
     """Background service that detects orphaned runs and marks them failed."""
 
-    def __init__(self, run_store=None, poll_interval_seconds: int = 60, db_ops=None):
-        # run_store kept for API compatibility; db_ops is injected for testability.
+    def __init__(self, poll_interval_seconds: int = 60, db_ops=None):
         self._db_ops = db_ops
         self._poll_interval = poll_interval_seconds
         self._task: Optional[asyncio.Task] = None

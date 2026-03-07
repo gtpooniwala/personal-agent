@@ -7,6 +7,7 @@ import sys
 import unittest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import MagicMock, patch
+from sqlalchemy.exc import IntegrityError
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
@@ -197,6 +198,39 @@ class TestSchedulerRoutes(unittest.TestCase):
             client = TestClient(app)
             resp = client.delete("/scheduler/tasks/task-1")
         self.assertEqual(resp.status_code, 204)
+
+    def test_create_task_duplicate_name_returns_409(self):
+        db = self._mock_db()
+        db.create_scheduled_task.side_effect = IntegrityError("statement", "params", Exception("unique"))
+        with patch.object(scheduler_routes_module, "db_ops", db):
+            from backend.api.scheduler_routes import scheduler_router
+            app = FastAPI()
+            app.include_router(scheduler_router)
+            client = TestClient(app, raise_server_exceptions=False)
+            resp = client.post("/scheduler/tasks", json={
+                "name": "duplicate",
+                "conversation_id": "conv-1",
+                "message": "hi",
+                "cron_expr": "0 * * * *",
+            })
+        self.assertEqual(resp.status_code, 409)
+        self.assertIn("duplicate", resp.json()["detail"])
+
+    def test_create_task_unexpected_db_error_returns_500(self):
+        db = self._mock_db()
+        db.create_scheduled_task.side_effect = RuntimeError("db exploded")
+        with patch.object(scheduler_routes_module, "db_ops", db):
+            from backend.api.scheduler_routes import scheduler_router
+            app = FastAPI()
+            app.include_router(scheduler_router)
+            client = TestClient(app, raise_server_exceptions=False)
+            resp = client.post("/scheduler/tasks", json={
+                "name": "ok-task",
+                "conversation_id": "conv-1",
+                "message": "hi",
+                "cron_expr": "0 * * * *",
+            })
+        self.assertEqual(resp.status_code, 500)
 
 
 if __name__ == "__main__":

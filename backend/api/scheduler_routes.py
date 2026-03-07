@@ -4,6 +4,7 @@ import logging
 from typing import List
 
 from fastapi import APIRouter, HTTPException
+from sqlalchemy.exc import IntegrityError
 
 from backend.api.models import ScheduledTaskCreate, ScheduledTaskResponse, ScheduledTaskUpdate
 from backend.database.operations import db_ops
@@ -15,11 +16,8 @@ scheduler_router = APIRouter(prefix="/scheduler/tasks", tags=["scheduler"])
 
 
 def _validate_cron(cron_expr: str) -> None:
-    try:
-        from croniter import croniter
-        if not croniter.is_valid(cron_expr):
-            raise ValueError("invalid")
-    except Exception:
+    from croniter import croniter
+    if not croniter.is_valid(cron_expr):
         raise HTTPException(status_code=422, detail=f"Invalid cron expression: {cron_expr!r}")
 
 
@@ -57,9 +55,11 @@ def create_task(body: ScheduledTaskCreate):
             cron_expr=body.cron_expr,
             next_run_at=next_run,
         )
-    except Exception as exc:
+    except IntegrityError:
+        raise HTTPException(status_code=409, detail=f"A scheduled task named {body.name!r} already exists")
+    except Exception:
         logger.exception("Failed to create scheduled task")
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Failed to create scheduled task")
     return _task_response(task)
 
 

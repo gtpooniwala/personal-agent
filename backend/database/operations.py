@@ -735,7 +735,7 @@ class DatabaseOperations:
         task_id: str,
         *,
         last_run_at: datetime,
-        last_run_id: str,
+        last_run_id: Optional[str],
         next_run_at: datetime,
     ) -> Optional[Dict[str, Any]]:
         """Update post-dispatch fields after a scheduled task fires."""

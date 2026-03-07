@@ -97,35 +97,37 @@ class SchedulerService:
         run_id: Optional[str] = None
 
         try:
-            request = _SchedulerRequest(
-                conversation_id=str(task["conversation_id"]),
-                message=str(task["message"]),
-            )
-            result = await self._runtime_service.submit_run(request)
-            run_id = result["run_id"]
-            logger.info(
-                "Scheduled task dispatched",
-                extra={"event": "scheduler.task_dispatched", "task_id": task_id, "run_id": run_id},
-            )
-        except Exception:
-            logger.exception(
-                "Scheduled task dispatch failed",
-                extra={"event": "scheduler.task_dispatch_error", "task_id": task_id},
-            )
+            try:
+                request = _SchedulerRequest(
+                    conversation_id=str(task["conversation_id"]),
+                    message=str(task["message"]),
+                )
+                result = await self._runtime_service.submit_run(request)
+                run_id = result["run_id"]
+                logger.info(
+                    "Scheduled task dispatched",
+                    extra={"event": "scheduler.task_dispatched", "task_id": task_id, "run_id": run_id},
+                )
+            except Exception:
+                logger.exception(
+                    "Scheduled task dispatch failed",
+                    extra={"event": "scheduler.task_dispatch_error", "task_id": task_id},
+                )
 
-        # Always advance next_run_at to prevent tight re-dispatch loop on failure
-        try:
-            next_run = _next_run_at(str(task["cron_expr"]), now)
-            db.advance_scheduled_task(
-                task_id,
-                last_run_at=now,
-                last_run_id=run_id or "",
-                next_run_at=next_run,
-            )
-        except Exception:
-            logger.exception(
-                "Failed to advance scheduled task",
-                extra={"event": "scheduler.task_advance_error", "task_id": task_id},
-            )
-
-        db.release_lease(lease_key, owner_id)
+            # Always advance next_run_at to prevent tight re-dispatch loop on failure.
+            # run_id is None when dispatch failed — stored as NULL, not empty string.
+            try:
+                next_run = _next_run_at(str(task["cron_expr"]), now)
+                db.advance_scheduled_task(
+                    task_id,
+                    last_run_at=now,
+                    last_run_id=run_id,
+                    next_run_at=next_run,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to advance scheduled task",
+                    extra={"event": "scheduler.task_advance_error", "task_id": task_id},
+                )
+        finally:
+            db.release_lease(lease_key, owner_id)

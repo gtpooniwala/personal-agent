@@ -10,5 +10,5 @@ run_store = DbRunStore()
 
 runtime_service = RuntimeService(orchestrator=orchestrator, run_store=run_store)
 
-heartbeat_service = HeartbeatService(run_store=run_store)
+heartbeat_service = HeartbeatService()
 scheduler_service = SchedulerService(runtime_service=runtime_service)

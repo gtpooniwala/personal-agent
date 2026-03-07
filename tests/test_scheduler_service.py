@@ -116,7 +116,7 @@ class TestSchedulerService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(fake_db.advanced), 0)
 
     async def test_dispatch_advances_even_on_submit_error(self):
-        """next_run_at should still advance if submit_run raises."""
+        """next_run_at should still advance if submit_run raises; last_run_id is None."""
         service, _, fake_db = self._make_service(
             due_tasks=[_make_task()],
             raise_on_submit=True,
@@ -124,6 +124,7 @@ class TestSchedulerService(unittest.IsolatedAsyncioTestCase):
         await service._tick()
 
         self.assertEqual(len(fake_db.advanced), 1)
+        self.assertIsNone(fake_db.advanced[0]["last_run_id"])
 
     async def test_multiple_due_tasks_all_dispatched(self):
         tasks = [_make_task("task-1"), _make_task("task-2")]
