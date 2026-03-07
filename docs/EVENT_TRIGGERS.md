@@ -97,7 +97,7 @@ The scheduler polls `scheduled_tasks`, fires runs when `next_run_at` is due, and
 
 **Lift:** Medium — builds on #18 which is already in progress.
 
-**Deferred: execution model depends on min-instances decision.** If `min-instances=0`, the internal scheduler loop won't run when the container is idle. The alternative is an external Cloud Scheduler job that POSTs to a `/triggers/schedule` endpoint on a regular cadence, waking the container to check and fire due tasks. Decide during #90 implementation.
+**Deferred: execution model depends on min-instances decision.** If `min-instances=0`, the internal scheduler loop won't run when the container is idle. The alternative is an external Cloud Scheduler job that POSTs to a `/triggers/schedule` endpoint on a regular cadence, waking the container to check and fire due tasks. Decide during #89 implementation.
 
 ---
 
@@ -112,7 +112,7 @@ Poll Gmail for emails matching user-defined criteria (sender, subject pattern, l
 
 **Lift:** Medium — Gmail auth already exists; main work is the polling loop and dedup logic.
 
-**Deferred: polling model depends on min-instances decision.** An internal polling loop won't run when `min-instances=0`. Options: (1) set `min-instances=1`, (2) use Cloud Scheduler to trigger a `/triggers/email-poll` endpoint periodically, (3) use Gmail push notifications via Cloud Pub/Sub (avoids polling entirely but adds GCP infrastructure). Decide during #91 implementation.
+**Deferred: polling model depends on min-instances decision.** An internal polling loop won't run when `min-instances=0`. Options: (1) set `min-instances=1`, (2) use Cloud Scheduler to trigger a `/triggers/email-poll` endpoint periodically, (3) use Gmail push notifications via Cloud Pub/Sub (avoids polling entirely but adds GCP infrastructure). Decide during #91 implementation alongside the min-instances decision in #87 and #88.
 
 ---
 
@@ -150,7 +150,7 @@ A Telegram bot receives messages via webhook, creates agent runs, and sends resu
 | Issue | Title |
 |-------|-------|
 | #88 | feat: event trigger framework — unified infrastructure for external triggers |
-| #89 | feat: task-to-task chaining — trigger_run tool for agent-spawned runs |
-| #90 | feat: scheduled task runner — cron-like recurring agent runs |
+| #89 | feat: scheduled task runner — cron-like recurring agent runs |
+| #90 | feat: task-to-task chaining — trigger_run tool for agent-spawned runs |
 | #91 | feat: email-triggered task execution |
 | #92 | feat: Telegram bot integration for mobile task monitoring and triggering |

@@ -15,7 +15,7 @@ Three-container Docker Compose setup:
 
 Limitations:
 - Runs only on local machine; no remote access
-- Local `./data` volume is ephemeral and not backed up
+- Local `./data` volume is local-only and not backed up (data loss risk)
 - No auth; exposed to anyone on the network
 - No CI/CD deploy path
 
@@ -58,7 +58,7 @@ Limitations:
 | **GKE** | ~$75+/mo | Overkill for personal use |
 | **App Engine** | ~$5–20/mo | Older, less flexible, harder to migrate existing Docker setup |
 
-**Faster alternative:** If the priority is "get it running in the cloud quickly," a Compute Engine VM is simpler — you run Docker Compose on it and skip the GCS migration. Cloud Run is the better long-term choice but has more setup steps and requires the GCS migration (#80) before it works correctly. Decide based on timeline.
+**Faster alternative:** If the priority is "get it running in the cloud quickly," a Compute Engine VM is simpler — you run Docker Compose on it and skip the GCS migration. Cloud Run is the better long-term choice but has more setup steps and requires the GCS migration (#79) before it works correctly. Decide based on timeline.
 
 **Decision deferred on min-instances:** The choice of `min-instances=0` vs `min-instances=1` has significant implications for the event trigger architecture and is linked to that decision. See #87 (cold start) and #88 (event trigger framework). Discuss during implementation.
 
@@ -118,13 +118,13 @@ IAP works well for browser requests (it redirects to a Google login page). Howev
 - If the frontend is on Cloud Run behind IAP too, service-to-service auth (using a GCP service account) is one path
 - If the frontend is on Vercel or Firebase Hosting (outside GCP), it needs to obtain a user identity token via Google Sign-In and pass it to the backend
 
-This needs to be worked out during implementation of #85 (IAP) alongside the frontend hosting decision.
+This needs to be worked out during implementation of #83 (IAP) alongside the frontend hosting decision (#85).
 
 ---
 
 ### 6. Frontend Hosting: Decision Deferred
 
-**Decision deferred** — to be finalized during implementation of #82.
+**Decision deferred** — to be finalized during implementation of #85 (Cloud Run service definitions).
 
 Key prerequisite question: does the Next.js app use server-side rendering (SSR) or Next.js API routes? Check `next.config.js` before deciding. If yes, options B and D below require code changes.
 
@@ -170,13 +170,13 @@ The event trigger framework design depends on this choice. If scale-to-zero is p
 
 ## Deployment Plan (Ordered)
 
-1. **Cloud SQL** — provision instance, migrate schema, update `DATABASE_URL`
-2. **Secret Manager** — migrate all secrets, update Cloud Run service account
-3. **GCS** — create bucket, update backend file-handling code (tracked separately)
-4. **Backend Cloud Run** — deploy FastAPI service, wire Cloud SQL + secrets + IAP
-5. **Frontend Cloud Run** — deploy Next.js service, point at backend URL
-6. **IAP** — enable on backend service, allowlist Google account
-7. **CI/CD** — add GitHub Actions workflow to build and deploy on merge to main
+1. **Cloud SQL** (#80) — provision instance, migrate schema, update `DATABASE_URL`
+2. **Secret Manager** (#82) — migrate all secrets, update Cloud Run service account
+3. **GCS** (#79) — create bucket, update backend file-handling code (tracked separately)
+4. **Backend Cloud Run** (#85) — deploy FastAPI service, wire Cloud SQL + secrets
+5. **Frontend Cloud Run** (#85) — deploy Next.js service, point at backend URL
+6. **IAP** (#83) — enable on backend service, allowlist Google account
+7. **CI/CD** (#86) — add GitHub Actions workflow to build and deploy on merge to main
 8. **Custom domain** (optional) — configure Cloud Run domain mapping
 
 ---
@@ -196,11 +196,11 @@ The event trigger framework design depends on this choice. If scale-to-zero is p
 
 | Issue | Title |
 |-------|-------|
-| #79 | docs: GCP deployment architecture decision record |
-| #80 | feat: migrate document storage from local filesystem to GCS |
-| #81 | feat: Cloud SQL setup and production database configuration |
-| #82 | feat: Cloud Run service definitions for backend and frontend |
-| #83 | feat: Secret Manager integration for production API keys |
-| #85 | feat: IAP setup for personal cloud authentication |
+| #79 | feat: migrate document storage from local filesystem to GCS |
+| #80 | feat: Cloud SQL setup and production database configuration |
+| #81 | docs: GCP deployment architecture decision record |
+| #82 | feat: Secret Manager integration for production API keys |
+| #83 | feat: IAP setup for personal cloud authentication |
+| #85 | feat: Cloud Run service definitions for backend and frontend |
 | #86 | feat: GitHub Actions CI/CD pipeline for Cloud Run deployment |
 | #87 | chore: cold start optimization and min-instances strategy for Cloud Run |

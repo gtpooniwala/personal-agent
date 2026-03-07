@@ -46,19 +46,19 @@ Workflow:
 ## Backlog
 
 ### Cloud Deployment (GCP)
-- [ ] `todo` GCP deployment architecture decision record ([#79](https://github.com/gtpooniwala/personal-agent/issues/79))
-- [ ] `todo` Migrate document storage from local filesystem to GCS ([#80](https://github.com/gtpooniwala/personal-agent/issues/80))
-- [ ] `todo` Cloud SQL setup and production database configuration ([#81](https://github.com/gtpooniwala/personal-agent/issues/81))
-- [ ] `todo` Cloud Run service definitions for backend and frontend ([#82](https://github.com/gtpooniwala/personal-agent/issues/82))
-- [ ] `todo` Secret Manager integration for production API keys ([#83](https://github.com/gtpooniwala/personal-agent/issues/83))
-- [ ] `todo` IAP setup for personal cloud authentication ([#85](https://github.com/gtpooniwala/personal-agent/issues/85))
+- [ ] `todo` Migrate document storage from local filesystem to GCS ([#79](https://github.com/gtpooniwala/personal-agent/issues/79))
+- [ ] `todo` Cloud SQL setup and production database configuration ([#80](https://github.com/gtpooniwala/personal-agent/issues/80))
+- [ ] `todo` GCP deployment architecture decision record ([#81](https://github.com/gtpooniwala/personal-agent/issues/81))
+- [ ] `todo` Secret Manager integration for production API keys ([#82](https://github.com/gtpooniwala/personal-agent/issues/82))
+- [ ] `todo` IAP setup for personal cloud authentication ([#83](https://github.com/gtpooniwala/personal-agent/issues/83))
+- [ ] `todo` Cloud Run service definitions for backend and frontend ([#85](https://github.com/gtpooniwala/personal-agent/issues/85))
 - [ ] `todo` GitHub Actions CI/CD pipeline for Cloud Run deployment ([#86](https://github.com/gtpooniwala/personal-agent/issues/86))
 - [ ] `todo` Cold start optimization and min-instances strategy ([#87](https://github.com/gtpooniwala/personal-agent/issues/87))
 
 ### Event-Driven Triggers + Mobile
 - [ ] `todo` Event trigger framework — unified infrastructure for external triggers ([#88](https://github.com/gtpooniwala/personal-agent/issues/88))
-- [ ] `todo` Task-to-task chaining — trigger_run tool for agent-spawned runs ([#89](https://github.com/gtpooniwala/personal-agent/issues/89))
-- [ ] `todo` Scheduled task runner — cron-like recurring agent runs ([#90](https://github.com/gtpooniwala/personal-agent/issues/90)) — *extends #18*
+- [ ] `todo` Scheduled task runner — cron-like recurring agent runs ([#89](https://github.com/gtpooniwala/personal-agent/issues/89)) — *extends #18*
+- [ ] `todo` Task-to-task chaining — trigger_run tool for agent-spawned runs ([#90](https://github.com/gtpooniwala/personal-agent/issues/90))
 - [ ] `todo` Email-triggered task execution ([#91](https://github.com/gtpooniwala/personal-agent/issues/91))
 - [ ] `todo` Telegram bot integration for mobile task monitoring and triggering ([#92](https://github.com/gtpooniwala/personal-agent/issues/92))
 
