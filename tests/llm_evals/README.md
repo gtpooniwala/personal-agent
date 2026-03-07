@@ -7,21 +7,27 @@ This folder contains local model/workflow eval suites. These are intentionally s
 Mock mode (deterministic, no model API required):
 
 ```bash
-python tests/run_llm_evals.py --mode mock
+python tests/run_llm_evals.py --mode mock --set core
 ```
 
 Live mode (runs real orchestrator + model/tool stack):
 
 ```bash
-python tests/run_llm_evals.py --mode live
+python tests/run_llm_evals.py --mode live --set core
 ```
 
-If a provider key is missing (default: `GEMINI_API_KEY`), live mode exits as `blocked` with setup instructions.
+Live mode requirements:
 
-Optional suite filter:
+- `GEMINI_API_KEY` (or equivalent configured provider key)
+- `EVAL_DATABASE_URL` pointing to a dedicated PostgreSQL `*_eval` or `*_test` database, or `TEST_DATABASE_URL` pointing to a dedicated PostgreSQL `*_test` database
+
+If either prerequisite is missing, live mode exits as `blocked` with setup instructions.
+
+Optional set and suite filters:
 
 ```bash
-python tests/run_llm_evals.py --mode mock --suite tool_calling --suite workflow
+python tests/run_llm_evals.py --mode mock --set extended
+python tests/run_llm_evals.py --mode mock --set all --suite tool_calling --suite workflow
 ```
 
 ## Case Format
@@ -29,9 +35,16 @@ python tests/run_llm_evals.py --mode mock --suite tool_calling --suite workflow
 Each suite file in `cases/` uses schema version `1.0` and includes:
 
 - `suite`: suite name
+- `cases[].set`: `core` or `extended`
 - `cases[]`: list of eval cases
 - `turns[]`: one or more conversation turns
 - `expected`: deterministic assertions
+
+Set intent:
+
+- `core`: fast baseline routing/workflow coverage for routine local runs
+- `extended`: broader scenario coverage, including optional/less-common paths
+- `all`: union of both sets
 
 Supported assertions:
 
@@ -55,7 +68,7 @@ If provided, the selected mode override replaces top-level `expected` keys with 
 
 Reports are written to:
 
-- `tests/llm_evals/results/report-<mode>-<timestamp>.json`
+- `tests/llm_evals/results/report-<mode>-<set>-<timestamp>.json`
 - `tests/llm_evals/results/latest.json`
 
 Each report contains per-case pass/fail details and aggregate summaries by suite.

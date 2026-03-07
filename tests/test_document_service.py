@@ -19,11 +19,13 @@ from backend.services.document_service import DocumentProcessor
 class _FakeQuery:
     def __init__(self, rows):
         self._rows = rows
+        self.filter_calls = []
 
     def join(self, *_args, **_kwargs):
         return self
 
-    def filter(self, *_args, **_kwargs):
+    def filter(self, *args, **_kwargs):
+        self.filter_calls.append(args)
         return self
 
     def all(self):
@@ -34,9 +36,11 @@ class _FakeSession:
     def __init__(self, rows):
         self._rows = rows
         self.closed = False
+        self.last_query = None
 
     def query(self, *_args, **_kwargs):
-        return _FakeQuery(self._rows)
+        self.last_query = _FakeQuery(self._rows)
+        return self.last_query
 
     def close(self):
         self.closed = True
@@ -86,6 +90,37 @@ class TestDocumentServiceModelRequirements(unittest.TestCase):
         self.assertEqual(results, [])
         embeddings.embed_query.assert_called_once_with("find contract")
         self.assertTrue(fake_session.closed)
+
+    def test_search_documents_sync_filters_chunks_by_current_embedding_model(self):
+        embeddings = Mock()
+        embeddings.model = "models/gemini-embedding-001"
+        embeddings.embed_query = Mock(return_value=[0.1, 0.2, 0.3])
+        fake_session = _FakeSession(rows=[])
+
+        with patch(
+            "backend.services.document_service.create_embeddings_model",
+            return_value=embeddings,
+        ), patch(
+            "backend.services.document_service.create_chat_model",
+            return_value=Mock(),
+        ), patch(
+            "backend.services.document_service.db_ops.get_session",
+            return_value=fake_session,
+        ):
+            processor = DocumentProcessor()
+            results = processor.search_documents_sync("find contract")
+
+        self.assertEqual(results, [])
+        self.assertIsNotNone(fake_session.last_query)
+        all_filters = [
+            str(expr)
+            for filter_args in fake_session.last_query.filter_calls
+            for expr in filter_args
+        ]
+        self.assertTrue(
+            any("document_chunks.embedding_model" in expr for expr in all_filters),
+            all_filters,
+        )
 
 
 class TestDocumentServiceUploadFailureHandling(unittest.TestCase):

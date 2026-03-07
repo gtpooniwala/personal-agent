@@ -5,7 +5,7 @@ import sys
 import os
 import asyncio
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 # Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -143,6 +143,63 @@ class TestCoreOrchestrator(unittest.TestCase):
         self.assertEqual(len(messages), 1)
         self.assertIsInstance(messages[0], HumanMessage)
         self.assertEqual(messages[0].content, "Hello")
+
+    def test_generate_direct_response_uses_structured_fallback_prompt(self):
+        """Direct fallback responses should use the shared honesty-first prompt contract."""
+        self.orchestrator.llm = Mock()
+        conversation_history = [
+            {"role": "user", "content": "Earlier question"},
+            {"role": "assistant", "content": "Earlier answer"},
+        ]
+
+        with patch(
+            "backend.orchestrator.core.predict_text",
+            new=AsyncMock(return_value="Fallback answer"),
+        ) as mock_predict:
+            result = asyncio.run(
+                self.orchestrator._generate_direct_response(
+                    user_request="What should I do next?",
+                    conversation_history=conversation_history,
+                )
+            )
+
+        self.assertEqual(result, "Fallback answer")
+        mock_predict.assert_awaited_once()
+        prompt = mock_predict.await_args.args[1]
+        self.assertIn("without tool execution", prompt)
+        self.assertIn("Do not claim that you searched the web", prompt)
+        self.assertIn("User: Earlier question", prompt)
+        self.assertIn("What should I do next?", prompt)
+
+    def test_short_circuit_unselected_document_request_returns_explicit_guidance(self):
+        response = self.orchestrator._maybe_short_circuit_unselected_document_request(
+            user_request="What does my uploaded contract say about termination?",
+            selected_documents=[],
+        )
+        self.assertIn("contract", response.lower())
+        self.assertIn(
+            "No documents are currently selected. Please select one or more documents to enable document search.",
+            response,
+        )
+
+    def test_short_circuit_does_not_misclassify_profile_as_document_query(self):
+        response = self.orchestrator._maybe_short_circuit_unselected_document_request(
+            user_request="Can you update my profile preferences?",
+            selected_documents=[],
+        )
+        self.assertIsNone(response)
+
+    def test_format_document_status_prefers_selected_document_state(self):
+        status = self.orchestrator._format_document_status(
+            {
+                "has_documents": False,
+                "document_count": 0,
+                "selected_count": 1,
+                "context_message": "Metadata unavailable.",
+            }
+        )
+        self.assertIn("selected for this conversation", status)
+        self.assertIn("use search_documents", status.lower())
 
 
 if __name__ == '__main__':

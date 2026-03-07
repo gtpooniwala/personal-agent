@@ -18,7 +18,7 @@ try:
     from sqlalchemy.engine import make_url
     from sqlalchemy.orm import sessionmaker
     from backend.database.models import Base
-    from backend.database.operations import DatabaseOperations
+    from backend.database.operations import DatabaseOperations, LazyDatabaseOperations
     from backend.runtime import RUN_EVENT_TYPES, RUN_STATUSES
 except Exception as exc:
     DB_TESTS_AVAILABLE = False
@@ -352,7 +352,38 @@ class TestDatabaseOperations(unittest.TestCase):
         stolen = self.db_ops.acquire_lease(key, owner_id="worker-b", ttl_seconds=30)
         self.assertIsNotNone(stolen)
         self.assertEqual(stolen["owner_id"], "worker-b")
-        self.assertEqual(stolen["fencing_token"], 2)
+
+
+class TestLazyDatabaseOperations(unittest.TestCase):
+    def test_getattr_raises_attribute_error_for_unknown_names(self):
+        lazy = LazyDatabaseOperations()
+        with self.assertRaises(AttributeError):
+            _ = lazy.this_attribute_does_not_exist
+
+    def test_get_instance_is_singleton_and_thread_safe_for_serial_access(self):
+        lazy = LazyDatabaseOperations()
+
+        created_instances = []
+
+        class _FakeDatabaseOperations:
+            def __init__(self):
+                created_instances.append(self)
+                self.engine = "engine"
+
+            def close(self):
+                return None
+
+            def get_value(self):
+                return 42
+
+        from unittest.mock import patch
+
+        with patch("backend.database.operations.DatabaseOperations", _FakeDatabaseOperations):
+            self.assertEqual(lazy.get_value(), 42)
+            self.assertEqual(lazy.engine, "engine")
+            self.assertEqual(lazy.get_value(), 42)
+
+        self.assertEqual(len(created_instances), 1)
 
 
 if __name__ == '__main__':

@@ -18,6 +18,7 @@ from backend.llm import (
     MissingProviderKeyError,
     MissingModelDependencyError,
 )
+from backend.orchestrator.prompts import build_document_summary_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,10 @@ class DocumentProcessor:
                 self.initialization_error
                 or "Document processing requires a configured chat model."
             )
+
+    def _current_embedding_model_name(self) -> str:
+        self._require_embeddings_model()
+        return str(getattr(self.embeddings, "model", "configured-embedding-model"))
     
     async def process_pdf_upload(self, file_content: bytes, filename: str, user_id: str = "default") -> str:
         """
@@ -154,7 +159,7 @@ class DocumentProcessor:
                         chunk_index=i,
                         content=chunk_text,
                         embedding=embedding_bytes,
-                        embedding_model=getattr(self.embeddings, "model", "configured-embedding-model")
+                        embedding_model=self._current_embedding_model_name(),
                     )
                     session.add(chunk)
                 
@@ -224,14 +229,7 @@ class DocumentProcessor:
             if len(text_content) > max_chars:
                 text_content = text_content[:max_chars] + "..."
             
-            summary_prompt = f"""Analyze the following document content and generate a single, concise sentence that summarizes what this document is about. Focus on the main topic, purpose, or subject matter.
-
-Document content:
-{text_content}
-
-Generate only one clear, informative sentence that captures the essence of this document. Do not include any additional text, quotes, or explanations.
-
-Summary:"""
+            summary_prompt = build_document_summary_prompt(text_content)
             summary = await predict_text(self.llm, summary_prompt)
             
             # Clean up the summary
@@ -266,6 +264,7 @@ Summary:"""
         """
         try:
             self._require_embeddings_model()
+            current_embedding_model = self._current_embedding_model_name()
             # Generate embedding for query
             query_embedding = await self.embeddings.aembed_query(query)
             
@@ -275,7 +274,8 @@ Summary:"""
                 # Build query with optional document filtering
                 query_filter = session.query(DocumentChunk).join(Document).filter(
                     Document.user_id == user_id,
-                    Document.processed == "completed"
+                    Document.processed == "completed",
+                    DocumentChunk.embedding_model == current_embedding_model,
                 )
                 
                 # Filter by selected documents if provided
@@ -341,6 +341,7 @@ Summary:"""
         """
         try:
             self._require_embeddings_model()
+            current_embedding_model = self._current_embedding_model_name()
             # Generate embedding for query (synchronous)
             query_embedding = self.embeddings.embed_query(query)
             
@@ -350,7 +351,8 @@ Summary:"""
                 # Build query with optional document filtering
                 query_filter = session.query(DocumentChunk).join(Document).filter(
                     Document.user_id == user_id,
-                    Document.processed == "completed"
+                    Document.processed == "completed",
+                    DocumentChunk.embedding_model == current_embedding_model,
                 )
                 
                 # Filter by selected documents if provided
@@ -479,12 +481,21 @@ Summary:"""
                 documents = query_filter.all()
                 
                 if not documents:
+                    selected_count = len(selected_documents or [])
+                    if selected_count > 0:
+                        context_message = (
+                            f"{selected_count} document reference(s) are selected, but processed document metadata "
+                            "is unavailable. Document search may still be attempted if the selected IDs are valid."
+                        )
+                    else:
+                        context_message = "No documents are currently available for search."
                     return {
                         "has_documents": False,
                         "document_count": 0,
+                        "selected_count": selected_count,
                         "total_chunks": 0,
                         "document_summaries": [],
-                        "context_message": "No documents are currently available for search."
+                        "context_message": context_message,
                     }
                 
                 # Collect document information
@@ -510,6 +521,7 @@ Summary:"""
                 return {
                     "has_documents": True,
                     "document_count": len(documents),
+                    "selected_count": len(selected_documents or []),
                     "total_chunks": total_chunks,
                     "document_summaries": document_summaries,
                     "context_message": context_message
@@ -523,6 +535,7 @@ Summary:"""
             return {
                 "has_documents": False,
                 "document_count": 0,
+                "selected_count": len(selected_documents or []),
                 "total_chunks": 0,
                 "document_summaries": [],
                 "context_message": "Error retrieving document information."

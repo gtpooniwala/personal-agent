@@ -64,6 +64,7 @@ DEBUG=true
 DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent
 DATABASE_URL_DOCKER=postgresql+psycopg://personal_agent:personal_agent@postgres:5432/personal_agent
 TEST_DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent_test
+EVAL_DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent_test
 
 # CORS Configuration
 CORS_ORIGINS=http://localhost:3000,http://localhost:8080
@@ -136,6 +137,7 @@ python test_basic_agent.py
 | `DATABASE_URL` | Database connection string | postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent | Yes |
 | `DATABASE_URL_DOCKER` | DB URL used by backend container in docker compose | postgresql+psycopg://personal_agent:personal_agent@postgres:5432/personal_agent | No |
 | `TEST_DATABASE_URL` | Dedicated destructive test DB URL | postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent_test | No |
+| `EVAL_DATABASE_URL` | Dedicated Postgres DB URL for live eval harnesses (falls back to `TEST_DATABASE_URL`) | postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent_test | No |
 | `CORS_ORIGINS` | Allowed CORS origins (comma-separated) | * | No |
 | `LOG_LEVEL` | Logging level (DEBUG/INFO/WARNING/ERROR) | INFO | No |
 | `MAX_FILE_SIZE` | Maximum upload file size (bytes) | 10485760 | No |

@@ -2,8 +2,10 @@ from pydantic import BaseModel, Field, PrivateAttr
 from typing import Literal, Optional, Dict, Any
 import os
 import json
+import logging
 from langchain_core.tools import BaseTool
 from backend.llm import create_chat_model, MissingProviderKeyError, MissingModelDependencyError
+from backend.orchestrator.prompts import build_user_profile_prompt
 
 # Use BASE_DIR from environment or fallback to project root
 BASE_DIR = os.environ.get("BASE_DIR")
@@ -11,6 +13,7 @@ if not BASE_DIR:
     BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../'))
 USER_PROFILE_DIR = os.path.join(BASE_DIR, "data", "user_profiles")
 os.makedirs(USER_PROFILE_DIR, exist_ok=True)
+logger = logging.getLogger(__name__)
 
 def get_profile_path(user_id: str) -> str:
     return os.path.join(USER_PROFILE_DIR, f"{user_id}.json")
@@ -24,7 +27,6 @@ def load_user_profile(user_id: str) -> Dict[str, Any]:
 
 def save_user_profile(user_id: str, profile: Dict[str, Any]):
     path = get_profile_path(user_id)
-    print(f"[DEBUG] Writing profile for user_id={user_id} to {path}: {profile}")
     with open(path, "w") as f:
         json.dump(profile, f, indent=2)
 
@@ -84,27 +86,24 @@ class UserProfileTool(BaseTool):
         return self._run(action, instruction)
 
     def _merge_profile_with_llm(self, current_profile: Dict[str, Any], instruction: Optional[str], user_prompt: Optional[str]) -> Dict[str, Any]:
-        prompt = f"""
-You are an assistant that maintains a structured user profile for personalization.\n
-Current profile (JSON):\n{json.dumps(current_profile, indent=2)}\n
-Instruction: {instruction}\n
-User's original message: {user_prompt}\n
-Extract all relevant facts about the user from the user's message and update the profile as instructed. You may add, update, or delete any information as requested.\n
-IMPORTANT: Only use the scratchpad for temporary, session-specific notes. For all persistent, user-specific facts, preferences, or background, ALWAYS use the user profile.\n
-Return the updated profile as a valid JSON object only, with no extra text or explanation. Do not lose any existing information unless it is contradicted by the instruction or user message.\n"""
+        prompt = build_user_profile_prompt(
+            current_profile=current_profile,
+            instruction=instruction,
+            user_prompt=user_prompt,
+        )
         response = self._llm.invoke(prompt)
         response_text = getattr(response, 'content', str(response))
-        print(f"[DEBUG] LLM response: {response_text}")
         try:
             # Try to extract JSON from the LLM response
             start = response_text.find('{')
             end = response_text.rfind('}') + 1
             if start != -1 and end != -1:
-                result = json.loads(response_text[start:end])
-                print(f"[DEBUG] Parsed LLM result: {result}")
-                return result
+                return json.loads(response_text[start:end])
         except Exception as e:
-            print(f"[UserProfileTool] LLM JSON parse failed: {e}. Returning current profile.")
+            logger.warning(
+                "User profile LLM JSON parse failed for user_id=%s: %s. Returning current profile.",
+                self._user_id,
+                e,
+            )
         # Final fallback: return current profile if all else fails
-        print(f"[DEBUG] Returning current profile: {current_profile}")
         return current_profile
