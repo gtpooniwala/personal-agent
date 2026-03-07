@@ -25,11 +25,25 @@ The Gmail Tool provides robust integration with Gmail, enabling the agent to sea
 - Returns formatted results for agent and user
 
 ## Setup Requirements
-- `ENABLE_GMAIL_INTEGRATION=true`
-- Gmail dependencies installed: `google-auth`, `google-auth-oauthlib`, `google-api-python-client`
-- Google Cloud project with Gmail API enabled
-- OAuth client credentials JSON at `GMAIL_CREDENTIALS_PATH` (defaults to `backend/data/gmail/client_secret.json`)
-- Token file generated on first use (user login)
+- `ENABLE_GMAIL_INTEGRATION=true` in your `.env` file.
+- **Dependencies**: Install Gmail-specific dependencies:
+  ```bash
+  pip install -r backend/requirements-gmail.txt
+  ```
+- **Google Cloud Project**:
+  1. Create a project in Google Cloud Console.
+  2. Enable the **Gmail API**.
+  3. Configure OAuth consent screen (add your email as a test user).
+  4. Create OAuth 2.0 Desktop App credentials.
+  5. Download the JSON file and save it as `backend/data/gmail/client_secret.json` (or set `GMAIL_CREDENTIALS_PATH`).
+- **First Run**:
+  - The first time the tool is used, it will launch a local browser window to authorize access.
+  - A token will be saved to `backend/data/gmail/token.pickle` for future use.
+
+## Troubleshooting
+- **Dependencies Missing**: If you see an error about missing dependencies, run the pip install command above.
+- **Credentials Not Found**: Ensure `client_secret.json` is in the correct path or `GMAIL_CREDENTIALS_PATH` is set.
+- **Auth Errors**: If authentication fails or tokens expire unexpectedly, delete `backend/data/gmail/token.pickle` and try again to trigger a new OAuth flow.
 
 ## Limitations
 - Only read/search is implemented (no send/compose yet)
