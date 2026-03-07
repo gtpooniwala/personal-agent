@@ -43,7 +43,7 @@ export default function HomePage() {
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
-  const [sendingMessage, setSendingMessage] = useState(false);
+  const [sendingConversationId, setSendingConversationId] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
@@ -198,7 +198,7 @@ export default function HomePage() {
     const trimmedMessage = messageInput.trim();
     const requestConversationId = currentConversationId;
 
-    if (!trimmedMessage || sendingMessage) {
+    if (!trimmedMessage || sendingConversationId === requestConversationId) {
       return;
     }
 
@@ -207,7 +207,7 @@ export default function HomePage() {
       return;
     }
 
-    setSendingMessage(true);
+    setSendingConversationId(requestConversationId);
     setChatError("");
     setMessageInput("");
 
@@ -298,7 +298,7 @@ export default function HomePage() {
         setChatError("Failed to send message.");
       }
     } finally {
-      setSendingMessage(false);
+      setSendingConversationId(null);
     }
   }, [
     loadConversations,
@@ -306,7 +306,7 @@ export default function HomePage() {
     currentConversationId,
     messageInput,
     selectedDocuments,
-    sendingMessage,
+    sendingConversationId,
   ]);
 
   const uploadFiles = useCallback(
@@ -462,7 +462,7 @@ export default function HomePage() {
         isLoadingMessages={loadingMessages}
         chatError={chatError}
         messageInput={messageInput}
-        isSending={sendingMessage}
+        isSending={sendingConversationId === currentConversationId}
         onChangeMessage={setMessageInput}
         onSendMessage={sendMessage}
       />
