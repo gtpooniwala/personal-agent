@@ -1,0 +1,25 @@
+frontend/tests/ChatPanel.test.jsx
+  cb6f0e8bb2b3c83b 1-51
+frontend/tests/sendMessage.test.jsx
+  cb6f0e8bb2b3c83b 1-99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "c20fe03933f06b2cc633d89245bd5dff3a4c0f98",
+  "prompts": {
+    "cb6f0e8bb2b3c83b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b245f5c0-311f-4519-a7a8-e1e43548343f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 150,
+      "overriden_lines": 0
+    }
+  }
+}
