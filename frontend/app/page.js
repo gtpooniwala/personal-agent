@@ -198,7 +198,7 @@ export default function HomePage() {
     const trimmedMessage = messageInput.trim();
     const requestConversationId = currentConversationId;
 
-    if (!trimmedMessage || (sendingConversationId !== null && sendingConversationId === requestConversationId)) {
+    if (!trimmedMessage || (sendingConversationId && sendingConversationId === requestConversationId)) {
       return;
     }
 
@@ -462,7 +462,7 @@ export default function HomePage() {
         isLoadingMessages={loadingMessages}
         chatError={chatError}
         messageInput={messageInput}
-        isSending={sendingConversationId !== null && sendingConversationId === currentConversationId}
+        isSending={!!(sendingConversationId && sendingConversationId === currentConversationId)}
         onChangeMessage={setMessageInput}
         onSendMessage={sendMessage}
       />

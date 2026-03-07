@@ -116,12 +116,12 @@ describe('sendMessage conversation scoping (issue #31)', () => {
     await user.click(screen.getByRole('button', { name: /^send$/i }));
 
     // Conv-a's send button should be disabled
-    expect(screen.getByRole('button', { name: /sending/i })).toBeDisabled();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /sending/i })).toBeDisabled();
+    });
 
     // Switch to conv-b
-    await act(async () => {
-      await user.click(screen.getByText('Conv B'));
-    });
+    await user.click(screen.getByText('Conv B'));
 
     // Conv-b's send button must NOT be disabled
     await waitFor(() => {
