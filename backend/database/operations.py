@@ -464,14 +464,14 @@ class DatabaseOperations:
                             lease_key, owner_id, fencing_token, acquired_at, expires_at, updated_at
                         )
                         VALUES (
-                            :lease_key, :owner_id, 1, NOW(), NOW() + INTERVAL :ttl_seconds, NOW()
+                            :lease_key, :owner_id, 1, NOW(), NOW() + make_interval(secs := :ttl_seconds), NOW()
                         )
                         ON CONFLICT (lease_key)
                         DO UPDATE SET
                             owner_id = :owner_id,
                             fencing_token = leases.fencing_token + 1,
                             acquired_at = NOW(),
-                            expires_at = NOW() + INTERVAL :ttl_seconds,
+                            expires_at = NOW() + make_interval(secs := :ttl_seconds),
                             updated_at = NOW()
                         WHERE leases.expires_at <= NOW() OR leases.owner_id = :owner_id
                         RETURNING lease_key, owner_id, fencing_token, acquired_at, expires_at, updated_at
@@ -480,7 +480,7 @@ class DatabaseOperations:
                     {
                         "lease_key": lease_key,
                         "owner_id": owner_id,
-                        "ttl_seconds": f"{ttl_seconds} seconds",
+                        "ttl_seconds": ttl_seconds,
                     },
                 )
                 .mappings()
@@ -511,7 +511,7 @@ class DatabaseOperations:
                     text(
                         """
                         UPDATE leases
-                        SET expires_at = NOW() + INTERVAL :ttl_seconds, updated_at = NOW()
+                        SET expires_at = NOW() + make_interval(secs := :ttl_seconds), updated_at = NOW()
                         WHERE lease_key = :lease_key
                           AND owner_id = :owner_id
                           AND expires_at > NOW()
@@ -521,7 +521,7 @@ class DatabaseOperations:
                     {
                         "lease_key": lease_key,
                         "owner_id": owner_id,
-                        "ttl_seconds": f"{ttl_seconds} seconds",
+                        "ttl_seconds": ttl_seconds,
                     },
                 )
                 .mappings()
