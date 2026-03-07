@@ -1,7 +1,19 @@
-from sqlalchemy import Column, String, DateTime, Text, Integer, ForeignKey, LargeBinary
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+)
 from sqlalchemy.orm import relationship, declarative_base
 from datetime import datetime, timezone
 import uuid
+
+from backend.runtime import RUN_EVENT_TYPES, RUN_STATUSES
 
 Base = declarative_base()
 
@@ -14,6 +26,11 @@ def generate_id():
 def utcnow():
     """Timezone-aware UTC timestamp helper (avoids deprecated utcnow())."""
     return datetime.now(timezone.utc)
+
+
+def _sql_string_literals(values):
+    """Render Python string literals for SQL check constraints."""
+    return ", ".join(f"'{value}'" for value in values)
 
 
 class Conversation(Base):
@@ -29,6 +46,7 @@ class Conversation(Base):
     # Relationship to messages
     messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan")
     memory_entries = relationship("MemoryStore", back_populates="conversation", cascade="all, delete-orphan")
+    runs = relationship("Run", back_populates="conversation", cascade="all, delete-orphan")
 
 
 class Message(Base):
@@ -113,4 +131,79 @@ class RuntimeCounter(Base):
 
     key = Column(String, primary_key=True)
     value = Column(Integer, nullable=False, default=0)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class Run(Base):
+    """Durable run lifecycle state."""
+
+    __tablename__ = "runs"
+    __table_args__ = (
+        CheckConstraint(
+            f"status IN ({_sql_string_literals(RUN_STATUSES)})",
+            name="ck_runs_status_valid",
+        ),
+        Index("ix_runs_status_created_at", "status", "created_at"),
+        Index("ix_runs_conversation_created_at", "conversation_id", "created_at"),
+    )
+
+    id = Column(String, primary_key=True, default=generate_id)
+    conversation_id = Column(String, ForeignKey("conversations.id"), nullable=False)
+    status = Column(String, nullable=False)
+    error = Column(Text, nullable=True)
+    result = Column(Text, nullable=True)
+    attempt_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    conversation = relationship("Conversation", back_populates="runs")
+    events = relationship("RunEvent", back_populates="run", cascade="all, delete-orphan")
+
+
+class RunEvent(Base):
+    """Append-only run event log for status and progress updates."""
+
+    __tablename__ = "run_events"
+    __table_args__ = (
+        CheckConstraint(
+            f"event_type IN ({_sql_string_literals(RUN_EVENT_TYPES)})",
+            name="ck_run_events_type_valid",
+        ),
+        CheckConstraint(
+            f"status IN ({_sql_string_literals(RUN_STATUSES)})",
+            name="ck_run_events_status_valid",
+        ),
+        Index("ix_run_events_run_id_id", "run_id", "id"),
+        Index("ix_run_events_status_created_at", "status", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_id = Column(String, ForeignKey("runs.id", ondelete="CASCADE"), nullable=False)
+    event_type = Column(String, nullable=False)
+    status = Column(String, nullable=False)
+    message = Column(Text, nullable=True)
+    tool = Column(String, nullable=True)
+    error = Column(Text, nullable=True)
+    payload = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+
+    run = relationship("Run", back_populates="events")
+
+
+class Lease(Base):
+    """Distributed-lease table for worker ownership and serialization."""
+
+    __tablename__ = "leases"
+    __table_args__ = (
+        CheckConstraint("expires_at > acquired_at", name="ck_leases_expiry_after_acquire"),
+        Index("ix_leases_expires_at", "expires_at"),
+    )
+
+    lease_key = Column(String, primary_key=True)
+    owner_id = Column(String, nullable=False)
+    fencing_token = Column(Integer, nullable=False, default=1)
+    acquired_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

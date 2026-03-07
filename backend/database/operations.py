@@ -1,11 +1,23 @@
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
-from backend.database.models import Base, Conversation, Message, MemoryStore, RuntimeCounter
+from backend.database.models import (
+    Base,
+    Conversation,
+    MemoryStore,
+    Message,
+    Run,
+    RunEvent,
+    RuntimeCounter,
+)
 from backend.config import settings
 from typing import List, Optional, Dict, Any
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import atexit
+
+from backend.runtime import RUN_EVENT_TYPE_SET, RUN_STATUS_SET
+
+_UNSET = object()
 
 
 class DatabaseOperations:
@@ -28,6 +40,60 @@ class DatabaseOperations:
         """Dispose database engine and release pooled connections."""
         if getattr(self, "engine", None) is not None:
             self.engine.dispose()
+
+    @staticmethod
+    def _to_iso(value: Optional[datetime]) -> Optional[str]:
+        return value.isoformat() if value else None
+
+    @staticmethod
+    def _serialize_run(run: Run) -> Dict[str, Any]:
+        return {
+            "id": run.id,
+            "conversation_id": run.conversation_id,
+            "status": run.status,
+            "error": run.error,
+            "result": run.result,
+            "attempt_count": run.attempt_count,
+            "created_at": DatabaseOperations._to_iso(run.created_at),
+            "updated_at": DatabaseOperations._to_iso(run.updated_at),
+            "started_at": DatabaseOperations._to_iso(run.started_at),
+            "completed_at": DatabaseOperations._to_iso(run.completed_at),
+        }
+
+    @staticmethod
+    def _serialize_run_event(event: RunEvent) -> Dict[str, Any]:
+        return {
+            "id": event.id,
+            "run_id": event.run_id,
+            "type": event.event_type,
+            "status": event.status,
+            "message": event.message,
+            "tool": event.tool,
+            "error": event.error,
+            "payload": event.payload,
+            "created_at": DatabaseOperations._to_iso(event.created_at),
+        }
+
+    @staticmethod
+    def _serialize_lease_row(row: Any) -> Dict[str, Any]:
+        return {
+            "lease_key": row["lease_key"],
+            "owner_id": row["owner_id"],
+            "fencing_token": int(row["fencing_token"]),
+            "acquired_at": DatabaseOperations._to_iso(row["acquired_at"]),
+            "expires_at": DatabaseOperations._to_iso(row["expires_at"]),
+            "updated_at": DatabaseOperations._to_iso(row["updated_at"]),
+        }
+
+    @staticmethod
+    def _validate_run_status(status: str) -> None:
+        if status not in RUN_STATUS_SET:
+            raise ValueError(f"Invalid run status: {status}")
+
+    @staticmethod
+    def _validate_run_event_type(event_type: str) -> None:
+        if event_type not in RUN_EVENT_TYPE_SET:
+            raise ValueError(f"Invalid run event type: {event_type}")
     
     def create_conversation(self, title: Optional[str] = None, user_id: str = "default") -> str:
         """Create a new conversation and return its ID."""
@@ -237,6 +303,286 @@ class DatabaseOperations:
             session.delete(conversation)
             session.commit()
             return True
+        finally:
+            session.close()
+
+    def create_run(
+        self,
+        conversation_id: str,
+        status: str = "queued",
+        error: Optional[str] = None,
+        result: Optional[str] = None,
+        attempt_count: int = 0,
+    ) -> Dict[str, Any]:
+        """Create and return a run record."""
+        self._validate_run_status(status)
+        if attempt_count < 0:
+            raise ValueError("attempt_count must be non-negative")
+
+        session = self.get_session()
+        try:
+            run = Run(
+                conversation_id=conversation_id,
+                status=status,
+                error=error,
+                result=result,
+                attempt_count=attempt_count,
+            )
+            session.add(run)
+            session.commit()
+            session.refresh(run)
+            return self._serialize_run(run)
+        finally:
+            session.close()
+
+    def get_run(self, run_id: str) -> Optional[Dict[str, Any]]:
+        """Fetch a run record by id."""
+        session = self.get_session()
+        try:
+            run = session.query(Run).filter(Run.id == run_id).first()
+            if not run:
+                return None
+            return self._serialize_run(run)
+        finally:
+            session.close()
+
+    def update_run(
+        self,
+        run_id: str,
+        status: Optional[str] = None,
+        error: Any = _UNSET,
+        result: Any = _UNSET,
+        attempt_count: Optional[int] = None,
+        started_at: Any = _UNSET,
+        completed_at: Any = _UNSET,
+    ) -> Optional[Dict[str, Any]]:
+        """Update mutable run fields and return the updated record."""
+        if status is not None:
+            self._validate_run_status(status)
+        if attempt_count is not None and attempt_count < 0:
+            raise ValueError("attempt_count must be non-negative")
+
+        session = self.get_session()
+        try:
+            run = session.query(Run).filter(Run.id == run_id).first()
+            if not run:
+                return None
+
+            if status is not None:
+                run.status = status
+            if error is not _UNSET:
+                run.error = error
+            if result is not _UNSET:
+                run.result = result
+            if attempt_count is not None:
+                run.attempt_count = attempt_count
+            if started_at is not _UNSET:
+                if started_at is not None and not (isinstance(started_at, datetime) and started_at.tzinfo is not None):
+                    raise ValueError("started_at must be a timezone-aware datetime or None")
+                run.started_at = started_at
+            if completed_at is not _UNSET:
+                if completed_at is not None and not (isinstance(completed_at, datetime) and completed_at.tzinfo is not None):
+                    raise ValueError("completed_at must be a timezone-aware datetime or None")
+                run.completed_at = completed_at
+            run.updated_at = datetime.now(timezone.utc)
+
+            session.commit()
+            session.refresh(run)
+            return self._serialize_run(run)
+        finally:
+            session.close()
+
+    def append_run_event(
+        self,
+        run_id: str,
+        event_type: str,
+        status: str,
+        message: Optional[str] = None,
+        tool: Optional[str] = None,
+        error: Optional[str] = None,
+        payload: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Append and return a run event."""
+        self._validate_run_event_type(event_type)
+        self._validate_run_status(status)
+
+        session = self.get_session()
+        try:
+            event = RunEvent(
+                run_id=run_id,
+                event_type=event_type,
+                status=status,
+                message=message,
+                tool=tool,
+                error=error,
+                payload=payload,
+            )
+            session.add(event)
+            session.commit()
+            session.refresh(event)
+            return self._serialize_run_event(event)
+        finally:
+            session.close()
+
+    def list_run_events(
+        self,
+        run_id: str,
+        after_event_id: Optional[int] = None,
+        limit: int = 200,
+    ) -> List[Dict[str, Any]]:
+        """List run events in append order."""
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+
+        session = self.get_session()
+        try:
+            query = session.query(RunEvent).filter(RunEvent.run_id == run_id)
+            if after_event_id is not None:
+                query = query.filter(RunEvent.id > after_event_id)
+            events = query.order_by(RunEvent.id.asc()).limit(limit).all()
+            return [self._serialize_run_event(event) for event in events]
+        finally:
+            session.close()
+
+    def acquire_lease(
+        self,
+        lease_key: str,
+        owner_id: str,
+        ttl_seconds: int,
+    ) -> Optional[Dict[str, Any]]:
+        """Acquire or steal an expired lease. Returns lease row on success."""
+        if ttl_seconds <= 0:
+            raise ValueError("ttl_seconds must be positive")
+
+        session = self.get_session()
+        try:
+            row = (
+                session.execute(
+                    text(
+                        """
+                        INSERT INTO leases (
+                            lease_key, owner_id, fencing_token, acquired_at, expires_at, updated_at
+                        )
+                        VALUES (
+                            :lease_key, :owner_id, 1, NOW(), NOW() + make_interval(secs := :ttl_seconds), NOW()
+                        )
+                        ON CONFLICT (lease_key)
+                        DO UPDATE SET
+                            owner_id = :owner_id,
+                            fencing_token = leases.fencing_token + 1,
+                            acquired_at = NOW(),
+                            expires_at = NOW() + make_interval(secs := :ttl_seconds),
+                            updated_at = NOW()
+                        WHERE leases.expires_at <= NOW() OR leases.owner_id = :owner_id
+                        RETURNING lease_key, owner_id, fencing_token, acquired_at, expires_at, updated_at
+                        """
+                    ),
+                    {
+                        "lease_key": lease_key,
+                        "owner_id": owner_id,
+                        "ttl_seconds": ttl_seconds,
+                    },
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                session.rollback()
+                return None
+            session.commit()
+            return self._serialize_lease_row(row)
+        finally:
+            session.close()
+
+    def renew_lease(
+        self,
+        lease_key: str,
+        owner_id: str,
+        ttl_seconds: int,
+    ) -> Optional[Dict[str, Any]]:
+        """Extend a currently held lease. Returns lease row on success."""
+        if ttl_seconds <= 0:
+            raise ValueError("ttl_seconds must be positive")
+
+        session = self.get_session()
+        try:
+            row = (
+                session.execute(
+                    text(
+                        """
+                        UPDATE leases
+                        SET expires_at = NOW() + make_interval(secs := :ttl_seconds), updated_at = NOW()
+                        WHERE lease_key = :lease_key
+                          AND owner_id = :owner_id
+                          AND expires_at > NOW()
+                        RETURNING lease_key, owner_id, fencing_token, acquired_at, expires_at, updated_at
+                        """
+                    ),
+                    {
+                        "lease_key": lease_key,
+                        "owner_id": owner_id,
+                        "ttl_seconds": ttl_seconds,
+                    },
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                session.rollback()
+                return None
+            session.commit()
+            return self._serialize_lease_row(row)
+        finally:
+            session.close()
+
+    def release_lease(self, lease_key: str, owner_id: str) -> bool:
+        """Release a lease when owned by caller."""
+        session = self.get_session()
+        try:
+            row = (
+                session.execute(
+                    text(
+                        """
+                        DELETE FROM leases
+                        WHERE lease_key = :lease_key
+                          AND owner_id = :owner_id
+                        RETURNING lease_key
+                        """
+                    ),
+                    {
+                        "lease_key": lease_key,
+                        "owner_id": owner_id,
+                    },
+                )
+                .mappings()
+                .first()
+            )
+            session.commit()
+            return bool(row)
+        finally:
+            session.close()
+
+    def get_lease(self, lease_key: str) -> Optional[Dict[str, Any]]:
+        """Get the current lease row for a key."""
+        session = self.get_session()
+        try:
+            row = (
+                session.execute(
+                    text(
+                        """
+                        SELECT lease_key, owner_id, fencing_token, acquired_at, expires_at, updated_at
+                        FROM leases
+                        WHERE lease_key = :lease_key
+                        """
+                    ),
+                    {"lease_key": lease_key},
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                return None
+            return self._serialize_lease_row(row)
         finally:
             session.close()
 

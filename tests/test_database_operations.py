@@ -4,7 +4,7 @@ Comprehensive tests for Database Operations functionality.
 import sys
 import os
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 # Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -14,11 +14,12 @@ DB_TESTS_AVAILABLE = True
 DB_IMPORT_ERROR = ""
 
 try:
-    from sqlalchemy import create_engine
+    from sqlalchemy import create_engine, text
     from sqlalchemy.engine import make_url
     from sqlalchemy.orm import sessionmaker
     from backend.database.models import Base
     from backend.database.operations import DatabaseOperations
+    from backend.runtime import RUN_EVENT_TYPES, RUN_STATUSES
 except Exception as exc:
     DB_TESTS_AVAILABLE = False
     DB_IMPORT_ERROR = str(exc)
@@ -188,6 +189,170 @@ class TestDatabaseOperations(unittest.TestCase):
         counters = self.db_ops.get_runtime_counters(prefix="api.chat")
         self.assertIn(key, counters)
         self.assertEqual(counters[key], 3)
+
+    def test_lifecycle_vocabulary_is_frozen(self):
+        """Run statuses/events should stay aligned with migration contract."""
+        self.assertEqual(
+            RUN_STATUSES,
+            (
+                "queued",
+                "running",
+                "retrying",
+                "succeeded",
+                "failed",
+                "cancelling",
+                "cancelled",
+            ),
+        )
+        self.assertEqual(
+            RUN_EVENT_TYPES,
+            (
+                "queued",
+                "started",
+                "tool_call",
+                "tool_result",
+                "retrying",
+                "failed",
+                "succeeded",
+                "cancelling",
+                "cancelled",
+            ),
+        )
+
+    def test_run_create_get_update(self):
+        """Runs should support create, lookup, and lifecycle updates."""
+        conv_id = self.db_ops.create_conversation("Run lifecycle", self.test_user_id)
+
+        run = self.db_ops.create_run(conv_id)
+        self.assertEqual(run["conversation_id"], conv_id)
+        self.assertEqual(run["status"], "queued")
+        self.assertEqual(run["attempt_count"], 0)
+        self.assertIsNotNone(run["created_at"])
+
+        started_at = datetime.now(timezone.utc)
+        updated = self.db_ops.update_run(
+            run["id"],
+            status="running",
+            attempt_count=1,
+            started_at=started_at,
+            error="temporary failure",
+        )
+        self.assertIsNotNone(updated)
+        self.assertEqual(updated["status"], "running")
+        self.assertEqual(updated["attempt_count"], 1)
+        self.assertIsNotNone(updated["started_at"])
+        self.assertEqual(updated["error"], "temporary failure")
+
+        # Nullable fields should be clearable (explicit None), not treated as "unset"
+        cleared = self.db_ops.update_run(
+            run["id"],
+            error=None,
+            started_at=None,
+            completed_at=None,
+        )
+        self.assertIsNone(cleared["error"])
+        self.assertIsNone(cleared["started_at"])
+        self.assertIsNone(cleared["completed_at"])
+
+        fetched = self.db_ops.get_run(run["id"])
+        self.assertEqual(fetched["id"], run["id"])
+        self.assertEqual(fetched["status"], "running")
+
+    def test_run_events_append_and_list_in_order(self):
+        """Run events should preserve append order for polling lookups."""
+        conv_id = self.db_ops.create_conversation("Run events", self.test_user_id)
+        run = self.db_ops.create_run(conv_id)
+
+        first = self.db_ops.append_run_event(
+            run_id=run["id"],
+            event_type="queued",
+            status="queued",
+            message="Run queued",
+        )
+        second = self.db_ops.append_run_event(
+            run_id=run["id"],
+            event_type="started",
+            status="running",
+            message="Run started",
+        )
+        third = self.db_ops.append_run_event(
+            run_id=run["id"],
+            event_type="tool_call",
+            status="running",
+            tool="calculator",
+            message="Calling calculator",
+        )
+
+        events = self.db_ops.list_run_events(run["id"])
+        self.assertEqual([event["id"] for event in events], [first["id"], second["id"], third["id"]])
+        self.assertEqual([event["type"] for event in events], ["queued", "started", "tool_call"])
+        self.assertEqual(events[2]["tool"], "calculator")
+
+        after_first = self.db_ops.list_run_events(run["id"], after_event_id=first["id"])
+        self.assertEqual([event["id"] for event in after_first], [second["id"], third["id"]])
+
+    def test_run_lifecycle_validation_rejects_invalid_values(self):
+        """Invalid statuses/event types should be rejected before DB writes."""
+        conv_id = self.db_ops.create_conversation("Validation", self.test_user_id)
+        run = self.db_ops.create_run(conv_id)
+
+        with self.assertRaises(ValueError):
+            self.db_ops.create_run(conv_id, status="not-a-status")
+        with self.assertRaises(ValueError):
+            self.db_ops.update_run(run["id"], status="not-a-status")
+        with self.assertRaises(ValueError):
+            self.db_ops.append_run_event(run["id"], event_type="not-an-event", status="queued")
+        with self.assertRaises(ValueError):
+            self.db_ops.append_run_event(run["id"], event_type="queued", status="not-a-status")
+
+    def test_lease_primitives_enforce_ownership_and_expiry(self):
+        """Lease acquire/renew/release should enforce ownership and allow expiry takeover."""
+        key = "conversation:lease-test"
+        first = self.db_ops.acquire_lease(key, owner_id="worker-a", ttl_seconds=30)
+        self.assertIsNotNone(first)
+        self.assertEqual(first["owner_id"], "worker-a")
+        self.assertEqual(first["fencing_token"], 1)
+
+        blocked = self.db_ops.acquire_lease(key, owner_id="worker-b", ttl_seconds=30)
+        self.assertIsNone(blocked)
+
+        renewed = self.db_ops.renew_lease(key, owner_id="worker-a", ttl_seconds=45)
+        self.assertIsNotNone(renewed)
+        self.assertEqual(renewed["fencing_token"], 1)
+
+        self.assertFalse(self.db_ops.release_lease(key, owner_id="worker-b"))
+        self.assertTrue(self.db_ops.release_lease(key, owner_id="worker-a"))
+        self.assertIsNone(self.db_ops.get_lease(key))
+
+        reacquired = self.db_ops.acquire_lease(key, owner_id="worker-a", ttl_seconds=30)
+        self.assertEqual(reacquired["fencing_token"], 1)
+        session = self.db_ops.get_session()
+        try:
+            stale_acquired_at = datetime.now(timezone.utc) - timedelta(seconds=10)
+            session.execute(
+                text(
+                    """
+                    UPDATE leases
+                    SET acquired_at = :acquired_at,
+                        expires_at = :expired_at,
+                        updated_at = :acquired_at
+                    WHERE lease_key = :lease_key
+                    """
+                ),
+                {
+                    "lease_key": key,
+                    "acquired_at": stale_acquired_at,
+                    "expired_at": datetime.now(timezone.utc) - timedelta(seconds=5),
+                },
+            )
+            session.commit()
+        finally:
+            session.close()
+
+        stolen = self.db_ops.acquire_lease(key, owner_id="worker-b", ttl_seconds=30)
+        self.assertIsNotNone(stolen)
+        self.assertEqual(stolen["owner_id"], "worker-b")
+        self.assertEqual(stolen["fencing_token"], 2)
 
 
 if __name__ == '__main__':
