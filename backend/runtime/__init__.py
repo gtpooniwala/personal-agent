@@ -7,6 +7,7 @@ from backend.runtime.contracts import (
     RUN_TERMINAL_STATUSES,
 )
 from backend.runtime.store import (
+    DbRunStore,
     InMemoryRunStore,
     InvalidEventsCursorError,
     PostgresRunStorePlaceholder,
@@ -23,6 +24,7 @@ from .lifecycle import (
 
 __all__ = [
     "DEFAULT_EVENTS_LIMIT",
+    "DbRunStore",
     "InMemoryRunStore",
     "InvalidEventsCursorError",
     "MAX_EVENTS_LIMIT",

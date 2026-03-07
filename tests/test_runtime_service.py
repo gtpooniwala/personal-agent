@@ -54,6 +54,16 @@ class FailingOrchestrator:
         }
 
 
+class ExceptionOrchestrator:
+    """Raises an exception when processing a request."""
+    def create_conversation(self):
+        return "conv-generated"
+
+    async def process_request(self, user_request, conversation_id, selected_documents=None):
+        await asyncio.sleep(0)
+        raise RuntimeError("Orchestrator error")
+
+
 @unittest.skipUnless(
     RUNTIME_SERVICE_TESTS_AVAILABLE,
     f"Runtime service test dependencies unavailable: {RUNTIME_SERVICE_IMPORT_ERROR}",
@@ -83,6 +93,63 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         status = await self._wait_for_terminal(service, submitted["run_id"])
         self.assertEqual(status["status"], "failed")
         self.assertEqual(status["error"], "something failed")
+
+    async def test_concurrent_runs_to_same_conversation_are_rejected(self):
+        """Two concurrent runs to same conversation should result in one succeeding and one failing with session_busy."""
+        service = RuntimeService(orchestrator=SuccessfulOrchestrator(), run_store=InMemoryRunStore())
+
+        # Submit first run
+        submitted1 = await service.submit_run(RuntimeRequest(message="hello", conversation_id="shared-conv", selected_documents=[]))
+        run_id1 = submitted1["run_id"]
+
+        # Immediately submit second run to same conversation (before first completes)
+        submitted2 = await service.submit_run(RuntimeRequest(message="hello again", conversation_id="shared-conv", selected_documents=[]))
+        run_id2 = submitted2["run_id"]
+
+        # Wait for both to complete
+        status1 = await self._wait_for_terminal(service, run_id1)
+        status2 = await self._wait_for_terminal(service, run_id2)
+
+        # One should succeed, one should fail with session_busy
+        statuses = sorted([status1["status"], status2["status"]])
+        errors = [status1.get("error"), status2.get("error")]
+
+        self.assertEqual(statuses[0], "failed")
+        self.assertEqual(statuses[1], "succeeded")
+        self.assertIn("Another operation is already running", "".join(e or "" for e in errors))
+
+    async def test_orchestrator_exception_is_retried(self):
+        """Orchestrator exceptions should trigger retries up to MAX_RETRY_ATTEMPTS."""
+        # Create an orchestrator that fails once then succeeds
+        attempt_count = [0]
+
+        class RetryableOrchestrator:
+            def create_conversation(self):
+                return "conv-generated"
+
+            async def process_request(self, user_request, conversation_id, selected_documents=None):
+                await asyncio.sleep(0)
+                attempt_count[0] += 1
+                if attempt_count[0] < 2:
+                    raise RuntimeError("Temporary failure")
+                return {
+                    "response": "ok",
+                    "conversation_id": conversation_id,
+                    "orchestration_actions": [],
+                    "token_usage": 4,
+                }
+
+        service = RuntimeService(orchestrator=RetryableOrchestrator(), run_store=InMemoryRunStore())
+        submitted = await service.submit_run(RuntimeRequest(message="hello", conversation_id="conv-retry", selected_documents=[]))
+
+        status = await self._wait_for_terminal(service, submitted["run_id"])
+        self.assertEqual(status["status"], "succeeded")
+        self.assertEqual(attempt_count[0], 2)
+
+        # Check that retrying event was logged
+        events = await service.get_run_events(run_id=submitted["run_id"], after=None, limit=100)
+        event_types = [event["type"] for event in events["events"]]
+        self.assertIn("retrying", event_types)
 
     async def _wait_for_terminal(self, service, run_id):
         terminal = {"succeeded", "failed", "cancelled"}
