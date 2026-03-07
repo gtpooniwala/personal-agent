@@ -7,7 +7,13 @@ from threading import RLock
 from typing import Dict, List, Optional, Sequence, Tuple
 from uuid import uuid4
 
-from backend.runtime.contracts import RunEventRecord, RunRecord, RUN_STATUS_QUEUED, utcnow
+from backend.runtime.contracts import (
+    RunEventRecord,
+    RunRecord,
+    RUN_STATUS_QUEUED,
+    RUN_TERMINAL_STATUSES,
+    utcnow,
+)
 
 
 class RunStoreError(Exception):
@@ -27,7 +33,9 @@ _UNSET = object()
 
 class RunStore(ABC):
     @abstractmethod
-    def create_run(self, *, conversation_id: str, message: str, selected_documents: Sequence[str]) -> RunRecord:
+    def create_run(
+        self, *, conversation_id: str, message: str, selected_documents: Sequence[str]
+    ) -> RunRecord:
         raise NotImplementedError
 
     @abstractmethod
@@ -35,7 +43,14 @@ class RunStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def update_run(self, *, run_id: str, status: str, error: Optional[str] = None, result: Optional[str] = None) -> RunRecord:
+    def update_run(
+        self,
+        *,
+        run_id: str,
+        status: str,
+        error: Optional[str] = None,
+        result: Optional[str] = None,
+    ) -> RunRecord:
         raise NotImplementedError
 
     @abstractmethod
@@ -72,7 +87,9 @@ class InMemoryRunStore(RunStore):
         self._event_sequence = 0
         self._lock = RLock()
 
-    def create_run(self, *, conversation_id: str, message: str, selected_documents: Sequence[str]) -> RunRecord:
+    def create_run(
+        self, *, conversation_id: str, message: str, selected_documents: Sequence[str]
+    ) -> RunRecord:
         with self._lock:
             run_id = str(uuid4())
             now = utcnow()
@@ -186,9 +203,10 @@ class InMemoryRunStore(RunStore):
             return
 
         # Only prune terminal runs to avoid deleting active executions
-        terminal_statuses = {"succeeded", "failed", "cancelled"}
+        terminal_statuses = RUN_TERMINAL_STATUSES
         stale_run_ids = [
-            run_id for run_id in list(self._runs.keys())
+            run_id
+            for run_id in list(self._runs.keys())
             if self._runs[run_id].status in terminal_statuses
         ][:overflow]
         for stale_run_id in stale_run_ids:
@@ -199,14 +217,29 @@ class InMemoryRunStore(RunStore):
 class SqliteRunStorePlaceholder(RunStore):
     # TODO(#15): Replace temporary in-memory run store with durable runs/run_events persistence.
     # TODO(postgres-migration): Implement Postgres-backed RunStore using DATABASE_URL and migration tables.
-    def create_run(self, *, conversation_id: str, message: str, selected_documents: Sequence[str]) -> RunRecord:
-        raise NotImplementedError("Durable SQLite run store will land with issue #15 schema work")
+    def create_run(
+        self, *, conversation_id: str, message: str, selected_documents: Sequence[str]
+    ) -> RunRecord:
+        raise NotImplementedError(
+            "Durable SQLite run store will land with issue #15 schema work"
+        )
 
     def get_run(self, run_id: str) -> RunRecord:
-        raise NotImplementedError("Durable SQLite run store will land with issue #15 schema work")
+        raise NotImplementedError(
+            "Durable SQLite run store will land with issue #15 schema work"
+        )
 
-    def update_run(self, *, run_id: str, status: str, error: Optional[str] = None, result: Optional[str] = None) -> RunRecord:
-        raise NotImplementedError("Durable SQLite run store will land with issue #15 schema work")
+    def update_run(
+        self,
+        *,
+        run_id: str,
+        status: str,
+        error: Optional[str] = None,
+        result: Optional[str] = None,
+    ) -> RunRecord:
+        raise NotImplementedError(
+            "Durable SQLite run store will land with issue #15 schema work"
+        )
 
     def append_event(
         self,
@@ -217,10 +250,16 @@ class SqliteRunStorePlaceholder(RunStore):
         message: str,
         tool: Optional[str] = None,
     ) -> RunEventRecord:
-        raise NotImplementedError("Durable SQLite run store will land with issue #15 schema work")
+        raise NotImplementedError(
+            "Durable SQLite run store will land with issue #15 schema work"
+        )
 
-    def list_events(self, *, run_id: str, after: Optional[str], limit: int) -> Tuple[List[RunEventRecord], Optional[str], bool]:
-        raise NotImplementedError("Durable SQLite run store will land with issue #15 schema work")
+    def list_events(
+        self, *, run_id: str, after: Optional[str], limit: int
+    ) -> Tuple[List[RunEventRecord], Optional[str], bool]:
+        raise NotImplementedError(
+            "Durable SQLite run store will land with issue #15 schema work"
+        )
 
 
 class DbRunStore(RunStore):
@@ -228,9 +267,12 @@ class DbRunStore(RunStore):
 
     def __init__(self):
         from backend.database.operations import db_ops
+
         self._db_ops = db_ops
 
-    def create_run(self, *, conversation_id: str, message: str, selected_documents: Sequence[str]) -> RunRecord:
+    def create_run(
+        self, *, conversation_id: str, message: str, selected_documents: Sequence[str]
+    ) -> RunRecord:
         db_record = self._db_ops.create_run(conversation_id=conversation_id)
         return RunRecord(
             run_id=str(db_record["id"]),
@@ -343,7 +385,9 @@ class DbRunStore(RunStore):
                 raise InvalidEventsCursorError("Invalid events cursor") from exc
 
         # Fetch one extra to determine if there are more events
-        db_events = self._db_ops.list_run_events(run_id=run_id, after_event_id=after_event_id, limit=limit + 1)
+        db_events = self._db_ops.list_run_events(
+            run_id=run_id, after_event_id=after_event_id, limit=limit + 1
+        )
 
         # Determine if there are more events beyond the requested limit
         has_more = len(db_events) > limit
@@ -373,8 +417,8 @@ class DbRunStore(RunStore):
             return None
         # Parse ISO format string, handling both Z and +00:00 suffixes
         try:
-            if iso_str.endswith('Z'):
-                iso_str = iso_str[:-1] + '+00:00'
+            if iso_str.endswith("Z"):
+                iso_str = iso_str[:-1] + "+00:00"
             return datetime.fromisoformat(iso_str)
         except ValueError as exc:
             raise ValueError(f"Failed to parse ISO datetime: {iso_str!r}") from exc
@@ -382,14 +426,29 @@ class DbRunStore(RunStore):
 
 class PostgresRunStorePlaceholder(RunStore):
     # TODO(postgres-migration): Implement Postgres-backed RunStore using DATABASE_URL and migration tables.
-    def create_run(self, *, conversation_id: str, message: str, selected_documents: Sequence[str]) -> RunRecord:
-        raise NotImplementedError("Postgres run store will be wired in the migration PR")
+    def create_run(
+        self, *, conversation_id: str, message: str, selected_documents: Sequence[str]
+    ) -> RunRecord:
+        raise NotImplementedError(
+            "Postgres run store will be wired in the migration PR"
+        )
 
     def get_run(self, run_id: str) -> RunRecord:
-        raise NotImplementedError("Postgres run store will be wired in the migration PR")
+        raise NotImplementedError(
+            "Postgres run store will be wired in the migration PR"
+        )
 
-    def update_run(self, *, run_id: str, status: str, error: Optional[str] = None, result: Optional[str] = None) -> RunRecord:
-        raise NotImplementedError("Postgres run store will be wired in the migration PR")
+    def update_run(
+        self,
+        *,
+        run_id: str,
+        status: str,
+        error: Optional[str] = None,
+        result: Optional[str] = None,
+    ) -> RunRecord:
+        raise NotImplementedError(
+            "Postgres run store will be wired in the migration PR"
+        )
 
     def append_event(
         self,
@@ -400,7 +459,13 @@ class PostgresRunStorePlaceholder(RunStore):
         message: str,
         tool: Optional[str] = None,
     ) -> RunEventRecord:
-        raise NotImplementedError("Postgres run store will be wired in the migration PR")
+        raise NotImplementedError(
+            "Postgres run store will be wired in the migration PR"
+        )
 
-    def list_events(self, *, run_id: str, after: Optional[str], limit: int) -> Tuple[List[RunEventRecord], Optional[str], bool]:
-        raise NotImplementedError("Postgres run store will be wired in the migration PR")
+    def list_events(
+        self, *, run_id: str, after: Optional[str], limit: int
+    ) -> Tuple[List[RunEventRecord], Optional[str], bool]:
+        raise NotImplementedError(
+            "Postgres run store will be wired in the migration PR"
+        )
