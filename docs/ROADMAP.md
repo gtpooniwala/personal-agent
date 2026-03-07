@@ -7,22 +7,26 @@ Move from strong prototype to production-ready personal AI agent with reliable b
 
 Current high-priority execution objective: validate and harden the async run model (`#15`-`#17`, now complete) and address frontend correctness follow-ups (`#31`, `#30`).
 
-## Now (Stabilize Core)
+## Now (Stabilize Core + Raise Quality Bar)
 - Async run lifecycle schema + submission/status/event contracts complete (`#15`, `#16`, `#17`).
+
+### Frontend Correctness (sequential)
 - Land Gmail reliability follow-up (`#40`).
 - Address active frontend send correctness risk (`#31`) and IME Enter handling (`#30`).
+
+### Runtime Quality (parallel with frontend)
+- Add runtime eval coverage for lifecycle transitions, retries, and session isolation (`#19`).
+- Add scheduler/heartbeat primitives for autonomous workflows (`#18`).
 
 Success criteria:
 - Core tests runnable in one documented command.
 - Request/run lifecycle events and counters are visible in logs/metrics.
-- `/runs` + async `/chat` submission and status/events paths are operational.
+- `/runs` + async `/chat` submission and status/events paths operational with verified correctness.
 - Assistant responses stay bound to originating conversation during in-flight requests.
+- Machine-readable runtime eval report with CI-friendly pass/fail signals.
+- Scheduler primitives enable autonomous long-running workflow orchestration.
 
-## Next (Raise Quality Bar)
-- Add runtime eval coverage for lifecycle transitions, retries, and session isolation (`#19`).
-- Add scheduler/heartbeat primitives for autonomous workflows after core runtime stabilizes (`#18`).
-- Resolve async-path follow-up correctness/cleanup items (`#28`, `#29`).
-- Continue integration ergonomics and cleanup after migration core and Gmail follow-up settle (`#40`, then frontend polish).
+## Next (Async Cleanup + Hardening)
 
 Success criteria:
 - Machine-readable runtime eval report with CI-friendly pass/fail signals.

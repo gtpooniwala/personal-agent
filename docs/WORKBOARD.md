@@ -18,14 +18,18 @@ Workflow:
 - `blocked`
 - `done`
 
-## Now
+## Now (Parallel Tracks)
+
+### Frontend Correctness (Sequential)
 - [ ] `todo` Fix Gmail auth flow and dependency packaging ([#40](https://github.com/gtpooniwala/personal-agent/issues/40))
 - [ ] `todo` Prevent cross-conversation message race on send ([#31](https://github.com/gtpooniwala/personal-agent/issues/31))
 - [ ] `todo` Guard Enter key send during IME composition ([#30](https://github.com/gtpooniwala/personal-agent/issues/30))
 
+### Runtime Quality (Parallel)
+- [ ] `todo` Add scheduler/heartbeat for autonomous workflows ([#18](https://github.com/gtpooniwala/personal-agent/issues/18)) — *parallel with #19*
+- [ ] `todo` Add runtime evals for lifecycle/retry/session isolation ([#19](https://github.com/gtpooniwala/personal-agent/issues/19)) — *parallel with #18*
+
 ## Next
-- [ ] `todo` Add runtime evals for lifecycle/retry/session isolation ([#19](https://github.com/gtpooniwala/personal-agent/issues/19))
-- [ ] `todo` Add scheduler/heartbeat for autonomous workflows ([#18](https://github.com/gtpooniwala/personal-agent/issues/18))
 
 ## Migration Track
 - [x] `done` Publish migration architecture contract + PR decomposition for long-running runtime ([#14](https://github.com/gtpooniwala/personal-agent/issues/14))
