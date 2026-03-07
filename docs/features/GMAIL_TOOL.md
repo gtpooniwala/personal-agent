@@ -42,7 +42,7 @@ The Gmail Tool provides robust integration with Gmail, enabling the agent to sea
 
 ## Troubleshooting
 - **Dependencies Missing**: If you see an error about missing dependencies, run the pip install command above.
-- **Credentials Not Found**: Ensure `client_secret.json` is in the correct path or `GMAIL_CREDENTIALS_PATH` is set.
+- **Credentials Not Found**: Ensure `client_secret.json` is in the correct path (`backend/data/gmail/`) or `GMAIL_CREDENTIALS_PATH` is set.
 - **Auth Errors**: If authentication fails or tokens expire unexpectedly, delete `backend/data/gmail/token.pickle` and try again to trigger a new OAuth flow.
 
 ## Limitations

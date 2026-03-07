@@ -48,7 +48,7 @@ class TestGmailToolErrors(unittest.TestCase):
             original_import = __import__
 
             def side_effect(name, globals=None, locals=None, fromlist=(), level=0):
-                if name.startswith("google"):
+                if name.startswith("google."):
                     raise ImportError(f"No module named {name}")
                 return original_import(name, globals, locals, fromlist, level)
 

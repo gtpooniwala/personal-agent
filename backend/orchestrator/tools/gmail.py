@@ -153,7 +153,14 @@ class GmailReadTool(BaseTool):
 
         # Support search query, max_results, and label_ids
         query = kwargs.get("query", None)  # Gmail search string
-        max_results = int(kwargs.get("max_results", 5))  # Default to 5 emails
+        raw_max_results = kwargs.get("max_results", 5)
+        try:
+            max_results = int(raw_max_results)
+            if max_results <= 0:
+                raise ValueError("Must be positive")
+        except (TypeError, ValueError):
+            return f"Invalid 'max_results' value: {raw_max_results}. Please provide a positive integer."
+
         label_ids = kwargs.get("label_ids", ["INBOX"])  # Default to INBOX
 
         try:
