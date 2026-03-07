@@ -137,17 +137,19 @@ describe('sendMessage first-message flow', () => {
       );
     });
 
-    expect(runtimeApiCall).toHaveBeenCalledWith(
-      '/chat',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({
-          message: 'hello',
-          conversation_id: 'conv-new',
-          selected_documents: [],
+    await waitFor(() => {
+      expect(runtimeApiCall).toHaveBeenCalledWith(
+        '/chat',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            message: 'hello',
+            conversation_id: 'conv-new',
+            selected_documents: [],
+          }),
         }),
-      }),
-    );
+      );
+    });
   });
 });
 

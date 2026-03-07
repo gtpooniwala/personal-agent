@@ -142,6 +142,7 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
   const fileInputRef = useRef(null);
   const messageInputRef = useRef(null);
   const activeConversationIdRef = useRef(null);
+  const latestConversationsRequestRef = useRef(0);
   const latestMessagesRequestRef = useRef(0);
   const uploadRunRef = useRef(0);
   const uploadResetTimerRef = useRef(null);
@@ -236,11 +237,18 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
 
   const loadConversations = useCallback(
     async (preferredConversationId = null) => {
+      const requestId = latestConversationsRequestRef.current + 1;
+      latestConversationsRequestRef.current = requestId;
+
       setLoadingConversations(true);
       setConversationError("");
 
       try {
         const payload = await apiCall("/conversations");
+        if (requestId !== latestConversationsRequestRef.current) {
+          return;
+        }
+
         const nextConversations = Array.isArray(payload) ? payload : [];
         setConversations(nextConversations);
 
@@ -263,9 +271,14 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
           return resolvedConversationId;
         });
       } catch {
+        if (requestId !== latestConversationsRequestRef.current) {
+          return;
+        }
         setConversationError("Failed to load conversations.");
       } finally {
-        setLoadingConversations(false);
+        if (requestId === latestConversationsRequestRef.current) {
+          setLoadingConversations(false);
+        }
       }
     },
     [syncConversationUrl],
