@@ -40,10 +40,8 @@ class TestDatabaseOperations(unittest.TestCase):
         Base.metadata.create_all(bind=self.engine)
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
         
-        # Create a mock database operations instance
-        self.db_ops = DatabaseOperations()
-        self.db_ops.close()
-        # Replace the engine and session with our test ones
+        # Construct instance without running __init__ so tests never touch runtime DB settings.
+        self.db_ops = DatabaseOperations.__new__(DatabaseOperations)
         self.db_ops.engine = self.engine
         self.db_ops.SessionLocal = SessionLocal
         
