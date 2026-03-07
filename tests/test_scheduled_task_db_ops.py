@@ -28,20 +28,8 @@ if AVAILABLE:
 
 def _make_db():
     """Create a fresh DatabaseOperations pointing at the test database."""
-    import os as _os
-    original = _os.environ.get("DATABASE_URL")
-    _os.environ["DATABASE_URL"] = TEST_DATABASE_URL
-    # Re-import settings to pick up new value
-    import importlib
-    import backend.config as cfg_mod
-    importlib.reload(cfg_mod)
     from backend.database.operations import DatabaseOperations
-    db = DatabaseOperations()
-    if original is not None:
-        _os.environ["DATABASE_URL"] = original
-    else:
-        del _os.environ["DATABASE_URL"]
-    return db
+    return DatabaseOperations(database_url=TEST_DATABASE_URL)
 
 
 def _utcnow():

@@ -162,8 +162,9 @@ class TestNextRunAt(unittest.TestCase):
         self.assertAlmostEqual(delta, 60, delta=1)
 
     def test_no_now_uses_current_time(self):
+        before = datetime.now(timezone.utc)
         nxt = _next_run_at("* * * * *")
-        self.assertGreater(nxt, datetime.now(timezone.utc))
+        self.assertGreater(nxt, before)
 
 
 if __name__ == "__main__":

@@ -55,8 +55,12 @@ def create_task(body: ScheduledTaskCreate):
             cron_expr=body.cron_expr,
             next_run_at=next_run,
         )
-    except IntegrityError:
-        raise HTTPException(status_code=409, detail=f"A scheduled task named {body.name!r} already exists")
+    except IntegrityError as exc:
+        orig = str(getattr(exc, "orig", exc)).lower()
+        if "unique" in orig:
+            raise HTTPException(status_code=409, detail=f"A scheduled task named {body.name!r} already exists")
+        logger.exception("Integrity constraint violation creating scheduled task")
+        raise HTTPException(status_code=422, detail="Database constraint violation")
     except Exception:
         logger.exception("Failed to create scheduled task")
         raise HTTPException(status_code=500, detail="Failed to create scheduled task")

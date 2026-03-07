@@ -24,8 +24,9 @@ _UNSET = object()
 class DatabaseOperations:
     """Database operations for the personal agent."""
     
-    def __init__(self):
-        self.engine = create_engine(settings.database_url, pool_pre_ping=True)
+    def __init__(self, database_url: Optional[str] = None):
+        url = database_url or settings.database_url
+        self.engine = create_engine(url, pool_pre_ping=True)
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
         self.init_database()
     
@@ -745,7 +746,7 @@ class DatabaseOperations:
             if not task:
                 return None
             task.last_run_at = last_run_at
-            task.last_run_id = last_run_id
+            task.last_run_id = last_run_id or None
             task.next_run_at = next_run_at
             task.updated_at = datetime.now(timezone.utc)
             session.commit()

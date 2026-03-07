@@ -220,7 +220,7 @@ class ScheduledTask(Base):
 
     id = Column(String, primary_key=True, default=generate_id)
     name = Column(String, nullable=False, unique=True)
-    conversation_id = Column(String, ForeignKey("conversations.id"), nullable=False)
+    conversation_id = Column(String, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False)
     message = Column(Text, nullable=False)
     cron_expr = Column(String, nullable=False)
     enabled = Column(Boolean, nullable=False, default=True)

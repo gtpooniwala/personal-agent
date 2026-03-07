@@ -7,8 +7,6 @@ import sys
 import unittest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import MagicMock, patch
-from sqlalchemy.exc import IntegrityError
-
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
@@ -18,6 +16,7 @@ IMPORT_ERROR = ""
 try:
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
+    from sqlalchemy.exc import IntegrityError
     # Import scheduler_routes module so patch target is resolvable
     import backend.api.scheduler_routes as scheduler_routes_module
 except (ImportError, ModuleNotFoundError) as exc:
