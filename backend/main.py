@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from backend.api import router
+from backend.api.routes import router as versioned_router
+from backend.api.runtime_routes import runtime_router
 from backend.config import settings
 from backend.observability import configure_logging, langfuse_manager, push_context
 import logging
@@ -99,7 +100,8 @@ async def request_context_middleware(request, call_next):
         return response
 
 # Include API routes
-app.include_router(router, prefix="/api/v1")
+app.include_router(versioned_router, prefix="/api/v1")
+app.include_router(runtime_router)
 
 # Serve static files (for serving the frontend if needed)
 # app.mount("/", StaticFiles(directory="../frontend", html=True), name="frontend")

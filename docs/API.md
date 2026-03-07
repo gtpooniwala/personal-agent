@@ -1,11 +1,9 @@
 # API Documentation
 
 ## Scope And Status (As Of March 6, 2026)
-This document intentionally separates:
-- `Implemented now` behavior available on `main`.
-- `Planned target` behavior for the async runtime migration.
-
-Do not treat planned endpoints as currently available unless issues [#15](https://github.com/gtpooniwala/personal-agent/issues/15) and [#17](https://github.com/gtpooniwala/personal-agent/issues/17) are merged.
+This document reflects the current split route model:
+- Bare runtime endpoints for async run submission and polling.
+- `/api/v1` endpoints for conversations, tools, documents, and health.
 
 ## Base URLs
 - Development host: `http://127.0.0.1:8000`
@@ -13,8 +11,8 @@ Do not treat planned endpoints as currently available unless issues [#15](https:
 - OpenAPI schema: `http://127.0.0.1:8000/openapi.json`
 
 Routing conventions:
-- Implemented now: all API routes are mounted under `/api/v1`.
-- Planned target: runtime endpoints also exposed as bare routes (`/chat`, `/runs`, ...).
+- Runtime endpoints: bare routes (`/chat`, `/runs`, ...).
+- Non-runtime endpoints: mounted under `/api/v1`.
 
 ## Authentication
 Implemented now: no auth; single default-user behavior.
@@ -28,8 +26,8 @@ Production/shared deployment requirement: before exposing this service beyond st
 
 ### Implemented Now (Current Mainline)
 
-#### POST `/api/v1/chat`
-Current behavior: synchronous chat request/response.
+#### POST `/chat`
+Asynchronous conversational submit endpoint.
 
 Request body:
 ```json
@@ -43,20 +41,79 @@ Request body:
 Response body:
 ```json
 {
-  "response": "2 + 2 = 4",
-  "conversation_id": "conv-uuid",
-  "agent_actions": [
-    {
-      "tool": "calculator",
-      "input": "2+2",
-      "output": "4"
-    }
-  ],
-  "token_usage": 123,
-  "cost": 0.00012,
-  "error": false
+  "run_id": "run-uuid",
+  "status": "queued",
+  "conversation_id": "generated-or-provided-uuid"
 }
 ```
+
+#### POST `/runs`
+Asynchronous generic submit endpoint.
+
+Request body:
+```json
+{
+  "message": "What's 2 + 2?",
+  "conversation_id": "optional-uuid",
+  "selected_documents": ["doc-id-1", "doc-id-2"]
+}
+```
+
+Response body:
+```json
+{
+  "run_id": "run-uuid",
+  "status": "queued",
+  "conversation_id": "generated-or-provided-uuid"
+}
+```
+
+#### GET `/runs/{run_id}/status`
+Returns lifecycle state for polling clients.
+
+Response body:
+```json
+{
+  "run_id": "run-uuid",
+  "status": "running",
+  "conversation_id": "conv-uuid",
+  "created_at": "2026-03-06T10:00:00Z",
+  "updated_at": "2026-03-06T10:00:02Z",
+  "error": null,
+  "result": null
+}
+```
+
+#### GET `/runs/{run_id}/events`
+Returns ordered progress events for polling UIs.
+
+Response body:
+```json
+{
+  "run_id": "run-uuid",
+  "events": [
+    {
+      "type": "started",
+      "status": "running",
+      "message": "Run created and queued",
+      "created_at": "2026-03-06T10:00:01Z"
+    },
+    {
+      "type": "tool_result",
+      "status": "running",
+      "tool": "calculator",
+      "message": "Tool action completed",
+      "created_at": "2026-03-06T10:00:02Z"
+    }
+  ],
+  "next_after": "2",
+  "has_more": false
+}
+```
+
+Cursor contract:
+- `after`: fetch events strictly after this event cursor.
+- `limit`: page size (`1..200`, default `50`).
 
 #### GET `/api/v1/conversations`
 Get all conversations.
@@ -100,77 +157,6 @@ Response body:
   "version": "1.0.0"
 }
 ```
-
-### Planned Target (Not Yet Implemented On Main)
-
-These endpoints document migration intent and are not guaranteed to exist yet:
-
-#### POST `/chat`
-Target behavior: asynchronous submit endpoint returning `run_id`.
-
-#### POST `/runs`
-Target behavior: asynchronous submit endpoint returning `run_id`.
-
-Planned request body:
-```json
-{
-  "message": "What's 2 + 2?",
-  "conversation_id": "optional-uuid",
-  "selected_documents": ["doc-id-1", "doc-id-2"]
-}
-```
-
-Planned response body:
-```json
-{
-  "run_id": "run-uuid",
-  "status": "queued",
-  "conversation_id": "generated-or-provided-uuid"
-}
-```
-
-#### GET `/runs/{run_id}/status`
-Target behavior: return lifecycle state for polling clients.
-
-Planned response body:
-```json
-{
-  "run_id": "run-uuid",
-  "status": "running",
-  "conversation_id": "conv-uuid",
-  "created_at": "2026-03-06T10:00:00Z",
-  "updated_at": "2026-03-06T10:00:02Z",
-  "error": null,
-  "result": null
-}
-```
-
-#### GET `/runs/{run_id}/events`
-Target behavior: ordered progress events for polling UIs.
-
-Planned response body:
-```json
-{
-  "run_id": "run-uuid",
-  "events": [
-    {
-      "type": "started",
-      "status": "running",
-      "message": "Run created and queued",
-      "created_at": "2026-03-06T10:00:01Z"
-    },
-    {
-      "type": "tool_call",
-      "status": "running",
-      "tool": "calculator",
-      "message": "Tool selected and executing",
-      "created_at": "2026-03-06T10:00:02Z"
-    }
-  ]
-}
-```
-
-Contract note: pagination/cursor shape for events remains intentionally flexible until `#17` is finalized.
 
 ## Data Models
 
@@ -224,7 +210,7 @@ Contract note: pagination/cursor shape for events remains intentionally flexible
 }
 ```
 
-### Planned Runtime Models (Migration Target)
+### Runtime Models
 
 #### Run
 ```json
@@ -242,7 +228,8 @@ Contract note: pagination/cursor shape for events remains intentionally flexible
 #### RunEvent
 ```json
 {
-  "type": "started|tool_call|tool_result|retrying|failed|succeeded|cancelled",
+  "event_id": "string cursor",
+  "type": "queued|started|tool_result|retrying|failed|succeeded|cancelled",
   "status": "queued|running|retrying|succeeded|failed|cancelling|cancelled",
   "message": "string",
   "tool": "string|null",
@@ -269,31 +256,15 @@ Common status codes:
 
 ## Usage Examples
 
-### Implemented Now: Synchronous Chat
+### Implemented Now: Async Run Polling
 ```javascript
-const response = await fetch('/api/v1/chat', {
+const submit = await fetch('/chat', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    message: "What's the current time?",
-    conversation_id: null,
+    message: "Summarize the uploaded document",
+    conversation_id: "existing-conv-id",
     selected_documents: []
-  })
-});
-
-const data = await response.json();
-console.log(data.response, data.conversation_id);
-```
-
-### Planned Target: Async Run Polling
-```javascript
-const submit = await fetch('/runs', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    message: 'Summarize the uploaded document',
-    conversation_id: 'existing-conv-id',
-    selected_documents: ['doc-id']
   })
 });
 

@@ -1,25 +1,22 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from backend.orchestrator import CoreOrchestrator
 from backend.api.models import (
-    ChatRequest, ChatResponse, ConversationCreate, ConversationResponse,
+    ConversationCreate, ConversationResponse,
     MessageResponse, ToolInfo, HealthResponse, DocumentUploadResponse,
     DocumentListResponse, DocumentDeleteResponse, DocumentInfo,
-    TitleGenerationResponse  # Add new model import
+    TitleGenerationResponse
 )
 from backend.services.document_service import doc_processor
 from typing import List
 from datetime import datetime, timedelta
 import asyncio
 import logging
+from backend.api.state import orchestrator
 from backend.database.operations import db_ops
-from backend.observability import observe_operation, update_observation, increment_counter, push_context
+from backend.observability import observe_operation, update_observation, increment_counter
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-# Initialize core orchestrator
-orchestrator = CoreOrchestrator()
 
 # Async task functions for conversation maintenance
 async def async_generate_title(conversation_id: str):
@@ -95,56 +92,6 @@ def check_conversation_maintenance(conversations: List[dict]) -> None:
                        f"(age: {now - created_at})")
             increment_counter("maintenance.delete_empty_conversation.scheduled_total")
             asyncio.create_task(async_delete_empty_conversation(conversation_id))
-
-@router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
-    """Process a chat message through the LangChain agent."""
-    conversation_id = request.conversation_id or orchestrator.create_conversation()
-    payload_preview = {
-        "message_chars": len(request.message or ""),
-        "selected_documents_count": len(request.selected_documents or []),
-        "has_conversation_id": bool(request.conversation_id),
-    }
-    with observe_operation(
-        name="api.chat",
-        counter_prefix="api.chat",
-        as_type="chain",
-        conversation_id=conversation_id,
-        input_data=payload_preview,
-        metadata={"component": "api", "endpoint": "/api/v1/chat"},
-    ) as observation:
-        try:
-            with push_context(conversation_id=conversation_id):
-                # Process message with orchestrator
-                result = await orchestrator.process_request(
-                    user_request=request.message,
-                    conversation_id=conversation_id,
-                    selected_documents=request.selected_documents,
-                )
-
-            update_observation(
-                observation,
-                output={
-                    "error": bool(result.get("error", False)),
-                    "token_usage": result.get("token_usage"),
-                    "tool_actions_count": len(result.get("orchestration_actions") or []),
-                },
-            )
-
-            # Return orchestrator response
-            return ChatResponse(
-                response=result["response"],
-                conversation_id=result["conversation_id"],
-                agent_actions=result.get("orchestration_actions"),
-                token_usage=result.get("token_usage"),
-                cost=result.get("cost"),
-                error=result.get("error", False),
-            )
-
-        except Exception as e:
-            logger.error(f"Error in chat endpoint: {str(e)}")
-            raise HTTPException(status_code=500, detail="Failed to process chat request")
-
 
 @router.get("/conversations", response_model=List[ConversationResponse])
 async def get_conversations():

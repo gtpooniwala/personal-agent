@@ -1,4 +1,19 @@
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
+const RUNTIME_API_BASE_FROM_ENV = process.env.NEXT_PUBLIC_RUNTIME_API_BASE_URL?.replace(/\/$/, "");
+
+function deriveRuntimeBase(apiBase) {
+  if (!apiBase) {
+    return undefined;
+  }
+
+  if (apiBase.endsWith("/api/v1")) {
+    return apiBase.slice(0, -7);
+  }
+
+  return apiBase;
+}
+
+export const RUNTIME_API_BASE = RUNTIME_API_BASE_FROM_ENV || deriveRuntimeBase(API_BASE);
 
 async function parseResponse(response) {
   const contentType = response.headers.get("content-type") || "";
@@ -26,12 +41,12 @@ function extractErrorMessage(response, payload) {
   return `HTTP ${response.status} ${response.statusText}`;
 }
 
-export async function apiCall(endpoint, options = {}) {
-  if (!API_BASE) {
-    throw new Error("NEXT_PUBLIC_API_BASE_URL is not configured.");
+async function callApi(baseUrl, endpoint, options = {}, missingBaseMessage) {
+  if (baseUrl === undefined || baseUrl === null) {
+    throw new Error(missingBaseMessage);
   }
 
-  const url = `${API_BASE}${endpoint}`;
+  const url = `${baseUrl}${endpoint}`;
   const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
   const hasBody = options.body !== undefined && options.body !== null;
   const headers = new Headers(options.headers || {});
@@ -52,6 +67,19 @@ export async function apiCall(endpoint, options = {}) {
   }
 
   return payload;
+}
+
+export async function apiCall(endpoint, options = {}) {
+  return callApi(API_BASE, endpoint, options, "NEXT_PUBLIC_API_BASE_URL is not configured.");
+}
+
+export async function runtimeApiCall(endpoint, options = {}) {
+  return callApi(
+    RUNTIME_API_BASE,
+    endpoint,
+    options,
+    "Runtime API base is not configured. Set NEXT_PUBLIC_RUNTIME_API_BASE_URL or NEXT_PUBLIC_API_BASE_URL.",
+  );
 }
 
 export async function uploadPdf(file) {

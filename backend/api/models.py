@@ -19,6 +19,43 @@ class ChatResponse(BaseModel):
     error: Optional[bool] = Field(False, description="Whether an error occurred")
 
 
+class RunSubmitResponse(BaseModel):
+    """Response model for asynchronous run submission."""
+    run_id: str = Field(..., description="Run ID")
+    status: str = Field(..., description="Initial run status")
+    conversation_id: str = Field(..., description="Conversation ID")
+
+
+class RunStatusResponse(BaseModel):
+    """Response model for asynchronous run status."""
+    run_id: str = Field(..., description="Run ID")
+    status: str = Field(..., description="Current run status")
+    conversation_id: str = Field(..., description="Conversation ID")
+    created_at: str = Field(..., description="Run creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
+    error: Optional[str] = Field(None, description="Failure details if present")
+    result: Optional[str] = Field(None, description="Final assistant response if completed")
+
+
+class RunEventResponse(BaseModel):
+    """Single run event model."""
+    event_id: str = Field(..., description="Monotonic event cursor ID")
+    type: str = Field(..., description="Event type")
+    status: str = Field(..., description="Run status at event time")
+    message: str = Field(..., description="Human-readable event message")
+    created_at: str = Field(..., description="Event creation timestamp")
+    tool: Optional[str] = Field(None, description="Associated tool name if applicable")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional event metadata")
+
+
+class RunEventsResponse(BaseModel):
+    """Paginated run events response."""
+    run_id: str = Field(..., description="Run ID")
+    events: List[RunEventResponse] = Field(default_factory=list, description="Ordered run events")
+    next_after: Optional[str] = Field(None, description="Cursor for the next page")
+    has_more: bool = Field(False, description="Whether more events are available")
+
+
 class ConversationCreate(BaseModel):
     """Request model for creating a new conversation."""
     title: Optional[str] = Field(None, description="Conversation title")
