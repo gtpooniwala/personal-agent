@@ -40,8 +40,8 @@ flowchart LR
 Current runtime path:
 1. User sends a message from the frontend.
 2. `POST /chat` or `POST /runs` submits asynchronous work and returns a `run_id`.
-3. Backend in-process background tasks execute run steps asynchronously (tool selection, tool execution, synthesis), with dedicated worker queueing planned in `#16`.
-4. Frontend polls `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events`.
+3. Backend executes run steps asynchronously with per-session serialization (tool selection, tool execution, synthesis).
+4. Frontend polls `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events` for real-time updates.
 
 ## Implemented Capabilities
 
@@ -65,17 +65,20 @@ Current runtime path:
 - Frontend: Next.js + React
 - Storage: PostgreSQL + local filesystem (`data/`)
 
-## LangChain/LangGraph Migration Baseline
+## Runtime and Migration Status
 
-Contributor reference for current migration state:
+Contributor reference for current implementation:
 - Dependency source of truth:
   - Backend: `backend/requirements.txt`
   - Frontend: `frontend/package.json`
 - Completed baseline:
   - LangGraph ReAct orchestration is the active architecture.
   - Tool routing is centralized in the orchestrator tool registry.
-- Runtime migration status:
-  - Runtime submission/status/events now use async bare routes (`/chat`, `/runs`, `/runs/{run_id}/...`).
+- Async runtime (completed `#15`, `#16`, `#17`):
+  - Run lifecycle schema with per-session durability and retry logic.
+  - Async submission via `POST /runs` and `POST /chat`.
+  - Real-time status and event polling via `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events`.
+  - Background worker execution with per-session serialization guarantees.
   - `/api/v1/*` remains active for non-runtime endpoints (conversations/tools/documents/health).
 
 ## Quick Start (Docker, Recommended)
