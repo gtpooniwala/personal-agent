@@ -33,7 +33,7 @@ if _STUB_DB_MODULE_NAME not in sys.modules:
     class _StubDbOps:
         """Minimal no-op stub so module-level imports in tracking.py succeed."""
 
-        def acquire_lease(self, key: str, owner_id: str, ttl_seconds: int) -> None:
+        def acquire_lease(self, key: str, owner_id: str, ttl_seconds: int) -> Optional[Dict[str, str]]:
             return None
 
         def release_lease(self, key: str, owner_id: str) -> None:
@@ -182,7 +182,7 @@ def _check_event_order(
             return
         indices.append(event_types.index(etype))
     for i in range(1, len(indices)):
-        if indices[i] <= indices[i - 1]:
+        if not (indices[i - 1] < indices[i]):  # require strict ascending order
             failures.append(
                 f"events out of order: expected {required_sequence}, got {event_types}"
             )
