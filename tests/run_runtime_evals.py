@@ -33,13 +33,17 @@ if _STUB_DB_MODULE_NAME not in sys.modules:
     class _StubDbOps:
         """Minimal no-op stub so module-level imports in tracking.py succeed."""
 
-        def acquire_lease(self, key: str, owner_id: str, ttl_seconds: int) -> Optional[Dict[str, str]]:
+        def acquire_lease(
+            self, key: str, owner_id: str, ttl_seconds: int
+        ) -> Optional[Dict[str, str]]:
             return None
 
         def release_lease(self, key: str, owner_id: str) -> None:
             pass
 
-        def renew_lease(self, key: str, owner_id: str, ttl_seconds: int) -> None:
+        def renew_lease(
+            self, key: str, owner_id: str, ttl_seconds: int
+        ) -> Optional[Dict[str, str]]:
             return None
 
         def increment_runtime_counter(self, key: str, amount: int = 1) -> int:
@@ -82,13 +86,16 @@ except Exception as exc:
 # Mock helpers
 # ---------------------------------------------------------------------------
 
+
 class MockDbOps:
     """In-memory lease management used to replace db_ops during eval cases."""
 
     def __init__(self) -> None:
         self._leases: Dict[str, str] = {}
 
-    def acquire_lease(self, key: str, owner_id: str, ttl_seconds: int) -> Optional[Dict[str, str]]:
+    def acquire_lease(
+        self, key: str, owner_id: str, ttl_seconds: int
+    ) -> Optional[Dict[str, str]]:
         if key not in self._leases:
             self._leases[key] = owner_id
             return {"key": key, "owner_id": owner_id}
@@ -98,7 +105,9 @@ class MockDbOps:
         if self._leases.get(key) == owner_id:
             del self._leases[key]
 
-    def renew_lease(self, key: str, owner_id: str, ttl_seconds: int) -> Optional[Dict[str, str]]:
+    def renew_lease(
+        self, key: str, owner_id: str, ttl_seconds: int
+    ) -> Optional[Dict[str, str]]:
         if self._leases.get(key) == owner_id:
             return {"key": key, "owner_id": owner_id}
         return None
@@ -122,7 +131,9 @@ class MockOrchestrator:
     async def process_request(self, **kwargs: Any) -> Dict[str, Any]:
         self._call_count += 1
         if self._index >= len(self._responses):
-            raise RuntimeError("MockOrchestrator exhausted: no more responses configured")
+            raise RuntimeError(
+                "MockOrchestrator exhausted: no more responses configured"
+            )
         kind, payload = self._responses[self._index]
         self._index += 1
         if kind == "raise":
@@ -147,6 +158,7 @@ class RuntimeRequest:
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
+
 
 async def _wait_terminal(
     service: Any,
@@ -192,6 +204,7 @@ def _check_event_order(
 # ---------------------------------------------------------------------------
 # Eval cases
 # ---------------------------------------------------------------------------
+
 
 async def _case_lifecycle_queued_to_succeeded() -> Tuple[bool, List[str]]:
     """State transitions: queued→running→succeeded; events in order; result populated."""
@@ -268,11 +281,13 @@ async def _case_retry_transient_then_success() -> Tuple[bool, List[str]]:
     """Orchestrator raises twice, succeeds on 3rd; retrying events emitted; final status succeeded."""
     failures: List[str] = []
     mock_db_ops = MockDbOps()
-    orchestrator = MockOrchestrator([
-        ("raise", RuntimeError("transient error 1")),
-        ("raise", RuntimeError("transient error 2")),
-        ("success", "recovered ok"),
-    ])
+    orchestrator = MockOrchestrator(
+        [
+            ("raise", RuntimeError("transient error 1")),
+            ("raise", RuntimeError("transient error 2")),
+            ("success", "recovered ok"),
+        ]
+    )
     store = InMemoryRunStore()
     service = RuntimeService(orchestrator=orchestrator, run_store=store)
 
@@ -311,11 +326,13 @@ async def _case_retry_exhaustion() -> Tuple[bool, List[str]]:
     """All 3 attempts raise; final status failed; exactly 2 retrying events before failed."""
     failures: List[str] = []
     mock_db_ops = MockDbOps()
-    orchestrator = MockOrchestrator([
-        ("raise", RuntimeError("fail 1")),
-        ("raise", RuntimeError("fail 2")),
-        ("raise", RuntimeError("fail 3")),
-    ])
+    orchestrator = MockOrchestrator(
+        [
+            ("raise", RuntimeError("fail 1")),
+            ("raise", RuntimeError("fail 2")),
+            ("raise", RuntimeError("fail 3")),
+        ]
+    )
     store = InMemoryRunStore()
     service = RuntimeService(orchestrator=orchestrator, run_store=store)
 
@@ -350,10 +367,12 @@ async def _case_session_isolation_different_sessions() -> Tuple[bool, List[str]]
     """Two concurrent runs in different sessions both reach succeeded."""
     failures: List[str] = []
     mock_db_ops = MockDbOps()
-    orchestrator = MockOrchestrator([
-        ("success", "result-A"),
-        ("success", "result-B"),
-    ])
+    orchestrator = MockOrchestrator(
+        [
+            ("success", "result-A"),
+            ("success", "result-B"),
+        ]
+    )
     store = InMemoryRunStore()
     service = RuntimeService(orchestrator=orchestrator, run_store=store)
 
@@ -447,14 +466,23 @@ EVAL_CASES: List[EvalCase] = [
     ("runtime", "lifecycle_queued_to_failed", _case_lifecycle_queued_to_failed),
     ("runtime", "retry_transient_then_success", _case_retry_transient_then_success),
     ("runtime", "retry_exhaustion", _case_retry_exhaustion),
-    ("runtime", "session_isolation_different_sessions", _case_session_isolation_different_sessions),
-    ("runtime", "session_isolation_same_session_blocked", _case_session_isolation_same_session_blocked),
+    (
+        "runtime",
+        "session_isolation_different_sessions",
+        _case_session_isolation_different_sessions,
+    ),
+    (
+        "runtime",
+        "session_isolation_same_session_blocked",
+        _case_session_isolation_same_session_blocked,
+    ),
 ]
 
 
 # ---------------------------------------------------------------------------
 # Runner and reporting
 # ---------------------------------------------------------------------------
+
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
