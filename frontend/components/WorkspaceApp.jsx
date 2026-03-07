@@ -5,12 +5,24 @@ import ActivityDashboard from "@/components/ActivityDashboard";
 import ChatPanel from "@/components/ChatPanel";
 import ConversationList from "@/components/ConversationList";
 import DocumentsPanel from "@/components/DocumentsPanel";
+import MetricsDashboard from "@/components/MetricsDashboard";
 import { apiCall, runtimeApiCall, uploadPdf } from "@/lib/api";
 
 const RUN_POLL_INTERVAL_MS = 500;
 const RUN_POLL_MAX_ATTEMPTS = 120;
 const MAX_VISIBLE_RUN_EVENTS = 4;
 const NEW_CONVERSATION_KEY = "__new__";
+const DEFAULT_LEFT_PANEL_WIDTH = 272;
+const DEFAULT_RIGHT_PANEL_WIDTH = 316;
+const MIN_LEFT_PANEL_WIDTH = 220;
+const MAX_LEFT_PANEL_WIDTH = 420;
+const MIN_RIGHT_PANEL_WIDTH = 260;
+const MAX_RIGHT_PANEL_WIDTH = 460;
+const COLLAPSED_PANEL_WIDTH = 0;
+const PANEL_COLLAPSE_THRESHOLD = 120;
+const APP_ROOT_PADDING = 16;
+const PANEL_GAP = 16;
+const DESKTOP_RESIZE_BREAKPOINT = 1120;
 
 const RUN_IN_PROGRESS_STATUSES = new Set(["queued", "running", "retrying", "cancelling"]);
 
@@ -120,9 +132,13 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
 
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [leftPanelWidth, setLeftPanelWidth] = useState(DEFAULT_LEFT_PANEL_WIDTH);
+  const [rightPanelWidth, setRightPanelWidth] = useState(DEFAULT_RIGHT_PANEL_WIDTH);
   const [documentsExpanded, setDocumentsExpanded] = useState(true);
   const [dragActive, setDragActive] = useState(false);
+  const [resizingSidebar, setResizingSidebar] = useState(null);
 
+  const appRootRef = useRef(null);
   const fileInputRef = useRef(null);
   const messageInputRef = useRef(null);
   const activeConversationIdRef = useRef(null);
@@ -165,6 +181,26 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
       }
     });
   }, [view]);
+
+  const toggleLeftCollapsed = useCallback(() => {
+    setLeftCollapsed((isCollapsed) => !isCollapsed);
+  }, []);
+
+  const toggleRightCollapsed = useCallback(() => {
+    setRightCollapsed((isCollapsed) => !isCollapsed);
+  }, []);
+
+  const startSidebarResize = useCallback(
+    (side) => (event) => {
+      if (typeof window === "undefined" || window.innerWidth <= DESKTOP_RESIZE_BREAKPOINT) {
+        return;
+      }
+
+      event.preventDefault();
+      setResizingSidebar(side);
+    },
+    [],
+  );
 
   const updateRunState = useCallback((conversationId, patch) => {
     if (!conversationId) {
@@ -726,6 +762,65 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
     };
   }, []);
 
+  useEffect(() => {
+    if (!resizingSidebar) {
+      return undefined;
+    }
+
+    const updateSidebarWidth = (clientX) => {
+      const appRoot = appRootRef.current;
+      if (!appRoot) {
+        return;
+      }
+
+      const rootBounds = appRoot.getBoundingClientRect();
+
+      if (resizingSidebar === "left") {
+        const rawWidth = clientX - rootBounds.left - APP_ROOT_PADDING - PANEL_GAP / 2;
+        if (rawWidth <= PANEL_COLLAPSE_THRESHOLD) {
+          setLeftCollapsed(true);
+          return;
+        }
+
+        setLeftCollapsed(false);
+        setLeftPanelWidth(Math.min(MAX_LEFT_PANEL_WIDTH, Math.max(MIN_LEFT_PANEL_WIDTH, rawWidth)));
+        return;
+      }
+
+      const rawWidth = rootBounds.right - APP_ROOT_PADDING - clientX - PANEL_GAP / 2;
+      if (rawWidth <= PANEL_COLLAPSE_THRESHOLD) {
+        setRightCollapsed(true);
+        return;
+      }
+
+      setRightCollapsed(false);
+      setRightPanelWidth(Math.min(MAX_RIGHT_PANEL_WIDTH, Math.max(MIN_RIGHT_PANEL_WIDTH, rawWidth)));
+    };
+
+    const onPointerMove = (event) => {
+      updateSidebarWidth(event.clientX);
+    };
+
+    const onPointerUp = () => {
+      setResizingSidebar(null);
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+
+    document.body.style.cursor = "ew-resize";
+    document.body.style.userSelect = "none";
+
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [resizingSidebar]);
+
   const currentConversation =
     conversations.find((conversation) => conversation.id === currentConversationId) || null;
   const activeRun =
@@ -733,10 +828,16 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
     runStateByConversation[NEW_CONVERSATION_KEY] ||
     null;
   const currentConversationKey = currentConversationId || NEW_CONVERSATION_KEY;
+  const appRootStyle = {
+    "--left-panel-width": `${leftCollapsed ? COLLAPSED_PANEL_WIDTH : leftPanelWidth}px`,
+    "--right-panel-width": `${rightCollapsed ? COLLAPSED_PANEL_WIDTH : rightPanelWidth}px`,
+  };
 
   return (
     <div
-      className={`app-root ${leftCollapsed ? "left-collapsed" : ""} ${rightCollapsed ? "right-collapsed" : ""}`}
+      ref={appRootRef}
+      style={appRootStyle}
+      className={`app-root ${leftCollapsed ? "left-collapsed" : ""} ${rightCollapsed ? "right-collapsed" : ""} ${resizingSidebar ? "resizing" : ""}`}
     >
       <ConversationList
         conversations={conversations}
@@ -745,9 +846,28 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
         isLoading={loadingConversations}
         error={conversationError}
         isCollapsed={leftCollapsed}
-        onToggleCollapse={() => setLeftCollapsed((isCollapsed) => !isCollapsed)}
+        onToggleCollapse={toggleLeftCollapsed}
         onCreateConversation={createConversation}
         onSelectConversation={handleSelectConversation}
+      />
+
+      {leftCollapsed ? (
+        <button
+          type="button"
+          className="sidebar-reopen-button left"
+          onClick={toggleLeftCollapsed}
+          aria-label="Reopen conversations sidebar"
+        >
+          ☰
+        </button>
+      ) : null}
+
+      <div
+        className={`sidebar-resizer left ${resizingSidebar === "left" ? "active" : ""}`}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize conversations sidebar"
+        onPointerDown={startSidebarResize("left")}
       />
 
       {view === "activity" ? (
@@ -759,6 +879,8 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
           tools={tools}
           conversations={conversations}
         />
+      ) : view === "metrics" ? (
+        <MetricsDashboard currentConversationId={currentConversationId} />
       ) : (
         <ChatPanel
           currentView={view}
@@ -777,6 +899,25 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
         />
       )}
 
+      {rightCollapsed ? (
+        <button
+          type="button"
+          className="sidebar-reopen-button right"
+          onClick={toggleRightCollapsed}
+          aria-label="Reopen workspace sidebar"
+        >
+          ≡
+        </button>
+      ) : null}
+
+      <div
+        className={`sidebar-resizer right ${resizingSidebar === "right" ? "active" : ""}`}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize workspace sidebar"
+        onPointerDown={startSidebarResize("right")}
+      />
+
       <DocumentsPanel
         documents={documents}
         selectedDocuments={selectedDocuments}
@@ -787,7 +928,7 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
         uploadProgress={uploadProgress}
         isCollapsed={rightCollapsed}
         isDragActive={dragActive}
-        onToggleCollapse={() => setRightCollapsed((isCollapsed) => !isCollapsed)}
+        onToggleCollapse={toggleRightCollapsed}
         onToggleDocumentsExpanded={() => setDocumentsExpanded((isExpanded) => !isExpanded)}
         onOpenFilePicker={() => fileInputRef.current?.click()}
         onFileSelect={onFileSelect}

@@ -26,14 +26,16 @@ export default function DocumentsPanel({
 
   return (
     <aside className={`panel panel-right ${isCollapsed ? "collapsed" : ""}`}>
-      <button
-        className="collapse-button"
-        type="button"
-        onClick={onToggleCollapse}
-        aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-      >
-        {isCollapsed ? "⮜" : "⮞"}
-      </button>
+      {!isCollapsed ? (
+        <button
+          className="collapse-button"
+          type="button"
+          onClick={onToggleCollapse}
+          aria-label="Collapse sidebar"
+        >
+          ⮞
+        </button>
+      ) : null}
 
       {!isCollapsed && (
         <>

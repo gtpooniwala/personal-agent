@@ -23,6 +23,12 @@ export default function WorkspaceViewTabs({ currentView, currentConversationId }
       >
         Activity
       </Link>
+      <Link
+        href={buildHref("/metrics", currentConversationId)}
+        className={`workspace-tab ${currentView === "metrics" ? "active" : ""}`}
+      >
+        Metrics
+      </Link>
     </nav>
   );
 }

@@ -3,9 +3,11 @@ from backend.api.models import (
     ConversationCreate, ConversationResponse,
     MessageResponse, ToolInfo, HealthResponse, DocumentUploadResponse,
     DocumentListResponse, DocumentDeleteResponse, DocumentInfo,
+    ObservabilitySummaryResponse,
     TitleGenerationResponse
 )
 from backend.services.document_service import doc_processor
+from backend.config import settings
 from typing import List
 from datetime import datetime, timedelta
 import asyncio
@@ -17,6 +19,18 @@ from backend.observability import observe_operation, update_observation, increme
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _average(total: int, count: int) -> float | None:
+    if count <= 0:
+        return None
+    return round(total / count, 1)
+
+
+def _percentage(numerator: int, denominator: int) -> float | None:
+    if denominator <= 0:
+        return None
+    return round((numerator / denominator) * 100, 1)
 
 # Async task functions for conversation maintenance
 async def async_generate_title(conversation_id: str):
@@ -191,6 +205,101 @@ async def health_check():
         timestamp=datetime.now().isoformat(),
         version="1.0.0"
     )
+
+
+@router.get("/observability/summary", response_model=ObservabilitySummaryResponse)
+async def get_observability_summary():
+    """Return a compact metrics snapshot for the frontend observability page."""
+    with observe_operation(
+        name="api.observability.summary",
+        counter_prefix="api.observability.summary",
+        as_type="retriever",
+        metadata={"component": "api", "endpoint": "/api/v1/observability/summary"},
+    ) as observation:
+        try:
+            counters = db_ops.get_runtime_counters()
+            database_summary = db_ops.get_observability_summary()
+
+            tool_usage = {
+                key.removeprefix("orchestrator.tool_calls.").removesuffix(".total"): value
+                for key, value in counters.items()
+                if key.startswith("orchestrator.tool_calls.") and key.endswith(".total")
+            }
+
+            runtime_submit_requests = counters.get("runtime.submit_run.requests_total", 0)
+            runtime_execute_requests = counters.get("runtime.execute_run.requests_total", 0)
+            runtime_runs_succeeded = counters.get("runtime.runs.succeeded_total", 0)
+            runtime_runs_failed = counters.get("runtime.runs.failed_total", 0)
+            runtime_runs_queued = counters.get("runtime.runs.queued_total", 0)
+
+            api_chat_submit_requests = counters.get("api.runtime.chat_submit.requests_total", 0)
+            api_documents_upload_requests = counters.get("api.documents.upload.requests_total", 0)
+            api_conversation_list_requests = counters.get("api.conversations.list.requests_total", 0)
+
+            response_payload = {
+                "generated_at": datetime.now().isoformat(),
+                "latest_counter_update": database_summary["latest_counter_update"],
+                "langfuse_enabled": bool(settings.langfuse_enabled and settings.langfuse_public_key and settings.langfuse_secret_key),
+                "langfuse_base_url": settings.langfuse_base_url,
+                "totals": database_summary["totals"],
+                "runtime": {
+                    "submit_requests_total": runtime_submit_requests,
+                    "execute_requests_total": runtime_execute_requests,
+                    "queued_total": runtime_runs_queued,
+                    "succeeded_total": runtime_runs_succeeded,
+                    "failed_total": runtime_runs_failed,
+                    "success_rate_pct": _percentage(
+                        runtime_runs_succeeded,
+                        runtime_runs_succeeded + runtime_runs_failed,
+                    ),
+                    "average_execution_latency_ms": _average(
+                        counters.get("runtime.execute_run.latency_ms_total", 0),
+                        counters.get("runtime.execute_run.success_total", 0),
+                    ),
+                    "average_completed_run_latency_ms": database_summary["average_run_latency_ms"],
+                },
+                "orchestration": {
+                    "tool_calls_total": counters.get("orchestrator.tool_calls_total", 0),
+                    "token_usage_total": counters.get("orchestrator.token_usage_total", 0),
+                    "fallback_total": counters.get("orchestrator.fallback_total", 0),
+                    "average_request_latency_ms": _average(
+                        counters.get("orchestrator.process_request.latency_ms_total", 0),
+                        counters.get("orchestrator.process_request.success_total", 0),
+                    ),
+                    "average_langgraph_latency_ms": _average(
+                        counters.get("orchestrator.langgraph.invoke.latency_ms_total", 0),
+                        counters.get("orchestrator.langgraph.invoke.success_total", 0),
+                    ),
+                },
+                "api": {
+                    "chat_submit_requests_total": api_chat_submit_requests,
+                    "documents_upload_requests_total": api_documents_upload_requests,
+                    "conversations_list_requests_total": api_conversation_list_requests,
+                    "average_chat_submit_latency_ms": _average(
+                        counters.get("api.runtime.chat_submit.latency_ms_total", 0),
+                        counters.get("api.runtime.chat_submit.success_total", 0),
+                    ),
+                    "average_documents_upload_latency_ms": _average(
+                        counters.get("api.documents.upload.latency_ms_total", 0),
+                        counters.get("api.documents.upload.success_total", 0),
+                    ),
+                },
+                "tool_usage": dict(sorted(tool_usage.items(), key=lambda item: item[1], reverse=True)),
+                "run_status_counts": database_summary["run_status_counts"],
+                "recent_runs": database_summary["recent_runs"],
+            }
+
+            update_observation(
+                observation,
+                output={
+                    "run_count": response_payload["totals"]["runs"],
+                    "tool_count": len(response_payload["tool_usage"]),
+                },
+            )
+            return ObservabilitySummaryResponse(**response_payload)
+        except Exception as e:
+            logger.error(f"Error getting observability summary: {str(e)}")
+            raise HTTPException(status_code=500, detail="Failed to retrieve observability summary")
 
 
 # Document management endpoints

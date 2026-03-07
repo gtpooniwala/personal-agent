@@ -1,8 +1,9 @@
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, func, text
 from sqlalchemy.orm import sessionmaker, Session
 from backend.database.models import (
     Base,
     Conversation,
+    Document,
     MemoryStore,
     Message,
     Run,
@@ -631,6 +632,65 @@ class DatabaseOperations:
                 query = query.filter(RuntimeCounter.key.like(f"{prefix}%"))
             rows = query.order_by(RuntimeCounter.key.asc()).all()
             return {row.key: row.value for row in rows}
+        finally:
+            session.close()
+
+    def get_observability_summary(self, recent_runs_limit: int = 8) -> Dict[str, Any]:
+        """Return a compact observability snapshot for the frontend dashboard."""
+        session = self.get_session()
+        try:
+            conversation_count = session.query(func.count(Conversation.id)).scalar() or 0
+            message_count = session.query(func.count(Message.id)).scalar() or 0
+            document_count = session.query(func.count(Document.id)).scalar() or 0
+            run_count = session.query(func.count(Run.id)).scalar() or 0
+
+            active_run_count = (
+                session.query(func.count(Run.id))
+                .filter(Run.status.in_(("queued", "running", "retrying", "cancelling")))
+                .scalar()
+                or 0
+            )
+
+            status_rows = session.query(Run.status, func.count(Run.id)).group_by(Run.status).all()
+            run_status_counts = {status: int(count) for status, count in status_rows}
+
+            average_run_latency_ms = session.execute(
+                text(
+                    """
+                    SELECT AVG(EXTRACT(EPOCH FROM (completed_at - started_at)) * 1000)
+                    FROM runs
+                    WHERE started_at IS NOT NULL
+                      AND completed_at IS NOT NULL
+                    """
+                )
+            ).scalar()
+
+            recent_runs = (
+                session.query(Run)
+                .order_by(Run.updated_at.desc(), Run.created_at.desc())
+                .limit(recent_runs_limit)
+                .all()
+            )
+
+            latest_counter_update = session.query(func.max(RuntimeCounter.updated_at)).scalar()
+
+            return {
+                "totals": {
+                    "conversations": int(conversation_count),
+                    "messages": int(message_count),
+                    "documents": int(document_count),
+                    "runs": int(run_count),
+                    "active_runs": int(active_run_count),
+                },
+                "run_status_counts": run_status_counts,
+                "recent_runs": [self._serialize_run(run) for run in recent_runs],
+                "average_run_latency_ms": (
+                    round(float(average_run_latency_ms), 1)
+                    if average_run_latency_ms is not None
+                    else None
+                ),
+                "latest_counter_update": self._to_iso(latest_counter_update),
+            }
         finally:
             session.close()
 

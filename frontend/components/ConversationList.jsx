@@ -13,14 +13,16 @@ export default function ConversationList({
 }) {
   return (
     <aside className={`panel panel-left ${isCollapsed ? "collapsed" : ""}`}>
-      <button
-        className="collapse-button"
-        type="button"
-        onClick={onToggleCollapse}
-        aria-label={isCollapsed ? "Expand conversations" : "Collapse conversations"}
-      >
-        {isCollapsed ? "⮞" : "⮜"}
-      </button>
+      {!isCollapsed ? (
+        <button
+          className="collapse-button"
+          type="button"
+          onClick={onToggleCollapse}
+          aria-label="Collapse conversations"
+        >
+          ⮜
+        </button>
+      ) : null}
 
       {!isCollapsed && (
         <>
