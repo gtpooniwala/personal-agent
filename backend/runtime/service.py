@@ -24,6 +24,7 @@ class RuntimeService:
     def __init__(self, *, orchestrator, run_store: RunStore):
         self._orchestrator = orchestrator
         self._run_store = run_store
+        self._background_tasks: set[asyncio.Task] = set()
 
     async def submit_run(self, request) -> Dict[str, str]:
         conversation_id = request.conversation_id or self._orchestrator.create_conversation()
@@ -55,7 +56,7 @@ class RuntimeService:
             update_observation(observation, output={"run_id": run.run_id, "status": run.status})
 
         # TODO(#16): Attach cancellation endpoint + worker-queue cancellation handling here.
-        asyncio.create_task(
+        task = asyncio.create_task(
             self._execute_run(
                 run_id=run.run_id,
                 conversation_id=conversation_id,
@@ -63,6 +64,8 @@ class RuntimeService:
                 selected_documents=selected_documents,
             )
         )
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
 
         return {
             "run_id": run.run_id,

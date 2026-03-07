@@ -29,6 +29,24 @@ Production/shared deployment requirement: before exposing this service beyond st
 #### POST `/chat`
 Asynchronous conversational submit endpoint.
 
+Request body:
+```json
+{
+  "message": "What's 2 + 2?",
+  "conversation_id": "optional-uuid",
+  "selected_documents": ["doc-id-1", "doc-id-2"]
+}
+```
+
+Response body:
+```json
+{
+  "run_id": "run-uuid",
+  "status": "queued",
+  "conversation_id": "generated-or-provided-uuid"
+}
+```
+
 #### POST `/runs`
 Asynchronous generic submit endpoint.
 

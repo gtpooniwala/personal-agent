@@ -249,8 +249,14 @@ export default function HomePage() {
 
       let status = null;
       let afterCursor = null;
+      let switchedConversation = false;
 
       for (let attempt = 0; attempt < RUN_POLL_MAX_ATTEMPTS; attempt += 1) {
+        if (activeConversationIdRef.current !== requestConversationId) {
+          switchedConversation = true;
+          break;
+        }
+
         status = await runtimeApiCall(`/runs/${runId}/status`);
 
         const params = new URLSearchParams({ limit: "50" });
@@ -267,6 +273,10 @@ export default function HomePage() {
         }
 
         await new Promise((resolve) => setTimeout(resolve, RUN_POLL_INTERVAL_MS));
+      }
+
+      if (switchedConversation) {
+        return;
       }
 
       if (!status || RUN_IN_PROGRESS_STATUSES.has(status.status)) {

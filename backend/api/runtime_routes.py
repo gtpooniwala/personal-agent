@@ -41,6 +41,8 @@ async def submit_run(request: ChatRequest):
 @runtime_router.get("/runs/{run_id}/status", response_model=RunStatusResponse)
 async def get_run_status(run_id: str):
     """Fetch the latest lifecycle snapshot for an asynchronous run."""
+    payload = None
+    not_found_error = None
     with observe_operation(
         name="api.runtime.run_status",
         counter_prefix="api.runtime.run_status",
@@ -49,10 +51,14 @@ async def get_run_status(run_id: str):
     ) as observation:
         try:
             payload = await runtime_service.get_run_status(run_id)
-            update_observation(observation, output={"status": payload["status"]})
-            return RunStatusResponse(**payload)
         except RunNotFoundError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
+            not_found_error = exc
+        else:
+            update_observation(observation, output={"status": payload["status"]})
+
+    if not_found_error is not None:
+        raise HTTPException(status_code=404, detail=str(not_found_error)) from not_found_error
+    return RunStatusResponse(**payload)
 
 
 @runtime_router.get("/runs/{run_id}/events", response_model=RunEventsResponse)
@@ -62,6 +68,9 @@ async def get_run_events(
     limit: int = Query(default=DEFAULT_EVENTS_LIMIT, ge=1, le=MAX_EVENTS_LIMIT),
 ):
     """Fetch an ordered page of run events using cursor-based pagination."""
+    payload = None
+    not_found_error = None
+    invalid_cursor_error = None
     with observe_operation(
         name="api.runtime.run_events",
         counter_prefix="api.runtime.run_events",
@@ -71,12 +80,18 @@ async def get_run_events(
     ) as observation:
         try:
             payload = await runtime_service.get_run_events(run_id=run_id, after=after, limit=limit)
-            update_observation(observation, output={"events_count": len(payload.get("events", []))})
-            return RunEventsResponse(**payload)
         except RunNotFoundError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
+            not_found_error = exc
         except InvalidEventsCursorError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            invalid_cursor_error = exc
+        else:
+            update_observation(observation, output={"events_count": len(payload.get("events", []))})
+
+    if not_found_error is not None:
+        raise HTTPException(status_code=404, detail=str(not_found_error)) from not_found_error
+    if invalid_cursor_error is not None:
+        raise HTTPException(status_code=400, detail=str(invalid_cursor_error)) from invalid_cursor_error
+    return RunEventsResponse(**payload)
 
 
 # TODO(#16): Attach cancellation endpoint + worker-queue cancellation handling here.
