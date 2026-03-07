@@ -1,0 +1,53 @@
+{
+  "schema_version": "1.0",
+  "suite": "gmail",
+  "description": "Gmail tool integration checks.",
+  "cases": [
+    {
+      "id": "gmail_read_latest",
+      "description": "Query for latest email should route to gmail_read and return success.",
+      "turns": [
+        {
+          "message": "What was the last email I received?"
+        }
+      ],
+      "expected": {
+        "per_turn": [
+          {
+            "must_call": [
+              "gmail_read"
+            ],
+            "must_not_call": [
+              "internet_search",
+              "calculator"
+            ],
+            "response_not_contains": [
+              "issue connecting",
+              "failed to"
+            ],
+            "response_contains_any": [
+              "Email",
+              "Subject",
+              "From",
+              "No emails found",
+              "sent",
+              "received"
+            ]
+          }
+        ],
+        "by_mode": {
+          "mock": {
+            "per_turn": [
+              {
+                "must_call": [],
+                "must_not_call": [
+                   "gmail_read"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

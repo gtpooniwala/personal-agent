@@ -37,6 +37,10 @@ venv\Scripts\activate
 # Install Python dependencies
 cd backend
 pip install -r requirements.txt
+
+# (Optional) Install Gmail integration dependencies
+# Only if you plan to use Gmail features
+pip install -r requirements-gmail.txt
 ```
 
 ### 3. Configure Environment Variables
