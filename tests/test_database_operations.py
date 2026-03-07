@@ -29,11 +29,11 @@ class TestDatabaseOperations(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
-        database_url = os.environ.get("TEST_DATABASE_URL") or os.environ.get("DATABASE_URL")
+        database_url = os.environ.get("TEST_DATABASE_URL")
         if not database_url:
-            self.skipTest("DATABASE_URL is required for database tests.")
+            self.skipTest("TEST_DATABASE_URL is required for database tests.")
         if not database_url.startswith("postgresql"):
-            self.skipTest(f"DATABASE_URL must use PostgreSQL for this suite. Got: {database_url}")
+            self.skipTest(f"TEST_DATABASE_URL must use PostgreSQL for this suite. Got: {database_url}")
 
         self.engine = create_engine(database_url)
         Base.metadata.drop_all(bind=self.engine)

@@ -97,6 +97,8 @@ cd personal-agent
 cp .env.example .env
 # Edit .env and set GEMINI_API_KEY
 # Optional observability: set LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_BASE_URL
+# `DATABASE_URL` is used for local host runtime.
+# `DATABASE_URL_DOCKER` is used by the backend container in docker compose.
 ```
 
 ### 3) Start backend + frontend
@@ -186,7 +188,7 @@ This command:
 - runs guarded unit tests (`tests/run_unit_tests.py`)
 - runs deterministic repository checks (`tests/run_repo_checks.py`)
 
-Note: for DB-backed tests, point `DATABASE_URL` to a running PostgreSQL instance.
+Note: `scripts/run_local_checks.sh` forces tests onto `TEST_DATABASE_URL` to avoid touching runtime data.
 
 Guardrails:
 - no discovered tests = non-pass

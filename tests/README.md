@@ -9,7 +9,7 @@ scripts/run_local_checks.sh
 ```
 
 This command installs backend dependencies into `.venv`, runs guarded unit tests, and then runs deterministic repository checks.
-It expects `DATABASE_URL` to point to a running PostgreSQL instance for DB-backed tests.
+By default it uses `TEST_DATABASE_URL` (or a safe PostgreSQL test DB default) for DB-backed tests.
 
 ## Run Guarded Unit Tests Only
 
