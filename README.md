@@ -37,15 +37,11 @@ flowchart LR
 
 ### Request Flow
 
-Current runtime path (today):
+Current runtime path:
 1. User sends a message from the frontend.
-2. `POST /api/v1/chat` processes the request in-request and returns the assistant response.
-
-Target runtime path (rolling out soon):
-1. `POST /chat` or `POST /runs` submits asynchronous work and returns a `run_id`.
-2. Backend worker processes run steps asynchronously (tool selection, tool execution, synthesis).
+2. `POST /chat` or `POST /runs` submits asynchronous work and returns a `run_id`.
+3. Backend worker processes run steps asynchronously (tool selection, tool execution, synthesis).
 3. Frontend polls `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events`.
-4. Legacy `POST /api/v1/chat` synchronous behavior is deprecated and will be removed.
 
 ## Implemented Capabilities
 
@@ -79,8 +75,8 @@ Contributor reference for current migration state:
   - LangGraph ReAct orchestration is the active architecture.
   - Tool routing is centralized in the orchestrator tool registry.
 - Runtime migration status:
-  - Current implementation uses `POST /api/v1/chat` synchronous request lifecycle.
-  - Next target is async `/chat` + `/runs` submission with status/events polling.
+  - Runtime submission/status/events now use async bare routes (`/chat`, `/runs`, `/runs/{run_id}/...`).
+  - `/api/v1/*` remains active for non-runtime endpoints (conversations/tools/documents/health).
 
 ## Quick Start (Docker, Recommended)
 
@@ -260,26 +256,23 @@ Base URL: `http://127.0.0.1:8000`
 Route notation:
 - Primary notation in docs: bare routes (`/chat`, `/runs`, ...)
 - Legacy compatibility notation: `/api/v1/...` (older deployments)
-- Current mainline implementation still serves routes under `/api/v1`.
-- Bare-route notation is the target runtime contract rolling out next.
+- Runtime endpoints are served as bare routes.
+- Non-runtime endpoints remain versioned under `/api/v1`.
 
 Core endpoints:
-- Current implementation:
-  - `POST /api/v1/chat` (legacy synchronous path)
-- Target migration behavior (rolling out soon):
 - `POST /runs`
 - `GET /runs/{run_id}/status`
 - `GET /runs/{run_id}/events`
 - `POST /chat`
-- `GET /conversations`
-- `POST /conversations`
-- `GET /conversations/{conversation_id}/messages`
-- `GET /tools`
-- `POST /documents/upload`
-- `GET /documents`
-- `DELETE /documents/{document_id}`
-- `POST /conversations/{conversation_id}/generate-title`
-- `GET /health`
+- `GET /api/v1/conversations`
+- `POST /api/v1/conversations`
+- `GET /api/v1/conversations/{conversation_id}/messages`
+- `GET /api/v1/tools`
+- `POST /api/v1/documents/upload`
+- `GET /api/v1/documents`
+- `DELETE /api/v1/documents/{document_id}`
+- `POST /api/v1/conversations/{conversation_id}/generate-title`
+- `GET /api/v1/health`
 
 Interactive docs:
 - Swagger UI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)

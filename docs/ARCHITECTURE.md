@@ -22,14 +22,14 @@ User Query → LangGraph Agent → Dynamic Route Decision (Graph-Based)
 
 - **Primary contract**: asynchronous run submission (`POST /runs` and `POST /chat`) plus status/events polling.
 - **Execution model**: dedicated worker processing with durable run state and event history.
-- **Compatibility**: legacy synchronous `POST /api/v1/chat` is deprecated; bare-route `/chat` remains active.
+- **Compatibility**: runtime endpoints are bare routes (`/chat`, `/runs`); non-runtime endpoints remain under `/api/v1`.
 - **Ordering model**: first implementation enforces one active run per conversation/session.
 
 This model decouples request acceptance from execution, enables retries/recovery, and prevents single long tool call from blocking the HTTP request lifecycle.
 
-Current vs soon:
-- Current implementation (today): `POST /api/v1/chat` synchronous request lifecycle.
-- Rolling out soon: async `/chat` and `/runs` runtime with status/events polling.
+Current implementation:
+- async `/chat` and `/runs` runtime with status/events polling is active.
+- conversations/tools/documents/health remain served from `/api/v1/*`.
 
 ### 2. Component Architecture
 

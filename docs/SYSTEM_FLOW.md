@@ -34,7 +34,7 @@ graph TB
 
 - `POST /chat` is an active asynchronous conversational submission path.
 - `POST /runs` is an active asynchronous general run submission path.
-- Legacy synchronous `POST /api/v1/chat` is deprecated and should be removed after migration completion.
+- Runtime routes are bare-path only; `/api/v1/*` remains for non-runtime APIs.
 
 ### High-Level Request Processing
 
