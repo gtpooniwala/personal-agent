@@ -1,0 +1,25 @@
+docs/EVENT_TRIGGERS.md
+  ea3120976fadd6d2 58-71,100-101,115-116
+docs/DEPLOYMENT.md
+  ea3120976fadd6d2 42,44,52-63,116-122,127,129,133-136,138-141,145,147,149,153-158
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "5d7d5d00a5da341d307be17ed85d088ca5a8b666",
+  "prompts": {
+    "ea3120976fadd6d2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8d953f5d-2848-4eb0-b6d8-481ca3de2b26",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 60,
+      "total_deletions": 11,
+      "accepted_lines": 60,
+      "overriden_lines": 0
+    }
+  }
+}
