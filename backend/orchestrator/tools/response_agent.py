@@ -1,9 +1,9 @@
 from langchain_core.tools import BaseTool
-from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field, PrivateAttr
 from typing import List, Dict, Any, Optional, Type
 
 from backend.llm import create_chat_model, MissingProviderKeyError, MissingModelDependencyError
+from backend.orchestrator.prompts import build_response_agent_prompt, format_conversation_history, format_tool_results
 
 class ResponseAgentInput(BaseModel):
     """Input for the Response Agent. Contains all information and tool results needed to craft the final user response.
@@ -43,16 +43,7 @@ class ResponseAgentTool(BaseTool):
         super().__init__(**kwargs)
         try:
             llm = create_chat_model("response_agent", temperature=0.3)
-            prompt = ChatPromptTemplate.from_messages([
-                (
-                    "system",
-                    "You are a helpful personal assistant. Given the user's query, tool results, and optional conversation history, craft a clear and natural final response. Do not mention tool names.",
-                ),
-                (
-                    "user",
-                    "User query:\n{user_query}\n\nConversation history:\n{conversation_history_str}\n\nTool results:\n{tool_results_str}\n\nRespond to the user directly.",
-                ),
-            ])
+            prompt = build_response_agent_prompt()
             self._chain = prompt | llm
         except (MissingProviderKeyError, MissingModelDependencyError) as exc:
             self._initialization_error = str(exc)
@@ -60,17 +51,8 @@ class ResponseAgentTool(BaseTool):
     def _run(self, user_query: str, tool_results: List[Dict[str, Any]], conversation_history: Optional[List[Dict[str, str]]] = None) -> str:
         if self._initialization_error:
             return self._initialization_error
-        # Prepare tool results as a string for the prompt
-        tool_results_str = "\n".join([
-            f"[{tr.get('tool', 'tool')}] {tr.get('output', '')}" for tr in tool_results if tr.get('output', '')
-        ]) if tool_results else ""
-        # Format conversation history for the prompt
-        if conversation_history:
-            conversation_history_str = "\n".join([
-                f"{msg.get('role', '').capitalize()}: {msg.get('content', '')}" for msg in conversation_history
-            ])
-        else:
-            conversation_history_str = "(No prior conversation history)"
+        tool_results_str = format_tool_results(tool_results)
+        conversation_history_str = format_conversation_history(conversation_history)
         inputs = {
             "user_query": user_query,
             "tool_results_str": tool_results_str,

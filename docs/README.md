@@ -7,6 +7,7 @@ Comprehensive documentation for the Personal Agent MVP - an intelligent AI assis
 ### 🏗️ **Core Architecture**
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) - System architecture and design patterns
 - [`MIGRATION_RUNTIME_ARCHITECTURE.md`](MIGRATION_RUNTIME_ARCHITECTURE.md) - Async run model migration contract and sequencing
+- [`PROMPT_ARCHITECTURE.md`](PROMPT_ARCHITECTURE.md) - Central prompt surfaces and behavioral contracts
 - [`SYSTEM_FLOW.md`](SYSTEM_FLOW.md) - Detailed system flow, logic, and decision-making processes
 - [`FEATURES_OVERVIEW.md`](FEATURES_OVERVIEW.md) - Comprehensive overview of all implemented features
 

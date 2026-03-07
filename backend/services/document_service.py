@@ -18,6 +18,7 @@ from backend.llm import (
     MissingProviderKeyError,
     MissingModelDependencyError,
 )
+from backend.orchestrator.prompts import build_document_summary_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -224,14 +225,7 @@ class DocumentProcessor:
             if len(text_content) > max_chars:
                 text_content = text_content[:max_chars] + "..."
             
-            summary_prompt = f"""Analyze the following document content and generate a single, concise sentence that summarizes what this document is about. Focus on the main topic, purpose, or subject matter.
-
-Document content:
-{text_content}
-
-Generate only one clear, informative sentence that captures the essence of this document. Do not include any additional text, quotes, or explanations.
-
-Summary:"""
+            summary_prompt = build_document_summary_prompt(text_content)
             summary = await predict_text(self.llm, summary_prompt)
             
             # Clean up the summary
@@ -479,12 +473,21 @@ Summary:"""
                 documents = query_filter.all()
                 
                 if not documents:
+                    selected_count = len(selected_documents or [])
+                    if selected_count > 0:
+                        context_message = (
+                            f"{selected_count} document reference(s) are selected, but processed document metadata "
+                            "is unavailable. Document search may still be attempted if the selected IDs are valid."
+                        )
+                    else:
+                        context_message = "No documents are currently available for search."
                     return {
                         "has_documents": False,
                         "document_count": 0,
+                        "selected_count": selected_count,
                         "total_chunks": 0,
                         "document_summaries": [],
-                        "context_message": "No documents are currently available for search."
+                        "context_message": context_message,
                     }
                 
                 # Collect document information
@@ -510,6 +513,7 @@ Summary:"""
                 return {
                     "has_documents": True,
                     "document_count": len(documents),
+                    "selected_count": len(selected_documents or []),
                     "total_chunks": total_chunks,
                     "document_summaries": document_summaries,
                     "context_message": context_message
@@ -523,6 +527,7 @@ Summary:"""
             return {
                 "has_documents": False,
                 "document_count": 0,
+                "selected_count": len(selected_documents or []),
                 "total_chunks": 0,
                 "document_summaries": [],
                 "context_message": "Error retrieving document information."

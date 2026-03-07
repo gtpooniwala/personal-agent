@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     # Feature flags
     enable_internet_search: bool = True
     enable_document_qa: bool = True
-    enable_gmail_integration: bool = False
+    enable_gmail_integration: bool = True
     enable_calendar_integration: bool = False
 
     # Performance settings

@@ -25,7 +25,7 @@ The Gmail Tool provides robust integration with Gmail, enabling the agent to sea
 - Returns formatted results for agent and user
 
 ## Setup Requirements
-- `ENABLE_GMAIL_INTEGRATION=true` in your `.env` file.
+- Gmail integration is enabled by default. Set `ENABLE_GMAIL_INTEGRATION=false` in your `.env` file if you want to hide it.
 - **Dependencies**: Install Gmail-specific dependencies:
   ```bash
   pip install -r backend/requirements-gmail.txt
@@ -48,7 +48,7 @@ The Gmail Tool provides robust integration with Gmail, enabling the agent to sea
 ## Limitations
 - Only read/search is implemented (no send/compose yet)
 - Requires user to complete OAuth flow on first use
-- Tool is hidden from active tool list unless integration is configured and ready
+- Tool is hidden from the active tool list unless dependencies, credentials, and token/auth readiness checks pass
 
 ## References
 - See [`README.md`](../../README.md) and [`AGENT.md`](../../AGENT.md) for user and workflow documentation
