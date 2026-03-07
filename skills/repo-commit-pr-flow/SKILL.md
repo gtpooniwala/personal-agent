@@ -25,6 +25,8 @@ Use this skill when changes are ready to commit, push, or publish as a PR.
 2. Validate before commit.
 - Run relevant tests/checks for changed scope.
 - Ensure no policy-violating files are included.
+- Use `cubic cli` and `cubic mcp` to review changes against the base branch (e.g., `cubic review --base main` or `cubic review --base` for auto-detect). This step assumes your `cubic` setup can see staged/uncommitted changes; if it only reviews committed diffs between branches, run `cubic review` after step 3 (Commit) instead.
+- Address any issues found by `cubic` and re-run until no issues remain.
 
 3. Commit.
 - Use clear, imperative commit messages.
@@ -43,6 +45,7 @@ Use this skill when changes are ready to commit, push, or publish as a PR.
 - Required checks are green:
   - `CI / tests-and-repo-checks`
   - `PR Policy / enforce-pr-policy`
+- Local validation: Automated Code Review (`cubic review --base main`) has been run and passed with no issues (this is a local check, not a PR status check).
 - Branch is up to date with `origin/main`.
 - Merge method remains squash-and-merge.
 
