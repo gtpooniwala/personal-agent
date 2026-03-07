@@ -13,9 +13,15 @@ EXIT_SKIP_ONLY = 3
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run unittest discovery with guardrails.")
-    parser.add_argument("--start-dir", default="tests", help="Discovery start directory.")
-    parser.add_argument("--pattern", default="test_*.py", help="Discovery filename pattern.")
+    parser = argparse.ArgumentParser(
+        description="Run unittest discovery with guardrails."
+    )
+    parser.add_argument(
+        "--start-dir", default="tests", help="Discovery start directory."
+    )
+    parser.add_argument(
+        "--pattern", default="test_*.py", help="Discovery filename pattern."
+    )
     parser.add_argument(
         "--top-level-dir",
         default=None,
@@ -41,6 +47,15 @@ def determine_exit_code(discovered: int, executed: int, successful: bool) -> int
 
 
 def main() -> int:
+    # Configure warnings for test runs
+    try:
+        from backend.config.warnings_shim import configure_warnings
+
+        configure_warnings()
+        print("Warnings configured successfully.")
+    except ImportError as e:
+        print(f"Failed to configure warnings: {e}")
+
     args = parse_args()
     loader = unittest.TestLoader()
     discover_kwargs = {

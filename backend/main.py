@@ -1,6 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+
+# Configure warnings early to suppress known upstream issues
+from backend.config.warnings_shim import configure_warnings
+
+configure_warnings()
+
 from backend.api.routes import router as versioned_router
 from backend.api.runtime_routes import runtime_router
 from backend.api.scheduler_routes import scheduler_router
@@ -25,6 +31,7 @@ def _safe_database_url() -> str:
     except Exception:
         return "<invalid DATABASE_URL>"
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
@@ -33,10 +40,13 @@ async def lifespan(app: FastAPI):
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Database URL: {_safe_database_url()}")
     if not settings.gemini_api_key and not settings.openai_api_key:
-        raise RuntimeError("Either GEMINI_API_KEY or OPENAI_API_KEY must be configured.")
+        raise RuntimeError(
+            "Either GEMINI_API_KEY or OPENAI_API_KEY must be configured."
+        )
     langfuse_manager.initialize()
 
     from backend.api.state import heartbeat_service, scheduler_service
+
     await heartbeat_service.start()
     await scheduler_service.start()
 
@@ -48,16 +58,19 @@ async def lifespan(app: FastAPI):
     await heartbeat_service.stop()
     langfuse_manager.shutdown()
 
+
 # Create FastAPI app
 app = FastAPI(
     title="Personal Agent API",
     description="LangChain-powered personal assistant API",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Add CORS middleware for frontend
-raw_origins = [origin.strip() for origin in settings.allowed_origins.split(",") if origin.strip()]
+raw_origins = [
+    origin.strip() for origin in settings.allowed_origins.split(",") if origin.strip()
+]
 allow_origins = raw_origins or ["*"]
 allow_credentials = allow_origins != ["*"]
 
@@ -106,6 +119,7 @@ async def request_context_middleware(request, call_next):
         )
         return response
 
+
 # Include API routes
 app.include_router(versioned_router, prefix="/api/v1")
 app.include_router(runtime_router)
@@ -120,5 +134,5 @@ if __name__ == "__main__":
         host=settings.api_host,
         port=settings.api_port,
         reload=True if settings.environment == "local" else False,
-        log_level=settings.log_level.lower()
+        log_level=settings.log_level.lower(),
     )
