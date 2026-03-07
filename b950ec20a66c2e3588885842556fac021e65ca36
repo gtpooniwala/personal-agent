@@ -1,0 +1,25 @@
+docker-compose.yml
+  51872a1b02d6bf75 35
+.github/workflows/ci.yml
+  51872a1b02d6bf75 87,140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "b950ec20a66c2e3588885842556fac021e65ca36",
+  "prompts": {
+    "51872a1b02d6bf75": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b6d6515f-9f33-4a42-9afc-c2a288a5b0e1",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 3,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
