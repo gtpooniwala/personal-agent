@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import replace
+from datetime import datetime
 from threading import RLock
 from typing import Dict, List, Optional, Sequence, Tuple
 from uuid import uuid4
@@ -220,6 +221,163 @@ class SqliteRunStorePlaceholder(RunStore):
 
     def list_events(self, *, run_id: str, after: Optional[str], limit: int) -> Tuple[List[RunEventRecord], Optional[str], bool]:
         raise NotImplementedError("Durable SQLite run store will land with issue #15 schema work")
+
+
+class DbRunStore(RunStore):
+    """Database-backed run store using durable persistence."""
+
+    def __init__(self):
+        from backend.database.operations import db_ops
+        self._db_ops = db_ops
+
+    def create_run(self, *, conversation_id: str, message: str, selected_documents: Sequence[str]) -> RunRecord:
+        db_record = self._db_ops.create_run(conversation_id=conversation_id)
+        return RunRecord(
+            run_id=str(db_record["id"]),
+            conversation_id=db_record["conversation_id"],
+            status=db_record["status"],
+            message=message,
+            selected_documents=tuple(selected_documents),
+            created_at=self._parse_iso(db_record["created_at"]),
+            updated_at=self._parse_iso(db_record["updated_at"]),
+            error=db_record["error"],
+            result=db_record["result"],
+        )
+
+    def get_run(self, run_id: str) -> RunRecord:
+        if not run_id or not isinstance(run_id, str):
+            raise RunNotFoundError(f"Invalid run_id: {run_id!r}")
+        db_record = self._db_ops.get_run(run_id)
+        if db_record is None:
+            raise RunNotFoundError(f"Run '{run_id}' was not found")
+        return RunRecord(
+            run_id=str(db_record["id"]),
+            conversation_id=db_record["conversation_id"],
+            status=db_record["status"],
+            # TODO: Store message and selected_documents in DB (requires schema change).
+            # Currently only available at creation time via create_run return value.
+            message="",
+            selected_documents=tuple(),
+            created_at=self._parse_iso(db_record["created_at"]),
+            updated_at=self._parse_iso(db_record["updated_at"]),
+            error=db_record["error"],
+            result=db_record["result"],
+        )
+
+    def update_run(
+        self,
+        *,
+        run_id: str,
+        status: str,
+        error: Optional[str] = _UNSET,
+        result: Optional[str] = _UNSET,
+    ) -> RunRecord:
+        # Build kwargs for db_ops, only including explicitly-set fields
+        update_kwargs = {"run_id": run_id, "status": status}
+        if error is not _UNSET:
+            update_kwargs["error"] = error
+        if result is not _UNSET:
+            update_kwargs["result"] = result
+
+        db_record = self._db_ops.update_run(**update_kwargs)
+        if db_record is None:
+            raise RunNotFoundError(f"Run '{run_id}' was not found")
+        return RunRecord(
+            run_id=str(db_record["id"]),
+            conversation_id=db_record["conversation_id"],
+            status=db_record["status"],
+            message="",
+            selected_documents=tuple(),
+            created_at=self._parse_iso(db_record["created_at"]),
+            updated_at=self._parse_iso(db_record["updated_at"]),
+            error=db_record["error"],
+            result=db_record["result"],
+        )
+
+    def append_event(
+        self,
+        *,
+        run_id: str,
+        event_type: str,
+        status: str,
+        message: str,
+        tool: Optional[str] = None,
+    ) -> RunEventRecord:
+        # Verify run exists before appending event
+        if not self._db_ops.get_run(run_id):
+            raise RunNotFoundError(f"Run '{run_id}' was not found")
+
+        db_event = self._db_ops.append_run_event(
+            run_id=run_id,
+            event_type=event_type,
+            status=status,
+            message=message,
+            tool=tool,
+        )
+        return RunEventRecord(
+            event_id=str(db_event["id"]),
+            run_id=db_event["run_id"],
+            type=db_event["type"],
+            status=db_event["status"],
+            message=db_event["message"],
+            created_at=self._parse_iso(db_event["created_at"]),
+            tool=db_event.get("tool"),
+        )
+
+    def list_events(
+        self,
+        *,
+        run_id: str,
+        after: Optional[str],
+        limit: int,
+    ) -> Tuple[List[RunEventRecord], Optional[str], bool]:
+        # Verify run exists before listing events
+        if not self._db_ops.get_run(run_id):
+            raise RunNotFoundError(f"Run '{run_id}' was not found")
+
+        after_event_id = None
+        if after is not None:
+            try:
+                after_event_id = int(after)
+            except ValueError as exc:
+                raise InvalidEventsCursorError("Invalid events cursor") from exc
+
+        # Fetch one extra to determine if there are more events
+        db_events = self._db_ops.list_run_events(run_id=run_id, after_event_id=after_event_id, limit=limit + 1)
+
+        # Determine if there are more events beyond the requested limit
+        has_more = len(db_events) > limit
+
+        # Trim to requested limit
+        db_events = db_events[:limit]
+
+        events = [
+            RunEventRecord(
+                event_id=str(event["id"]),
+                run_id=event["run_id"],
+                type=event["type"],
+                status=event["status"],
+                message=event["message"],
+                created_at=self._parse_iso(event["created_at"]),
+                tool=event.get("tool"),
+            )
+            for event in db_events
+        ]
+
+        next_after = events[-1].event_id if events else after
+        return events, next_after, has_more
+
+    @staticmethod
+    def _parse_iso(iso_str: Optional[str]) -> Optional[datetime]:
+        if iso_str is None:
+            return None
+        # Parse ISO format string, handling both Z and +00:00 suffixes
+        try:
+            if iso_str.endswith('Z'):
+                iso_str = iso_str[:-1] + '+00:00'
+            return datetime.fromisoformat(iso_str)
+        except ValueError as exc:
+            raise ValueError(f"Failed to parse ISO datetime: {iso_str!r}") from exc
 
 
 class PostgresRunStorePlaceholder(RunStore):
