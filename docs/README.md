@@ -16,6 +16,7 @@ Comprehensive documentation for the Personal Agent MVP - an intelligent AI assis
 - [`DEVELOPMENT_GUIDE.md`](DEVELOPMENT_GUIDE.md) - Development workflow and guidelines
 - [`../AGENT.md`](../AGENT.md) - AI coding agent workflow contract
 - [`ENGINEERING_WORKFLOW.md`](ENGINEERING_WORKFLOW.md) - Branch/worktree/PR/merge policy for Codex + Claude
+- [`ISSUE_MANAGEMENT.md`](ISSUE_MANAGEMENT.md) - Issue taxonomy, templates, and labeling contract
 - [`API.md`](API.md) - API reference and endpoint documentation
 - [`TESTING.md`](TESTING.md) - Testing framework and guidelines
 

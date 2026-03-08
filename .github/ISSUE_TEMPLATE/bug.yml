@@ -1,0 +1,106 @@
+name: Bug report
+description: Report broken behavior, a regression, or a correctness issue
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+      description: What is happening now?
+      placeholder: Describe the broken behavior clearly.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should happen instead?
+      placeholder: Describe the expected result.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction or evidence
+      description: Steps, logs, screenshots, or other evidence.
+      placeholder: Include the smallest reliable reproduction you have.
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Who or what is affected?
+      placeholder: Note severity, affected flows, and any workarounds.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: primary_type
+    attributes:
+      label: Primary type label
+      options:
+        - type:architecture
+        - type:security
+        - type:cleanup
+        - type:improvement
+        - type:ops
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: additional_types
+    attributes:
+      label: Additional type labels
+      description: Optional. Select only if the issue clearly spans another concern.
+      options:
+        - label: type:architecture
+        - label: type:security
+        - label: type:cleanup
+        - label: type:improvement
+        - label: type:ops
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - priority:p0
+        - priority:p1
+        - priority:p2
+        - priority:p3
+    validations:
+      required: true
+
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size
+      options:
+        - size:S
+        - size:M
+        - size:L
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: tracks
+    attributes:
+      label: Track labels
+      description: Select only for durable multi-issue initiatives.
+      options:
+        - label: track:migration
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: What would make this issue done?
+      placeholder: Use bullet points for clear, testable completion criteria.
+    validations:
+      required: true

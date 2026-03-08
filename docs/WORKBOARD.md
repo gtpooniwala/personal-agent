@@ -97,6 +97,7 @@ Workflow:
 - Keep items small enough to land in one commit when possible.
 - Prefer one GitHub issue per item, linked directly above.
 - Status source of truth for execution tracking is this file + [`ROADMAP.md`](ROADMAP.md).
+- Issue taxonomy and issue-creation rules live in [`ISSUE_MANAGEMENT.md`](ISSUE_MANAGEMENT.md).
 - Deprecated status docs removed: `PROJECT_STATUS.md` and `SUGGESTED_CHANGES.md`.
 - Milestone alignment:
 - `01 Foundation Hardening`: #7-#13, #40

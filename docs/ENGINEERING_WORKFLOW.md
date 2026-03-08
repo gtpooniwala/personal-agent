@@ -1,6 +1,6 @@
 # Engineering Workflow
 
-Last updated: March 6, 2026
+Last updated: March 8, 2026
 
 ## Goals
 - No direct commits to `main`
@@ -43,6 +43,14 @@ scripts/sync_main.sh
 - Do not merge until:
   - Required CI checks pass
   - Approval is provided per repo settings
+
+## Issue Rules
+- GitHub issues are the source of truth for individual work items.
+- Follow [`ISSUE_MANAGEMENT.md`](ISSUE_MANAGEMENT.md) for issue shape, label taxonomy, and lifecycle rules.
+- Prefer one issue per shippable slice; use tracker issues only for intentionally decomposed multi-PR programs.
+- Use the GitHub issue forms under [`.github/ISSUE_TEMPLATE`](../.github/ISSUE_TEMPLATE) for new issues.
+- Managed issue labels (`priority:*`, `size:*`, `type:*`, `track:*`) are synchronized from issue-form fields by [`.github/workflows/issue_label_sync.yml`](../.github/workflows/issue_label_sync.yml).
+- Keep `WORKBOARD.md` aligned with active execution state and `ROADMAP.md` aligned with grouped planning work.
 
 ## Solo Maintainer Note
 - GitHub does not count self-approval as an approving review in the usual protected-branch flow.
@@ -88,6 +96,7 @@ scripts/sync_skills.sh
 - Sync from repository to runtime with `scripts/sync_skills.sh`.
 - Current workflow skills:
   - `repo-workflow-env`: branch/worktree creation and rebase checkpoints
+  - `repo-issue-flow`: issue creation, body normalization, and labeling
   - `repo-commit-pr-flow`: commit slicing, push/PR workflow, final checklist
   - `gh-address-comments`: triage and resolve PR comments/threads
   - `gh-fix-ci`: investigate and fix failing GitHub Actions checks

@@ -25,6 +25,8 @@ Canonical workflow contract for AI coding agents in this repository.
 11. Keep `#59` as the permanent workflow-improvements tracker:
    - Never close issue `#59`.
    - Workflow/process policy PRs should include `Refs #59` in the PR body.
+12. Follow [`docs/ISSUE_MANAGEMENT.md`](docs/ISSUE_MANAGEMENT.md) when creating or relabeling issues.
+13. For issue-creation or triage tasks, apply `repo-issue-flow`.
 
 ## Required Checks
 - `CI / tests-and-repo-checks`

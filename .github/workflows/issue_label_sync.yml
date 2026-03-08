@@ -1,0 +1,144 @@
+name: Issue Label Sync
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync-issue-labels:
+    name: sync-issue-labels
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync managed labels from issue form fields
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const body = (issue.body || "").replace(/\r\n/g, "\n");
+
+            function escapeRegExp(value) {
+              return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            }
+
+            function getSection(title) {
+              const pattern = new RegExp(
+                `(?:^|\\n)### ${escapeRegExp(title)}\\n([\\s\\S]*?)(?=\\n### |$)`
+              );
+              const match = body.match(pattern);
+              return match ? match[1].trim() : "";
+            }
+
+            function getSingleValue(title) {
+              const section = getSection(title);
+              if (!section || section === "_No response_") {
+                return null;
+              }
+              const line = section
+                .split("\n")
+                .map((entry) => entry.trim())
+                .find((entry) => entry.length > 0 && entry !== "_No response_");
+              return line || null;
+            }
+
+            function getCheckedValues(title) {
+              const section = getSection(title);
+              if (!section) {
+                return [];
+              }
+              return Array.from(section.matchAll(/^- \[x\] (.+)$/gim), (match) => match[1].trim());
+            }
+
+            const managedPrefixes = ["priority:", "size:", "type:", "track:"];
+            const managedLabels = new Set([
+              "priority:p0",
+              "priority:p1",
+              "priority:p2",
+              "priority:p3",
+              "size:S",
+              "size:M",
+              "size:L",
+              "type:architecture",
+              "type:security",
+              "type:cleanup",
+              "type:improvement",
+              "type:ops",
+              "track:migration",
+            ]);
+            const currentLabels = (
+              await github.paginate(github.rest.issues.listLabelsOnIssue, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                per_page: 100,
+              })
+            ).map((label) => label.name);
+
+            const desiredLabels = new Set();
+
+            const priority = getSingleValue("Priority");
+            const size = getSingleValue("Size");
+            const primaryType = getSingleValue("Primary type label");
+            const additionalTypes = getCheckedValues("Additional type labels");
+            const tracks = getCheckedValues("Track labels");
+
+            const hasManagedFormFields = Boolean(
+              priority ||
+              size ||
+              primaryType ||
+              additionalTypes.length > 0 ||
+              tracks.length > 0
+            );
+
+            if (!hasManagedFormFields) {
+              core.info("Issue body does not contain managed issue-form fields. Skipping label sync.");
+              return;
+            }
+
+            function addManagedLabel(value) {
+              if (!value) {
+                return;
+              }
+
+              if (managedLabels.has(value)) {
+                desiredLabels.add(value);
+                return;
+              }
+
+              core.warning(`Ignoring unknown managed label value: ${value}`);
+            }
+
+            for (const value of [priority, size, primaryType]) {
+              addManagedLabel(value);
+            }
+
+            for (const value of [...additionalTypes, ...tracks]) {
+              addManagedLabel(value);
+            }
+
+            const labelsToRemove = currentLabels.filter(
+              (label) =>
+                managedPrefixes.some((prefix) => label.startsWith(prefix)) && !desiredLabels.has(label)
+            );
+            const labelsToAdd = Array.from(desiredLabels).filter((label) => !currentLabels.includes(label));
+
+            for (const label of labelsToRemove) {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                name: label,
+              });
+            }
+
+            if (labelsToAdd.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: labelsToAdd,
+              });
+            }
