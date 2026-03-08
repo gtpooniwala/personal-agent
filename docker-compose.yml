@@ -29,8 +29,8 @@ services:
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      GMAIL_CREDENTIALS_PATH: /app/data/gmail/client_secret.json
-      GMAIL_TOKEN_PATH: /app/data/gmail/token.pickle
+      GMAIL_CREDENTIALS_PATH: ${GMAIL_CREDENTIALS_PATH:-/app/data/gmail/client_secret.json}
+      GMAIL_TOKEN_PATH: ${GMAIL_TOKEN_PATH:-/app/data/gmail/token.pickle}
       DATABASE_URL: ${DATABASE_URL_DOCKER:-postgresql+psycopg://personal_agent:personal_agent@postgres:5432/personal_agent}
       HOST: 0.0.0.0
       PORT: ${PORT:-8000}
