@@ -110,22 +110,26 @@ jobs:
               addManagedLabel(value);
             }
 
-            const nonManagedLabels = currentLabels.filter(
-              (label) => !managedPrefixes.some((prefix) => label.startsWith(prefix))
+            const labelsToRemove = currentLabels.filter(
+              (label) =>
+                managedPrefixes.some((prefix) => label.startsWith(prefix)) && !desiredLabels.has(label)
             );
-            const finalLabels = [...nonManagedLabels, ...desiredLabels];
-            const currentLabelSet = new Set(currentLabels);
-            const finalLabelSet = new Set(finalLabels);
-            const labelsChanged =
-              currentLabelSet.size !== finalLabelSet.size ||
-              currentLabels.some((label) => !finalLabelSet.has(label)) ||
-              finalLabels.some((label) => !currentLabelSet.has(label));
+            const labelsToAdd = Array.from(desiredLabels).filter((label) => !currentLabels.includes(label));
 
-            if (labelsChanged) {
-              await github.rest.issues.setLabels({
+            for (const label of labelsToRemove) {
+              await github.rest.issues.removeLabel({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issue.number,
-                labels: finalLabels,
+                name: label,
+              });
+            }
+
+            if (labelsToAdd.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: labelsToAdd,
               });
             }
