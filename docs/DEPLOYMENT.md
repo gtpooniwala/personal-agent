@@ -1,8 +1,12 @@
 # GCP Deployment Architecture
 
-Last updated: March 7, 2026
+Last updated: March 8, 2026
 
 This document is the architecture decision record (ADR) and deployment plan for moving from local Docker Compose to Google Cloud Platform (GCP) for personal cloud use.
+
+Current status:
+- this is still a planning ADR, not a record of completed cloud rollout work,
+- issue [#81](https://github.com/gtpooniwala/personal-agent/issues/81) remains open specifically so this document can stay current as decisions are finalized.
 
 ---
 
@@ -18,6 +22,7 @@ Limitations:
 - Local `./data` volume is local-only and not backed up (data loss risk)
 - No auth; exposed to anyone on the network
 - No CI/CD deploy path
+- Runtime automation primitives exist locally, but external trigger and deployment behavior are not yet productionized
 
 ---
 
@@ -170,14 +175,15 @@ The event trigger framework design depends on this choice. If scale-to-zero is p
 
 ## Deployment Plan (Ordered)
 
-1. **Cloud SQL** (#80) — provision instance, migrate schema, update `DATABASE_URL`
-2. **Secret Manager** (#82) — migrate all secrets, update Cloud Run service account
-3. **GCS** (#79) — create bucket, update backend file-handling code (tracked separately)
-4. **Backend Cloud Run** (#85) — deploy FastAPI service, wire Cloud SQL + secrets
-5. **Frontend Cloud Run** (#85) — deploy Next.js service, point at backend URL
-6. **IAP** (#83) — enable on backend service, allowlist Google account
-7. **CI/CD** (#86) — add GitHub Actions workflow to build and deploy on merge to main
-8. **Custom domain** (optional) — configure Cloud Run domain mapping
+1. **Keep the ADR current** (#81) — resolve remaining frontend hosting and auth boundary decisions
+2. **Cloud SQL** (#80) — provision instance, migrate schema, update `DATABASE_URL`
+3. **Secret Manager** (#82) — migrate all secrets, update Cloud Run service account
+4. **GCS** (#79) — create bucket, update backend file-handling code
+5. **Backend and frontend Cloud Run services** (#85)
+6. **IAP** (#83) — enable authentication boundary for personal cloud access
+7. **CI/CD** (#86) — build and deploy on merge to `main`
+8. **Cold-start tuning** (#87) — optimize once the baseline deployment exists
+9. **Custom domain** (optional)
 
 ---
 
