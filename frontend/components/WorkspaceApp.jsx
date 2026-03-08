@@ -103,6 +103,14 @@ function mergeRunEvents(previousEvents, nextEvents) {
   return merged.slice(-MAX_VISIBLE_RUN_EVENTS);
 }
 
+function readConversationIdFromLocation() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return new URLSearchParams(window.location.search).get("conversation");
+}
+
 function sleep(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
@@ -141,6 +149,7 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
   const appRootRef = useRef(null);
   const fileInputRef = useRef(null);
   const messageInputRef = useRef(null);
+  const focusAnimationFrameRef = useRef(null);
   const activeConversationIdRef = useRef(null);
   const latestConversationsRequestRef = useRef(0);
   const latestMessagesRequestRef = useRef(0);
@@ -175,9 +184,14 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
     }
 
     input.focus({ preventScroll: true });
-    const cursorPosition = input.value.length;
-    requestAnimationFrame(() => {
+    if (focusAnimationFrameRef.current !== null) {
+      cancelAnimationFrame(focusAnimationFrameRef.current);
+    }
+
+    focusAnimationFrameRef.current = requestAnimationFrame(() => {
+      focusAnimationFrameRef.current = null;
       if (document.activeElement === input && typeof input.setSelectionRange === "function") {
+        const cursorPosition = input.value.length;
         input.setSelectionRange(cursorPosition, cursorPosition);
       }
     });
@@ -675,8 +689,13 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
   );
 
   useEffect(() => {
+    const preferredConversationId = initialConversationId || readConversationIdFromLocation();
+    if (preferredConversationId) {
+      setCurrentConversationId(preferredConversationId);
+    }
+
     void loadTools();
-    void loadConversations(initialConversationId);
+    void loadConversations(preferredConversationId);
     void loadDocuments();
   }, [initialConversationId, loadConversations, loadDocuments, loadTools]);
 
@@ -769,6 +788,10 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
 
   useEffect(() => {
     return () => {
+      if (focusAnimationFrameRef.current !== null) {
+        cancelAnimationFrame(focusAnimationFrameRef.current);
+      }
+
       if (uploadResetTimerRef.current) {
         clearTimeout(uploadResetTimerRef.current);
       }
@@ -896,6 +919,7 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
         <MetricsDashboard currentConversationId={currentConversationId} />
       ) : (
         <ChatPanel
+          ref={messageInputRef}
           currentView={view}
           currentConversationId={currentConversationId}
           currentConversationTitle={currentConversation?.title || ""}
@@ -908,7 +932,6 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
           onChangeMessage={setMessageInput}
           onSendMessage={sendMessage}
           onFocusComposer={focusComposer}
-          messageInputRef={messageInputRef}
         />
       )}
 

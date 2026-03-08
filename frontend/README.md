@@ -4,7 +4,7 @@ This frontend is a Next.js App Router migration of the previous static SPA.
 
 ## Requirements
 
-- Node.js 18.17+
+- Node.js 20.9+
 - Backend running on `http://127.0.0.1:8000`
 
 ## Environment

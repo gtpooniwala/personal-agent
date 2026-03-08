@@ -30,12 +30,12 @@ pip install -r backend/requirements.txt
 # Install frontend dependencies
 if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
     echo "❌ Node.js/npm is required for the Next.js frontend but was not found."
-    echo "Install Node.js 18.17+ and run: cd frontend && npm install"
+    echo "Install Node.js 20.9+ and run: cd frontend && npm install"
     exit 1
 fi
 
-if ! node -e "const [major, minor] = process.versions.node.split('.').map(Number); process.exit(major > 18 || (major === 18 && minor >= 17) ? 0 : 1)"; then
-    echo "❌ Node.js 18.17+ is required for the Next.js frontend."
+if ! node -e "const [major, minor] = process.versions.node.split('.').map(Number); process.exit(major > 20 || (major === 20 && minor >= 9) ? 0 : 1)"; then
+    echo "❌ Node.js 20.9+ is required for the Next.js frontend."
     echo "Detected: $(node -v)"
     exit 1
 fi

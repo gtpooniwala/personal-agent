@@ -147,7 +147,7 @@ Use this only when you need local debugging outside containers.
 ### Prerequisites
 
 - Python 3.11+
-- Node.js 18.17+
+- Node.js 20.9+
 
 ### Backend (debug)
 
