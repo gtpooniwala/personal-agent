@@ -5,7 +5,7 @@ import sys
 import os
 import asyncio
 import unittest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch, MagicMock
 
 # Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -200,6 +200,72 @@ class TestCoreOrchestrator(unittest.TestCase):
         )
         self.assertIn("selected for this conversation", status)
         self.assertIn("use search_documents", status.lower())
+
+    def test_process_request_uses_isolated_registry_per_run(self):
+        """
+        Concurrent calls to process_request must not share tool registry state.
+
+        Each call must build its own ToolRegistry so that selected_documents from
+        one run cannot leak into another run that uses different documents.
+        """
+        captured_registries = []
+
+        original_build = self.orchestrator._build_orchestrator_agent
+
+        def capturing_build(conversation_id, tool_registry):
+            captured_registries.append(tool_registry)
+            # Return a minimal mock agent that mimics the LangGraph interface
+            mock_agent = MagicMock()
+            mock_agent.invoke.return_value = {"messages": []}
+            return mock_agent
+
+        docs_a = ["doc-a"]
+        docs_b = ["doc-b"]
+
+        with patch.object(self.orchestrator, '_build_orchestrator_agent', side_effect=capturing_build), \
+             patch.object(self.orchestrator, '_ensure_llm'), \
+             patch('backend.orchestrator.core.db_ops') as mock_db_ops, \
+             patch('backend.orchestrator.core.observe_operation') as mock_obs:
+            mock_obs.return_value.__enter__ = Mock(return_value=None)
+            mock_obs.return_value.__exit__ = Mock(return_value=False)
+            mock_db_ops.get_conversation_history.return_value = []
+            mock_db_ops.save_message.return_value = None
+
+            asyncio.run(self.orchestrator.process_request(
+                "hello from A", "conv-a", selected_documents=docs_a
+            ))
+            asyncio.run(self.orchestrator.process_request(
+                "hello from B", "conv-b", selected_documents=docs_b
+            ))
+
+        self.assertEqual(len(captured_registries), 2)
+        self.assertIsNot(captured_registries[0], captured_registries[1],
+                         "Each run must receive a distinct ToolRegistry instance")
+        self.assertEqual(captured_registries[0].selected_documents, docs_a)
+        self.assertEqual(captured_registries[1].selected_documents, docs_b)
+
+    def test_process_request_does_not_store_agent_on_self(self):
+        """process_request must not write orchestrator_agent back to self."""
+        with patch.object(self.orchestrator, '_build_orchestrator_agent') as mock_build, \
+             patch.object(self.orchestrator, '_ensure_llm'), \
+             patch('backend.orchestrator.core.db_ops') as mock_db_ops, \
+             patch('backend.orchestrator.core.observe_operation') as mock_obs:
+            mock_obs.return_value.__enter__ = Mock(return_value=None)
+            mock_obs.return_value.__exit__ = Mock(return_value=False)
+            mock_db_ops.get_conversation_history.return_value = []
+            mock_db_ops.save_message.return_value = None
+            mock_agent = MagicMock()
+            mock_agent.invoke.return_value = {"messages": []}
+            mock_build.return_value = mock_agent
+
+            asyncio.run(self.orchestrator.process_request(
+                "test", "conv-x", selected_documents=[]
+            ))
+
+        self.assertFalse(hasattr(self.orchestrator, 'orchestrator_agent'),
+                         "orchestrator_agent must not be stored as instance state")
+        self.assertFalse(hasattr(self.orchestrator, 'current_conversation_id'),
+                         "current_conversation_id must not be stored as instance state")
 
 
 if __name__ == '__main__':

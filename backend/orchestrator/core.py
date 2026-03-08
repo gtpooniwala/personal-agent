@@ -51,10 +51,7 @@ class CoreOrchestrator:
     def __init__(self, user_id: str = "default"):
         self.user_id = user_id
         self.llm = None
-        self.tool_registry = ToolRegistry(user_id)
-        self.current_conversation_id = None
-        self.current_memory = None
-        self.orchestrator_agent = None
+        self.tool_registry = ToolRegistry(user_id)  # used only for static tool listing
     
     def _setup_llm(self):
         """Setup the language model for the orchestrator."""
@@ -68,43 +65,22 @@ class CoreOrchestrator:
         if self.llm is None:
             self.llm = self._setup_llm()
     
-    def _setup_orchestrator_agent(self, conversation_id: str, force_refresh: bool = False):
+    def _build_orchestrator_agent(self, conversation_id: str, tool_registry: ToolRegistry):
         """
-        Setup the LangGraph ReAct agent that serves as the orchestrator's decision-making brain.
-        
-        This agent is responsible for:
-        - Understanding user intent
-        - Deciding which tools/agents to use
-        - Coordinating multi-tool workflows
-        - Providing natural language responses
-        
-        Uses LangGraph's create_react_agent which automatically handles tool descriptions
-        and provides better state management than legacy AgentExecutor.
+        Build and return a fresh LangGraph ReAct agent for a single run.
+
+        Creating a new agent per run guarantees that concurrent runs for different
+        conversations cannot overwrite each other's tool context or agent state.
         """
-        if self.current_conversation_id == conversation_id and self.orchestrator_agent and not force_refresh:
-            return  # Already setup for this conversation
-        
-        self.current_conversation_id = conversation_id
-        
-        # Get available tools from the registry (no need for manual tool descriptions!)
-        available_tools = self.tool_registry.get_available_tools()
-
-        # Get document context to inform the agent about document availability
-        document_context = self._get_document_context()
-
-        # Default system prompt (always included)
+        available_tools = tool_registry.get_available_tools()
+        document_context = self._get_document_context(tool_registry)
         system_prompt = build_orchestrator_system_prompt(self._format_document_status(document_context))
-
-        # Create memory saver for this conversation
-        memory = MemorySaver()
-        
         self._ensure_llm()
-        # Create LangGraph ReAct agent with automatic tool binding
-        self.orchestrator_agent = create_react_agent(
+        return create_react_agent(
             model=self.llm,
             tools=available_tools,
             prompt=system_prompt,
-            checkpointer=memory  # Provides persistent conversation memory
+            checkpointer=MemorySaver(),
         )
     
     def get_condensed_conversation_history(self, conversation_id: str) -> list:
@@ -203,14 +179,10 @@ class CoreOrchestrator:
         ) as operation_observation:
             try:
                 self._ensure_llm()
-                # Update tool registry with selected documents if provided
-                if selected_documents is not None:
-                    self.tool_registry.update_selected_documents(selected_documents)
-                    # Force agent re-setup with updated tools
-                    self._setup_orchestrator_agent(conversation_id, force_refresh=True)
-                else:
-                    # Normal setup
-                    self._setup_orchestrator_agent(conversation_id)
+                # Build a fresh, run-scoped registry and agent to prevent cross-run
+                # state leakage when concurrent runs share the same orchestrator instance.
+                run_registry = ToolRegistry(self.user_id, selected_documents=selected_documents or [])
+                run_agent = self._build_orchestrator_agent(conversation_id, run_registry)
 
                 # Save user message to database
                 db_ops.save_message(conversation_id, "user", user_request)
@@ -252,10 +224,10 @@ class CoreOrchestrator:
                         metadata={"component": "orchestrator"},
                     ) as invoke_observation:
                         config = {"configurable": {"thread_id": conversation_id}}
-                        result = self.orchestrator_agent.invoke({"messages": messages}, config=config)
+                        result = run_agent.invoke({"messages": messages}, config=config)
                         orchestration_actions = self._extract_langgraph_actions(result["messages"]) if result and "messages" in result else []
                         tool_results = orchestration_actions if orchestration_actions else []
-                        response_agent_tool = self.tool_registry._tools.get("response_agent")
+                        response_agent_tool = run_registry._tools.get("response_agent")
                         if response_agent_tool:
                             # Use condensed history for response agent as well
                             conversation_history = self.get_condensed_conversation_history(conversation_id)
@@ -280,9 +252,9 @@ class CoreOrchestrator:
                     logger.warning(f"LangGraph agent processing failed: {str(e)}")
                     increment_counter("orchestrator.fallback_total")
                     fallback_used = True
-                    orchestration_actions = self._run_rule_based_fallback(user_request)
+                    orchestration_actions = self._run_rule_based_fallback(user_request, run_registry)
                     if orchestration_actions:
-                        response_agent_tool = self.tool_registry._tools.get("response_agent")
+                        response_agent_tool = run_registry._tools.get("response_agent")
                         if response_agent_tool:
                             conversation_history = self.get_condensed_conversation_history(conversation_id)
                             response = response_agent_tool._run(
@@ -471,7 +443,7 @@ class CoreOrchestrator:
 
         return f"I can't answer questions about your uploaded documents because {NO_SELECTED_DOCUMENTS_MESSAGE}"
 
-    def _run_rule_based_fallback(self, user_request: str) -> Optional[List[Dict[str, Any]]]:
+    def _run_rule_based_fallback(self, user_request: str, tool_registry: ToolRegistry) -> Optional[List[Dict[str, Any]]]:
         """
         Deterministic fallback routing when graph execution fails.
         Keeps common intents functional even if model/tool runtime has transient issues.
@@ -481,7 +453,7 @@ class CoreOrchestrator:
         query_lower = query.lower()
 
         math_expression = self._extract_math_expression(query)
-        if math_expression and "calculator" in self.tool_registry._tools:
+        if math_expression and "calculator" in tool_registry._tools:
             with observe_operation(
                 name="orchestrator.fallback.calculator",
                 counter_prefix="orchestrator.fallback.calculator",
@@ -489,14 +461,14 @@ class CoreOrchestrator:
                 input_data={"expression": math_expression},
                 metadata={"component": "orchestrator", "fallback": True},
             ):
-                output = self.tool_registry._tools["calculator"]._run(expression=math_expression)
+                output = tool_registry._tools["calculator"]._run(expression=math_expression)
                 actions.append({
                     "tool": "calculator",
                     "input": json.dumps({"expression": math_expression}, ensure_ascii=False),
                     "output": output,
                 })
 
-        if any(token in query_lower for token in ("time", "date", "day")) and "current_time" in self.tool_registry._tools:
+        if any(token in query_lower for token in ("time", "date", "day")) and "current_time" in tool_registry._tools:
             with observe_operation(
                 name="orchestrator.fallback.current_time",
                 counter_prefix="orchestrator.fallback.current_time",
@@ -504,7 +476,7 @@ class CoreOrchestrator:
                 input_data={"query_chars": len(query)},
                 metadata={"component": "orchestrator", "fallback": True},
             ):
-                output = self.tool_registry._tools["current_time"]._run(query=query)
+                output = tool_registry._tools["current_time"]._run(query=query)
                 actions.append({
                     "tool": "current_time",
                     "input": json.dumps({"query": query}, ensure_ascii=False),
@@ -513,7 +485,7 @@ class CoreOrchestrator:
 
         document_intent = self._has_document_intent(query_lower)
         if document_intent:
-            search_tool = self.tool_registry._tools.get("search_documents")
+            search_tool = tool_registry._tools.get("search_documents")
             with observe_operation(
                 name="orchestrator.fallback.search_documents",
                 counter_prefix="orchestrator.fallback.search_documents",
@@ -532,7 +504,7 @@ class CoreOrchestrator:
                 })
 
         internet_intent = any(token in query_lower for token in ("internet", "latest", "news", "headline", "headlines", "search the internet"))
-        if internet_intent and "internet_search" in self.tool_registry._tools:
+        if internet_intent and "internet_search" in tool_registry._tools:
             with observe_operation(
                 name="orchestrator.fallback.internet_search",
                 counter_prefix="orchestrator.fallback.internet_search",
@@ -540,7 +512,7 @@ class CoreOrchestrator:
                 input_data={"query_chars": len(query), "provider": "duckduckgo"},
                 metadata={"component": "orchestrator", "fallback": True},
             ):
-                output = self.tool_registry._tools["internet_search"]._run(query=query, provider="duckduckgo")
+                output = tool_registry._tools["internet_search"]._run(query=query, provider="duckduckgo")
                 actions.append({
                     "tool": "internet_search",
                     "input": json.dumps({"query": query, "provider": "duckduckgo"}, ensure_ascii=False),
@@ -700,7 +672,7 @@ class CoreOrchestrator:
             logger.error(f"Error generating conversation title: {str(e)}")
             return None
     
-    def _get_document_context(self) -> Dict[str, Any]:
+    def _get_document_context(self, tool_registry: ToolRegistry) -> Dict[str, Any]:
         """
         Get document context information to inform the orchestrator about document availability.
         This helps the agent make better decisions about when to use document_qa tool.
@@ -708,9 +680,8 @@ class CoreOrchestrator:
         try:
             # Import here to avoid circular imports
             from backend.services.document_service import doc_processor
-            
-            # Get document context for the current user
-            selected_docs = self.tool_registry.selected_documents if hasattr(self.tool_registry, 'selected_documents') else []
+
+            selected_docs = tool_registry.selected_documents if hasattr(tool_registry, 'selected_documents') else []
             return doc_processor.get_document_context(
                 user_id=self.user_id,
                 selected_documents=selected_docs if selected_docs else None
