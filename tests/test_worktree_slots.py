@@ -149,6 +149,7 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
             self.assertEqual(len(calls), 2)
         finally:
             worktree_slots.git = original_git
+            worktree_slots._parse_worktree_list_cached.cache_clear()
 
 
 if __name__ == "__main__":
