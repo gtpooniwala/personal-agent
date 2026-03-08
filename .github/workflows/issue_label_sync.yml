@@ -68,7 +68,14 @@ jobs:
               "type:ops",
               "track:migration",
             ]);
-            const currentLabels = issue.labels.map((label) => label.name);
+            const currentLabels = (
+              await github.paginate(github.rest.issues.listLabelsOnIssue, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                per_page: 100,
+              })
+            ).map((label) => label.name);
 
             const desiredLabels = new Set();
 
