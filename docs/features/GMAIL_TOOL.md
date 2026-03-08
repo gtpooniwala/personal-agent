@@ -36,6 +36,7 @@ The Gmail Tool provides robust integration with Gmail, enabling the agent to sea
   3. Configure OAuth consent screen (add your email as a test user).
   4. Create OAuth 2.0 Desktop App credentials.
   5. Download the JSON file and save it as `backend/data/gmail/client_secret.json` (or set `GMAIL_CREDENTIALS_PATH`).
+  6. If you run the backend via `docker compose`, place Gmail auth files under `data/gmail/` on the host. The compose backend reads `/app/data/gmail/client_secret.json` and `/app/data/gmail/token.pickle`.
 - **First Run**:
   - The first time the tool is used, it will launch a local browser window to authorize access.
   - A token will be saved to `backend/data/gmail/token.pickle` for future use.
@@ -44,6 +45,7 @@ The Gmail Tool provides robust integration with Gmail, enabling the agent to sea
 - **Dependencies Missing**: If you see an error about missing dependencies, run the pip install command above.
 - **Credentials Not Found**: Ensure `client_secret.json` is in the correct path (`backend/data/gmail/`) or `GMAIL_CREDENTIALS_PATH` is set.
 - **Auth Errors**: If authentication fails or tokens expire unexpectedly, delete `backend/data/gmail/token.pickle` and try again to trigger a new OAuth flow.
+- **Docker Compose Pathing**: When running in Docker, use `data/gmail/client_secret.json` and `data/gmail/token.pickle` on the host because the compose backend maps those to `/app/data/gmail/*`.
 
 ## Limitations
 - Only read/search is implemented (no send/compose yet)

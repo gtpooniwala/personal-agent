@@ -12,6 +12,7 @@ venv
 .DS_Store
 logs
 data
+backend/data/gmail
 frontend/node_modules
 frontend/.next
 frontend/out

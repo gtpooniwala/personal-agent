@@ -9,8 +9,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     HOST=0.0.0.0 \
     PORT=8000
 
-COPY backend/requirements.txt .
-RUN pip install -r requirements.txt
+COPY backend/requirements.txt backend/requirements-gmail.txt ./
+RUN pip install -r requirements.txt && \
+    pip install -r requirements-gmail.txt
 
 RUN addgroup --system app && adduser --system --ingroup app app
 
