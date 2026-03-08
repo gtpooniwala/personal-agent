@@ -1,4 +1,5 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import os
 import sys
 import threading
@@ -332,6 +333,30 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
                 orchestrator=SuccessfulOrchestrator(),
                 run_store=InMemoryRunStore(),
             )
+
+    async def test_custom_executor_allows_shared_orchestrator_configuration(self):
+        executor = ThreadPoolExecutor(max_workers=2)
+        service = None
+        try:
+            service = RuntimeService(
+                orchestrator=SuccessfulOrchestrator(),
+                orchestration_executor=executor,
+                run_store=InMemoryRunStore(),
+            )
+            submitted = await service.submit_run(
+                RuntimeRequest(
+                    message="hello",
+                    conversation_id="conv-custom-executor",
+                    selected_documents=[],
+                )
+            )
+            status = await self._wait_for_terminal(service, submitted["run_id"])
+            self.assertEqual(status["status"], "succeeded")
+        finally:
+            if service is not None:
+                await service.shutdown()
+            else:
+                executor.shutdown(wait=False, cancel_futures=False)
 
     async def _wait_until_running(self, service, run_id):
         for _ in range(80):

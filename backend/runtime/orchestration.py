@@ -38,7 +38,11 @@ class OrchestrationExecutionPlane:
         orchestration_executor: Optional[Executor] = None,
         orchestration_max_workers: int = 4,
     ):
-        if orchestrator_factory is None and orchestration_max_workers > 1:
+        if (
+            orchestrator_factory is None
+            and orchestration_executor is None
+            and orchestration_max_workers > 1
+        ):
             raise ValueError(
                 "orchestrator_factory is required when orchestration_max_workers > 1"
             )
