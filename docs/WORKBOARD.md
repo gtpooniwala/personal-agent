@@ -1,6 +1,6 @@
 # Workboard
 
-Last updated: March 7, 2026
+Last updated: March 8, 2026
 
 ## How This Is Used
 This file is the AI execution board for this repo.
@@ -20,14 +20,13 @@ Workflow:
 
 ## Now (Parallel Tracks)
 
-### Frontend Correctness (Sequential)
-- [x] `done` Fix Gmail auth flow and dependency packaging ([#40](https://github.com/gtpooniwala/personal-agent/issues/40))
-- [x] `done` Prevent cross-conversation message race on send ([#31](https://github.com/gtpooniwala/personal-agent/issues/31))
-- [ ] `todo` Guard Enter key send during IME composition ([#30](https://github.com/gtpooniwala/personal-agent/issues/30))
+### Test Coverage
+- [x] `done` Add schema validation tests for agent_config.yaml ([#73](https://github.com/gtpooniwala/personal-agent/issues/73))
+- [x] `done` Unit tests for check_conversation_maintenance and async_generate_title retry ([#74](https://github.com/gtpooniwala/personal-agent/issues/74))
 
-### Runtime Quality (Parallel)
-- [ ] `in_progress` Add scheduler/heartbeat for autonomous workflows ([#18](https://github.com/gtpooniwala/personal-agent/issues/18)) — *parallel with #19*
-- [ ] `todo` Add runtime evals for lifecycle/retry/session isolation ([#19](https://github.com/gtpooniwala/personal-agent/issues/19)) — *parallel with #18*
+### Orchestrator Hardening
+- [ ] `todo` Isolate orchestrator state per async run ([#50](https://github.com/gtpooniwala/personal-agent/issues/50))
+- [ ] `todo` Move blocking orchestration work off event loop ([#51](https://github.com/gtpooniwala/personal-agent/issues/51))
 
 ## Next
 
@@ -36,8 +35,8 @@ Workflow:
 - [x] `done` Add run lifecycle schema (`runs`, `run_events`, `leases`) ([#15](https://github.com/gtpooniwala/personal-agent/issues/15))
 - [x] `done` Deliver async submission contracts for `/chat` and `/runs` plus status/events endpoints ([#17](https://github.com/gtpooniwala/personal-agent/issues/17))
 - [x] `done` Implement runtime worker queue with per-session serialization ([#16](https://github.com/gtpooniwala/personal-agent/issues/16))
-- [ ] `in_progress` Add scheduler/heartbeat for autonomous workflows ([#18](https://github.com/gtpooniwala/personal-agent/issues/18))
-- [ ] `todo` Add runtime evals for lifecycle/retry/session isolation ([#19](https://github.com/gtpooniwala/personal-agent/issues/19))
+- [x] `done` Add scheduler/heartbeat for autonomous workflows ([#18](https://github.com/gtpooniwala/personal-agent/issues/18))
+- [x] `done` Add runtime evals for lifecycle/retry/session isolation ([#19](https://github.com/gtpooniwala/personal-agent/issues/19))
 - [ ] `todo` Make summarisation tool non-blocking in async path ([#28](https://github.com/gtpooniwala/personal-agent/issues/28))
 - [ ] `todo` Remove import-time global warning filter side effect ([#29](https://github.com/gtpooniwala/personal-agent/issues/29))
 - [x] `done` Build real LLM/workflow evaluation harness (separate from deterministic repo checks) ([#23](https://github.com/gtpooniwala/personal-agent/issues/23))
@@ -85,6 +84,11 @@ Workflow:
 - [x] `done` Move frontend from static HTML/JS to Next.js ([#24](https://github.com/gtpooniwala/personal-agent/issues/24))
 - [x] `done` Legacy module cleanup + import hygiene baseline eval
 - [x] `done` README architecture/setup refresh
+- [x] `done` Fix Gmail auth flow and dependency packaging ([#40](https://github.com/gtpooniwala/personal-agent/issues/40))
+- [x] `done` Guard Enter key send during IME composition ([#30](https://github.com/gtpooniwala/personal-agent/issues/30))
+- [x] `done` Prevent cross-conversation message race on send ([#31](https://github.com/gtpooniwala/personal-agent/issues/31))
+- [x] `done` Robust async conversation auto-naming ([#72](https://github.com/gtpooniwala/personal-agent/issues/72))
+- [x] `done` GCP deployment and event-driven triggers planning docs ([#78](https://github.com/gtpooniwala/personal-agent/issues/78))
 
 ## Notes
 - Keep items small enough to land in one commit when possible.
