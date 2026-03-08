@@ -32,6 +32,7 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
 
     def test_parse_worktree_list_supports_flag_only_lines(self) -> None:
         original_git = worktree_slots.git
+        worktree_slots._parse_worktree_list_cached.cache_clear()
 
         def fake_git(*args, **kwargs):
             return "\n".join(
@@ -55,6 +56,7 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
             entries = worktree_slots.parse_worktree_list(ctx)
         finally:
             worktree_slots.git = original_git
+            worktree_slots._parse_worktree_list_cached.cache_clear()
 
         self.assertEqual(entries[0]["worktree"], "/tmp/example")
         self.assertEqual(entries[0]["detached"], "true")
@@ -120,6 +122,33 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
 
             self.assertTrue(observed["slot_path_exists"])
             self.assertTrue(observed["dirty"])
+
+    def test_clear_worktree_list_cache_invalidates_cached_entries(self) -> None:
+        original_git = worktree_slots.git
+        calls = []
+
+        def fake_git(*args, **kwargs):
+            calls.append(args)
+            return "worktree /tmp/example\nHEAD abc123\n\n"
+
+        worktree_slots.git = fake_git
+        try:
+            ctx = worktree_slots.RepoContext(
+                cwd_root=worktree_slots.Path("/tmp/repo"),
+                shared_root=worktree_slots.Path("/tmp/repo"),
+                common_dir=worktree_slots.Path("/tmp/repo/.git"),
+                worktrees_dir=worktree_slots.Path("/tmp/repo/.worktrees"),
+                state_dir=worktree_slots.Path("/tmp/repo/.worktrees/state"),
+            )
+            worktree_slots.parse_worktree_list(ctx)
+            worktree_slots.parse_worktree_list(ctx)
+            self.assertEqual(len(calls), 1)
+
+            worktree_slots.clear_worktree_list_cache(ctx)
+            worktree_slots.parse_worktree_list(ctx)
+            self.assertEqual(len(calls), 2)
+        finally:
+            worktree_slots.git = original_git
 
 
 if __name__ == "__main__":

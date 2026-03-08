@@ -327,6 +327,10 @@ def _parse_worktree_list_cached(shared_root: str) -> tuple[dict[str, str], ...]:
     return tuple(entries)
 
 
+def clear_worktree_list_cache(ctx: RepoContext) -> None:
+    _parse_worktree_list_cached.cache_clear()
+
+
 def branch_worktree_map(ctx: RepoContext) -> dict[str, str]:
     mapping: dict[str, str] = {}
     for entry in parse_worktree_list(ctx):
@@ -500,6 +504,7 @@ def create_or_attach_worktree(ctx: RepoContext, slot_id: str, branch: str) -> No
         run("git", "worktree", "add", str(target), "-b", branch, f"origin/{branch}", cwd=ctx.shared_root)
     else:
         run("git", "worktree", "add", str(target), "-b", branch, base_ref(ctx), cwd=ctx.shared_root)
+    clear_worktree_list_cache(ctx)
     link_shared_credentials(ctx, target)
 
 
@@ -686,6 +691,7 @@ def cmd_release(args: argparse.Namespace) -> int:
         slot_dir = slot_path(ctx, slot_id)
         if slot_dir.exists():
             run("git", "worktree", "remove", str(slot_dir), cwd=ctx.shared_root)
+            clear_worktree_list_cache(ctx)
         mark_free(ctx, slot_id)
         print(f"Released {slot_id}.")
         if lease.get("branch") and args.keep_branch:
@@ -710,6 +716,7 @@ def cmd_reclaim(args: argparse.Namespace) -> int:
                     slot_dir = slot_path(ctx, slot_id)
                     if slot_dir.exists():
                         run("git", "worktree", "remove", str(slot_dir), cwd=ctx.shared_root)
+                        clear_worktree_list_cache(ctx)
                     mark_free(ctx, slot_id)
                 continue
 

@@ -8,7 +8,7 @@ else
   COMMON_DIR="$(git rev-parse --git-common-dir)"
   case "${COMMON_DIR}" in
     /*) ;;
-    *) COMMON_DIR="${TOPLEVEL}/${COMMON_DIR}" ;;
+    *) COMMON_DIR="$(cd "${COMMON_DIR}" && pwd -P)" ;;
   esac
 fi
 TOPLEVEL_REALPATH="$(cd "${TOPLEVEL}" && pwd -P)"
