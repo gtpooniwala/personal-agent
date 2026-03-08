@@ -82,3 +82,18 @@ export function formatRunStatusLabel(status) {
       return "";
   }
 }
+
+export function formatDocumentStatusLabel(status) {
+  switch (status) {
+    case "completed":
+      return "Ready";
+    case "processing":
+      return "Indexing";
+    case "pending":
+      return "Queued";
+    case "failed":
+      return "Failed";
+    default:
+      return "Unknown";
+  }
+}
