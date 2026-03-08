@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "suite": "workflow",
-  "description": "Multi-step and fallback workflow behavior checks.",
+  "description": "Multi-step workflow and capability-boundary checks.",
   "cases": [
     {
       "id": "multi_tool_single_turn",
@@ -28,9 +28,9 @@
       }
     },
     {
-      "id": "document_fallback_without_selection",
+      "id": "document_capability_gate_without_selection",
       "set": "core",
-      "description": "Document queries without selected docs should return clear fallback guidance.",
+      "description": "Document queries without selected docs should return clear capability-boundary guidance without calling search_documents.",
       "turns": [
         {
           "message": "What does my uploaded contract say about termination?",
@@ -40,6 +40,9 @@
       "expected": {
         "per_turn": [
           {
+            "must_not_call": [
+              "search_documents"
+            ],
             "response_contains": [
               "contract"
             ],

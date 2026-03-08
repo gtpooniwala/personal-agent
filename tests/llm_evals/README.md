@@ -7,17 +7,18 @@ This folder contains local model/workflow eval suites. These are intentionally s
 Mock mode (deterministic, no model API required):
 
 ```bash
-python tests/run_llm_evals.py --mode mock --set core
+python3 tests/run_llm_evals.py --mode mock --set core
 ```
 
 Live mode (runs real orchestrator + model/tool stack):
 
 ```bash
-python tests/run_llm_evals.py --mode live --set core
+python3 tests/run_llm_evals.py --mode live --set core
 ```
 
 Live mode requirements:
 
+- backend dependencies installed in the active interpreter, or available in the repo `.venv` for auto-reexec
 - `GEMINI_API_KEY` (or equivalent configured provider key)
 - `EVAL_DATABASE_URL` pointing to a dedicated PostgreSQL `*_eval` or `*_test` database, or `TEST_DATABASE_URL` pointing to a dedicated PostgreSQL `*_test` database
 
@@ -26,8 +27,8 @@ If either prerequisite is missing, live mode exits as `blocked` with setup instr
 Optional set and suite filters:
 
 ```bash
-python tests/run_llm_evals.py --mode mock --set extended
-python tests/run_llm_evals.py --mode mock --set all --suite tool_calling --suite workflow
+python3 tests/run_llm_evals.py --mode mock --set extended
+python3 tests/run_llm_evals.py --mode mock --set all --suite tool_calling --suite workflow
 ```
 
 ## Case Format

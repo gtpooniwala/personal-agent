@@ -45,7 +45,7 @@ flowchart LR
 - Scheduler service can dispatch stored scheduled tasks into the same runtime path.
 
 ## Current Gaps
-- Tool-selection ownership is still mixed: the LangGraph agent is primary, but `CoreOrchestrator` still contains rule-based routing and document short-circuit logic.
+- Normal tool selection is owned by the LangGraph agent from the bound tool set; remaining follow-up work is about retry policy and whether the degraded catastrophic-path fallback can be reduced further.
 - Some follow-up work still runs with in-process `asyncio.create_task(...)`, especially summarisation and maintenance helpers.
 - The runtime contract is async and responsive, but true end-to-end async internals are still future work.
 - The worker-pool execution plane exists, but lifecycle policy for background work and in-flight shutdown behavior still needs cleanup.

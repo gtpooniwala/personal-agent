@@ -25,7 +25,9 @@ class TestPromptContracts(unittest.TestCase):
     def test_orchestrator_prompt_includes_tool_policy_and_document_context(self):
         prompt = build_orchestrator_system_prompt("Documents are selected.")
         self.assertIn("TOOL SELECTION POLICY", prompt)
+        self.assertIn("Normal tool selection is your responsibility", prompt)
         self.assertIn("Use `internet_search` for current events", prompt)
+        self.assertIn("If a capability is unavailable because the relevant tool is not exposed", prompt)
         self.assertIn("Documents are selected.", prompt)
 
     def test_direct_response_prompt_enforces_honesty(self):

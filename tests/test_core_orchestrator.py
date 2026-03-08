@@ -173,23 +173,116 @@ class TestCoreOrchestrator(unittest.TestCase):
         self.assertIn("User: Earlier question", prompt)
         self.assertIn("What should I do next?", prompt)
 
-    def test_short_circuit_unselected_document_request_returns_explicit_guidance(self):
-        response = self.orchestrator._maybe_short_circuit_unselected_document_request(
-            user_request="What does my uploaded contract say about termination?",
-            selected_documents=[],
+    def test_process_request_uses_agent_path_for_document_query_without_selected_docs(self):
+        mock_agent = MagicMock()
+        mock_agent.invoke.return_value = {"messages": []}
+        response_agent_tool = Mock()
+        response_agent_tool._run.return_value = (
+            "I'm sorry, I wasn't able to process your uploaded contract to find information "
+            "about termination. Please try uploading the document again."
         )
-        self.assertIn("contract", response.lower())
-        self.assertIn(
-            "No documents are currently selected. Please select one or more documents to enable document search.",
-            response,
-        )
+        run_registry = Mock()
+        run_registry.get_tool.side_effect = lambda name: response_agent_tool if name == "response_agent" else None
+        direct_response = AsyncMock(return_value="direct fallback")
 
-    def test_short_circuit_does_not_misclassify_profile_as_document_query(self):
-        response = self.orchestrator._maybe_short_circuit_unselected_document_request(
-            user_request="Can you update my profile preferences?",
-            selected_documents=[],
+        with patch.object(self.orchestrator.tool_registry, "clone_with_selected_documents", return_value=run_registry), \
+             patch.object(self.orchestrator, "_build_orchestrator_agent", return_value=mock_agent), \
+             patch.object(self.orchestrator, "_ensure_llm"), \
+             patch.object(self.orchestrator, "_generate_direct_response", direct_response), \
+             patch("backend.orchestrator.core.db_ops") as mock_db_ops, \
+             patch("backend.orchestrator.core.increment_counter"), \
+             patch("backend.orchestrator.core.observe_operation") as mock_obs:
+            mock_obs.return_value.__enter__ = Mock(return_value=None)
+            mock_obs.return_value.__exit__ = Mock(return_value=False)
+            mock_db_ops.get_conversation_history.return_value = []
+            mock_db_ops.save_message.return_value = None
+
+            result = asyncio.run(
+                self.orchestrator.process_request(
+                    "What does my uploaded contract say about termination?",
+                    "conv-docs",
+                    selected_documents=[],
+                )
+            )
+
+        mock_agent.invoke.assert_called_once()
+        response_agent_tool._run.assert_called_once()
+        direct_response.assert_not_awaited()
+        self.assertEqual(result["orchestration_actions"], [])
+        self.assertIn("contract", result["response"].lower())
+        self.assertIn("no documents are currently selected", result["response"].lower())
+        self.assertNotIn("uploading the document again", result["response"].lower())
+
+    def test_process_request_uses_honest_direct_response_when_agent_fails(self):
+        mock_agent = MagicMock()
+        mock_agent.invoke.side_effect = RuntimeError("provider timeout")
+        direct_response = AsyncMock(return_value="Fallback answer")
+        response_agent_tool = Mock()
+        run_registry = Mock()
+        run_registry.get_tool.side_effect = lambda name: response_agent_tool if name == "response_agent" else None
+
+        with patch.object(self.orchestrator.tool_registry, "clone_with_selected_documents", return_value=run_registry), \
+             patch.object(self.orchestrator, "_build_orchestrator_agent", return_value=mock_agent), \
+             patch.object(self.orchestrator, "_ensure_llm"), \
+             patch.object(self.orchestrator, "_generate_direct_response", direct_response), \
+             patch("backend.orchestrator.core.db_ops") as mock_db_ops, \
+             patch("backend.orchestrator.core.increment_counter"), \
+             patch("backend.orchestrator.core.observe_operation") as mock_obs:
+            mock_obs.return_value.__enter__ = Mock(return_value=None)
+            mock_obs.return_value.__exit__ = Mock(return_value=False)
+            mock_db_ops.get_conversation_history.return_value = []
+            mock_db_ops.save_message.return_value = None
+
+            result = asyncio.run(
+                self.orchestrator.process_request(
+                    "What is 15 + 27?",
+                    "conv-fallback",
+                    selected_documents=[],
+                )
+            )
+
+        direct_response.assert_awaited_once()
+        response_agent_tool._run.assert_not_called()
+        self.assertEqual(result["response"], "Fallback answer")
+        self.assertEqual(result["orchestration_actions"], [])
+
+    def test_process_request_enforces_document_capability_boundary_after_agent_failure(self):
+        mock_agent = MagicMock()
+        mock_agent.invoke.side_effect = RuntimeError("provider timeout")
+        direct_response = AsyncMock(
+            return_value=(
+                "I'm sorry, I wasn't able to process the uploaded contract to find information "
+                "about termination. Please make sure the contract was successfully uploaded and try again."
+            )
         )
-        self.assertIsNone(response)
+        response_agent_tool = Mock()
+        run_registry = Mock()
+        run_registry.get_tool.side_effect = lambda name: response_agent_tool if name == "response_agent" else None
+
+        with patch.object(self.orchestrator.tool_registry, "clone_with_selected_documents", return_value=run_registry), \
+             patch.object(self.orchestrator, "_build_orchestrator_agent", return_value=mock_agent), \
+             patch.object(self.orchestrator, "_ensure_llm"), \
+             patch.object(self.orchestrator, "_generate_direct_response", direct_response), \
+             patch("backend.orchestrator.core.db_ops") as mock_db_ops, \
+             patch("backend.orchestrator.core.increment_counter"), \
+             patch("backend.orchestrator.core.observe_operation") as mock_obs:
+            mock_obs.return_value.__enter__ = Mock(return_value=None)
+            mock_obs.return_value.__exit__ = Mock(return_value=False)
+            mock_db_ops.get_conversation_history.return_value = []
+            mock_db_ops.save_message.return_value = None
+
+            result = asyncio.run(
+                self.orchestrator.process_request(
+                    "What does my uploaded contract say about termination?",
+                    "conv-fallback-docs",
+                    selected_documents=[],
+                )
+            )
+
+        direct_response.assert_awaited_once()
+        self.assertEqual(result["orchestration_actions"], [])
+        self.assertIn("no documents are currently selected", result["response"].lower())
+        self.assertNotIn("successfully uploaded", result["response"].lower())
 
     def test_format_document_status_prefers_selected_document_state(self):
         status = self.orchestrator._format_document_status(

@@ -29,8 +29,8 @@ python tests/run_runtime_evals.py
 
 ### Prompt Or Tool-Calling Change
 ```bash
-python tests/run_llm_evals.py --mode mock
-python tests/run_llm_evals.py --mode live
+python3 tests/run_llm_evals.py --mode mock
+python3 tests/run_llm_evals.py --mode live
 ```
 
 ## Recent Important Additions

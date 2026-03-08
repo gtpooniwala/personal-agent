@@ -82,7 +82,7 @@ Contributor reference for current implementation:
   - Heartbeat orphan recovery and scheduler-backed recurring task support.
   - `#51` worker-pool step landed: runtime coordination remains async while full orchestration attempts are offloaded from the FastAPI event loop.
 - Important remaining follow-ups:
-  - Tool-selection ownership is still partly split between the LLM and deterministic fallback logic.
+  - Normal tool selection is model-owned from the currently exposed tool set; follow-up reliability work should focus on retries rather than restoring handwritten routing.
   - Some follow-up work still runs as in-process background tasks.
   - SSE streaming and true end-to-end async internals are not implemented yet.
   - `/api/v1/*` remains active for non-runtime endpoints (conversations, tools, documents, health, observability).
@@ -249,17 +249,20 @@ LLM/workflow evals should be run locally when changes affect model prompts, tool
 Deterministic harness run:
 
 ```bash
-python tests/run_llm_evals.py --mode mock
+python3 tests/run_llm_evals.py --mode mock
 ```
 
 Live orchestrator/model run:
 
 ```bash
-python tests/run_llm_evals.py --mode live
+python3 tests/run_llm_evals.py --mode live
 ```
 
 Reports are written to `tests/llm_evals/results/latest.json` and timestamped report files.
-If the provider key is missing, live mode exits as `blocked` and tells you which key to configure.
+If backend deps are installed in `.venv`, the harness will re-exec into that interpreter automatically for live runs.
+If you are using the Docker Compose Postgres instance, point `TEST_DATABASE_URL` / `EVAL_DATABASE_URL` at `127.0.0.1:5433`.
+The harness reads the shared repo `.env` even when you run it from a dedicated worktree.
+If the provider key or live eval database is unavailable, live mode exits as `blocked` with the reason.
 
 ## API Surface
 
@@ -310,7 +313,7 @@ personal-agent/
 ## Engineering Notes
 
 Design choices reflected in this implementation:
-- **Graph-based orchestration as the primary path**, with some remaining deterministic fallback logic that is being removed incrementally.
+- **Graph-based orchestration as the normal routing path**, with deterministic code limited to capability gating and honest failure boundaries.
 - **Context-aware tool gating** (e.g., document search appears only when documents are selected).
 - **Separation of orchestration and response synthesis**, which keeps tool execution traces inspectable while preserving fluent final responses.
 - **Local-first persistence** for fast iteration and debuggability.

@@ -1,12 +1,12 @@
 {
   "schema_version": "1.0",
   "suite": "tool_calling",
-  "description": "Single-turn tool routing behavior checks.",
+  "description": "Single-turn tool selection checks for the model-owned normal path.",
   "cases": [
     {
       "id": "calculator_basic",
       "set": "core",
-      "description": "Math queries should route to calculator.",
+      "description": "Math queries should rely on the model-owned normal path to call calculator.",
       "turns": [
         {
           "message": "What is 15 + 27?"
@@ -32,7 +32,7 @@
     {
       "id": "current_time_basic",
       "set": "core",
-      "description": "Time queries should use current_time.",
+      "description": "Time queries should rely on the model-owned normal path to call current_time.",
       "turns": [
         {
           "message": "What time is it right now?"
@@ -71,7 +71,7 @@
     {
       "id": "greeting_no_tools",
       "set": "core",
-      "description": "Simple greetings should avoid unnecessary tools.",
+      "description": "Simple greetings should avoid unnecessary tools in the normal path.",
       "turns": [
         {
           "message": "Hello there"
@@ -96,7 +96,7 @@
     {
       "id": "internet_search_routing",
       "set": "core",
-      "description": "Queries about latest news should route to internet_search.",
+      "description": "Current-information queries should rely on the model-owned normal path to call internet_search.",
       "turns": [
         {
           "message": "Search the internet for today's top AI news headlines."
@@ -129,7 +129,7 @@
     {
       "id": "document_search_selected_docs",
       "set": "core",
-      "description": "Document-specific queries with selected docs should route to search_documents only.",
+      "description": "Document queries with selected docs should rely on the model-owned normal path to call search_documents only.",
       "turns": [
         {
           "message": "Search my uploaded contract for termination details.",
@@ -178,7 +178,7 @@
     {
       "id": "calculator_exponentiation",
       "set": "extended",
-      "description": "Exponentiation queries should route to calculator and produce numeric output.",
+      "description": "Exponentiation queries should call calculator and produce numeric output.",
       "turns": [
         {
           "message": "What is 2 ** 8?"
@@ -195,6 +195,48 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "id": "document_capability_gate_without_selection",
+      "set": "extended",
+      "description": "Document queries without selected docs should stay on the honest capability boundary instead of calling document search.",
+      "turns": [
+        {
+          "message": "What does my uploaded contract say about termination?",
+          "selected_documents": []
+        }
+      ],
+      "expected": {
+        "per_turn": [
+          {
+            "must_not_call": [
+              "search_documents",
+              "internet_search",
+              "calculator",
+              "current_time"
+            ],
+            "response_contains": [
+              "contract"
+            ],
+            "response_contains_any": [
+              "no documents",
+              "not possible",
+              "don't have access"
+            ]
+          }
+        ],
+        "by_mode": {
+          "mock": {
+            "per_turn": [
+              {
+                "response_contains": [
+                  "no documents are currently selected"
+                ]
+              }
+            ]
+          }
+        }
       }
     },
     {

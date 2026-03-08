@@ -6,10 +6,12 @@ from __future__ import annotations
 import argparse
 import ast
 import asyncio
+import importlib.util
 import json
 import math
 import os
 import re
+import subprocess
 import sys
 import time
 from collections import defaultdict
@@ -28,6 +30,96 @@ CASES_DIR = EVAL_ROOT / "cases"
 RESULTS_DIR = EVAL_ROOT / "results"
 MAX_SAFE_EXPONENT = 64
 DOTENV_PATH = ROOT / ".env"
+_LIVE_EVAL_REEXEC_ENV = "PERSONAL_AGENT_LLM_EVALS_VENV_REEXEC"
+
+
+def _live_mode_requested(argv: Sequence[str]) -> bool:
+    for index, arg in enumerate(argv[1:], start=1):
+        if arg == "--mode" and index + 1 < len(argv):
+            return argv[index + 1] == "live"
+        if arg.startswith("--mode="):
+            return arg.split("=", 1)[1] == "live"
+    return False
+
+
+def _missing_live_eval_dependencies() -> List[str]:
+    required = ("sqlalchemy", "psycopg", "langgraph")
+    return [name for name in required if importlib.util.find_spec(name) is None]
+
+
+def _repo_venv_python_candidates() -> List[Path]:
+    candidates = [ROOT / ".venv" / "bin" / "python"]
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-common-dir"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except Exception:
+        return candidates
+
+    common_dir = Path(result.stdout.strip())
+    if not common_dir.is_absolute():
+        common_dir = (ROOT / common_dir).resolve()
+    if common_dir.name == ".git":
+        candidates.append(common_dir.parent / ".venv" / "bin" / "python")
+    else:
+        candidates.append(common_dir / ".venv" / "bin" / "python")
+    return list(dict.fromkeys(candidates))
+
+
+def _dotenv_candidates() -> List[Path]:
+    candidates = [DOTENV_PATH]
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-common-dir"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except Exception:
+        return candidates
+
+    common_dir = Path(result.stdout.strip())
+    if not common_dir.is_absolute():
+        common_dir = (ROOT / common_dir).resolve()
+    if common_dir.name == ".git":
+        candidates.append(common_dir.parent / ".env")
+    else:
+        candidates.append(common_dir / ".env")
+    return list(dict.fromkeys(candidates))
+
+
+def _maybe_reexec_into_repo_venv() -> None:
+    if not _live_mode_requested(sys.argv):
+        return
+    if os.environ.get(_LIVE_EVAL_REEXEC_ENV) == "1":
+        return
+
+    missing = _missing_live_eval_dependencies()
+    if not missing:
+        return
+
+    venv_python = next(
+        (candidate for candidate in _repo_venv_python_candidates() if candidate.exists()),
+        None,
+    )
+    if venv_python is None:
+        return
+
+    env = os.environ.copy()
+    env[_LIVE_EVAL_REEXEC_ENV] = "1"
+    os.execve(
+        str(venv_python),
+        [str(venv_python), str(Path(__file__).resolve()), *sys.argv[1:]],
+        env,
+    )
+
+
+_maybe_reexec_into_repo_venv()
 
 
 @dataclass
@@ -77,17 +169,17 @@ def _utc_now_iso() -> str:
 
 def _read_env_file_value(name: str) -> Optional[str]:
     """Read a variable from the repository .env without importing backend settings."""
-    if not DOTENV_PATH.exists():
-        return None
-
-    for line in DOTENV_PATH.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
+    for dotenv_path in _dotenv_candidates():
+        if not dotenv_path.exists():
             continue
-        key, value = stripped.split("=", 1)
-        if key.strip() != name:
-            continue
-        return value.strip().strip('"').strip("'")
+        for line in dotenv_path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in stripped:
+                continue
+            key, value = stripped.split("=", 1)
+            if key.strip() != name:
+                continue
+            return value.strip().strip('"').strip("'")
     return None
 
 
@@ -99,6 +191,15 @@ def _env_or_file(name: str) -> Optional[str]:
     if file_value is not None and file_value.strip():
         return file_value.strip()
     return None
+
+
+def _hydrate_env_from_dotenv(names: Sequence[str]) -> None:
+    for name in names:
+        if os.environ.get(name):
+            continue
+        file_value = _read_env_file_value(name)
+        if file_value:
+            os.environ[name] = file_value
 
 
 def _resolve_live_eval_database_url() -> Tuple[Optional[str], Optional[str]]:
@@ -122,8 +223,67 @@ def _resolve_live_eval_database_url() -> Tuple[Optional[str], Optional[str]]:
     return database_url, None
 
 
+def _live_eval_connection_hint(database_url: str) -> Optional[str]:
+    parsed = urlsplit(database_url)
+    docker_port = (_env_or_file("DOCKER_POSTGRES_PORT") or "").strip()
+    if (
+        parsed.hostname in {"127.0.0.1", "localhost"}
+        and parsed.port == 5432
+        and docker_port
+        and docker_port != "5432"
+    ):
+        return (
+            f"Docker Compose exposes Postgres on host port {docker_port} in this repo. "
+            "If you are using the compose database, update TEST_DATABASE_URL/EVAL_DATABASE_URL "
+            f"to use 127.0.0.1:{docker_port} instead of 127.0.0.1:5432."
+        )
+    return None
+
+
+def _looks_like_missing_database_error(exc: Exception, database_url: str) -> bool:
+    database_name = urlsplit(database_url).path.rsplit("/", 1)[-1]
+    message = str(exc).lower()
+    if not database_name:
+        return False
+    return (
+        "does not exist" in message
+        or "unknown database" in message
+        or f'database "{database_name.lower()}"' in message
+        or f"database '{database_name.lower()}'" in message
+    )
+
+
+def _ensure_live_eval_database_exists(database_url: str) -> None:
+    try:
+        from sqlalchemy.engine import make_url
+        import psycopg
+        from psycopg import sql
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "SQLAlchemy and psycopg are required for live eval database checks. "
+            "Install backend requirements and retry."
+        ) from exc
+
+    target_url = make_url(database_url)
+    target_db = target_url.database
+    if not target_db:
+        return
+
+    admin_url = target_url.set(database="postgres")
+    admin_dsn = admin_url.render_as_string(hide_password=False).replace(
+        "postgresql+psycopg://", "postgresql://", 1
+    )
+
+    with psycopg.connect(admin_dsn, autocommit=True) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (target_db,))
+            if cur.fetchone() is None:
+                cur.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(target_db)))
+
+
 def _configure_live_eval_environment() -> Optional[str]:
     """Pin live evals to an isolated database before importing backend modules."""
+    _hydrate_env_from_dotenv(("GEMINI_API_KEY", "OPENAI_API_KEY"))
     database_url, error = _resolve_live_eval_database_url()
     if error:
         return error
@@ -144,6 +304,21 @@ def _check_live_eval_database_connectivity() -> Optional[str]:
         finally:
             engine.dispose()
     except Exception as exc:
+        if _looks_like_missing_database_error(exc, str(database_url)):
+            try:
+                _ensure_live_eval_database_exists(str(database_url))
+                engine, sql_text = _create_live_eval_engine(str(database_url))
+                try:
+                    with engine.connect() as connection:
+                        connection.execute(sql_text("SELECT 1"))
+                finally:
+                    engine.dispose()
+                return None
+            except Exception:
+                pass
+        hint = _live_eval_connection_hint(str(database_url))
+        if hint:
+            return f"Live eval database is not reachable: {exc}\n{hint}"
         return f"Live eval database is not reachable: {exc}"
     return None
 
@@ -419,6 +594,30 @@ def _check_turn_expectation(index: int, expectation: Dict[str, Any], actual: Tur
     return failures
 
 
+def _merge_per_turn_expectations(
+    base: Optional[List[Dict[str, Any]]],
+    override: Optional[List[Dict[str, Any]]],
+) -> List[Dict[str, Any]]:
+    if base is not None and not isinstance(base, list):
+        raise ValueError("Case has invalid 'expected.per_turn': must be a list")
+    if override is not None and not isinstance(override, list):
+        raise ValueError("Case has invalid mode-specific 'per_turn': must be a list")
+
+    merged: List[Dict[str, Any]] = []
+    base_list = base or []
+    override_list = override or []
+    length = max(len(base_list), len(override_list))
+
+    for index in range(length):
+        base_item = base_list[index] if index < len(base_list) else {}
+        override_item = override_list[index] if index < len(override_list) else {}
+        if not isinstance(base_item, dict) or not isinstance(override_item, dict):
+            raise ValueError("per_turn expectations must contain only objects")
+        merged.append({**base_item, **override_item})
+
+    return merged
+
+
 def _resolve_expected(case: Dict[str, Any], mode: str) -> Dict[str, Any]:
     case_id = str(case.get("id", "unknown"))
     expected = case.get("expected")
@@ -428,6 +627,8 @@ def _resolve_expected(case: Dict[str, Any], mode: str) -> Dict[str, Any]:
         raise ValueError(f"Case '{case_id}' has invalid 'expected': must be an object")
 
     resolved = {k: v for k, v in expected.items() if k != "by_mode"}
+    if "per_turn" in resolved and not isinstance(resolved["per_turn"], list):
+        raise ValueError(f"Case '{case_id}' has invalid 'expected.per_turn': must be a list")
     by_mode = expected.get("by_mode")
     if by_mode is not None and not isinstance(by_mode, dict):
         raise ValueError(f"Case '{case_id}' has invalid 'expected.by_mode': must be an object")
@@ -438,7 +639,18 @@ def _resolve_expected(case: Dict[str, Any], mode: str) -> Dict[str, Any]:
                 f"Case '{case_id}' has invalid 'expected.by_mode.{mode}': must be an object"
             )
         if isinstance(mode_override, dict):
-            resolved.update(mode_override)
+            for key, value in mode_override.items():
+                if key == "per_turn":
+                    if value is not None and not isinstance(value, list):
+                        raise ValueError(
+                            f"Case '{case_id}' has invalid 'expected.by_mode.{mode}.per_turn': must be a list"
+                        )
+                    resolved["per_turn"] = _merge_per_turn_expectations(
+                        resolved.get("per_turn"),
+                        value,
+                    )
+                else:
+                    resolved[key] = value
 
     if "per_turn" in resolved and not isinstance(resolved["per_turn"], list):
         raise ValueError(f"Case '{case_id}' has invalid 'expected.per_turn': must be a list")

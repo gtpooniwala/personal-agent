@@ -28,22 +28,20 @@ flowchart TB
 flowchart TB
     A["Load condensed conversation history"] --> B["Clone ToolRegistry for selected documents"]
     B --> C["Build fresh LangGraph agent"]
-    C --> D{"Unselected document request?"}
-    D -->|Yes| E["Short-circuit with explicit document-selection message"]
-    D -->|No| F["Invoke LangGraph agent"]
-    F --> G{"LangGraph succeeded?"}
-    G -->|Yes| H["Extract tool actions"]
-    G -->|No| I["Rule-based fallback or direct response"]
-    H --> J["ResponseAgent synthesizes final answer"]
-    I --> J
-    J --> K["Save assistant message"]
-    K --> L["Trigger background summarisation task"]
+    C --> D["Invoke LangGraph agent"]
+    D --> E{"LangGraph succeeded?"}
+    E -->|Yes| F["Extract tool actions"]
+    E -->|No| G["Honest direct response for catastrophic failure"]
+    F --> H["ResponseAgent synthesizes final answer"]
+    G --> H
+    H --> I["Save assistant message"]
+    I --> J["Trigger background summarisation task"]
 ```
 
 Important current nuance:
-- normal tool use should come from the LangGraph agent,
-- but the orchestrator still contains some deterministic routing and fallback logic,
-- which is why `#101` is the highest-value cleanup item.
+- normal tool use comes from the LangGraph agent using the currently bound tools,
+- deterministic code is limited to capability gating and honest failure boundaries,
+- retry policy and any further degraded-path cleanup are separate follow-up concerns.
 
 ## Scheduled Task Flow
 
