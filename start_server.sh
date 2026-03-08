@@ -13,12 +13,12 @@ fi
 # Check Node.js/npm prerequisites for frontend
 if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
     echo "❌ Error: Node.js and npm are required but not installed or not in PATH"
-    echo "Please install Node.js 18.17+"
+    echo "Please install Node.js 20.9+"
     exit 1
 fi
 
-if ! node -e "const [major, minor] = process.versions.node.split('.').map(Number); process.exit(major > 18 || (major === 18 && minor >= 17) ? 0 : 1)"; then
-    echo "❌ Error: Node.js 18.17+ is required for the Next.js frontend."
+if ! node -e "const [major, minor] = process.versions.node.split('.').map(Number); process.exit(major > 20 || (major === 20 && minor >= 9) ? 0 : 1)"; then
+    echo "❌ Error: Node.js 20.9+ is required for the Next.js frontend."
     echo "Detected: $(node -v)"
     exit 1
 fi

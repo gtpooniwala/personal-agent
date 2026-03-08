@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { formatRelativeTime } from "@/lib/formatters";
 import WorkspaceViewTabs from "@/components/WorkspaceViewTabs";
 
@@ -56,7 +56,7 @@ function ChatBubble({ message }) {
   );
 }
 
-export default function ChatPanel({
+const ChatPanel = forwardRef(function ChatPanel({
   currentView,
   currentConversationId,
   messages,
@@ -68,17 +68,20 @@ export default function ChatPanel({
   onChangeMessage,
   onSendMessage,
   onFocusComposer,
-  messageInputRef,
-}) {
+}, messageInputRef) {
+  const localMessageInputRef = useRef(null);
+
+  useImperativeHandle(messageInputRef, () => localMessageInputRef.current, []);
+
   useEffect(() => {
-    const input = messageInputRef?.current;
+    const input = localMessageInputRef.current;
     if (!input) {
       return;
     }
 
     input.style.height = "0px";
     input.style.height = `${Math.min(input.scrollHeight, 180)}px`;
-  }, [messageInput, messageInputRef]);
+  }, [messageInput]);
 
   return (
     <section className="chat-shell">
@@ -116,7 +119,7 @@ export default function ChatPanel({
 
       <footer className="chat-input-row">
         <textarea
-          ref={messageInputRef}
+          ref={localMessageInputRef}
           value={messageInput}
           className="chat-input"
           rows={1}
@@ -146,4 +149,6 @@ export default function ChatPanel({
       </footer>
     </section>
   );
-}
+});
+
+export default ChatPanel;

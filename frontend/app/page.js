@@ -1,11 +1,5 @@
 import WorkspaceApp from "@/components/WorkspaceApp";
 
-export default function HomePage({ searchParams }) {
-  return (
-    <WorkspaceApp
-      view="chat"
-      currentPath="/"
-      initialConversationId={searchParams?.conversation || null}
-    />
-  );
+export default function HomePage() {
+  return <WorkspaceApp view="chat" currentPath="/" />;
 }
