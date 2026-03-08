@@ -97,6 +97,7 @@ class FailingOrchestrator(BaseTestOrchestrator):
 class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self._mock_db_ops = MockDbOps()
+        self._services = []
         self._db_ops_patcher = patch(
             "backend.database.operations.db_ops", self._mock_db_ops
         )
@@ -107,11 +108,19 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         self._tracking_db_ops_patcher.start()
 
     async def asyncTearDown(self):
+        while self._services:
+            service = self._services.pop()
+            await service.shutdown()
         self._db_ops_patcher.stop()
         self._tracking_db_ops_patcher.stop()
 
+    def _make_service(self, **kwargs):
+        service = RuntimeService(**kwargs)
+        self._services.append(service)
+        return service
+
     async def test_submit_run_transitions_to_succeeded(self):
-        service = RuntimeService(
+        service = self._make_service(
             orchestrator=SuccessfulOrchestrator(),
             orchestrator_factory=build_factory(SuccessfulOrchestrator),
             run_store=InMemoryRunStore(),
@@ -132,7 +141,7 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         self.assertIn("succeeded", event_types)
 
     async def test_submit_run_transitions_to_failed(self):
-        service = RuntimeService(
+        service = self._make_service(
             orchestrator=FailingOrchestrator(),
             orchestrator_factory=build_factory(FailingOrchestrator),
             run_store=InMemoryRunStore(),
@@ -158,7 +167,7 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
                     "token_usage": 4,
                 }
 
-        service = RuntimeService(
+        service = self._make_service(
             orchestrator=BlockingOrchestrator(),
             orchestrator_factory=build_factory(BlockingOrchestrator),
             run_store=InMemoryRunStore(),
@@ -204,7 +213,7 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
                     "token_usage": 4,
                 }
 
-        service = RuntimeService(
+        service = self._make_service(
             orchestrator=RetryableOrchestrator(),
             orchestrator_factory=build_factory(RetryableOrchestrator),
             run_store=InMemoryRunStore(),
@@ -236,7 +245,7 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
                     "token_usage": 4,
                 }
 
-        service = RuntimeService(
+        service = self._make_service(
             orchestrator=BlockingOrchestrator(),
             orchestrator_factory=build_factory(BlockingOrchestrator),
             run_store=InMemoryRunStore(),
@@ -284,7 +293,7 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
                     "token_usage": 4,
                 }
 
-        service = RuntimeService(
+        service = self._make_service(
             orchestrator=BlockingOrchestrator(),
             orchestrator_factory=build_factory(BlockingOrchestrator),
             run_store=InMemoryRunStore(),
@@ -338,7 +347,7 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         executor = ThreadPoolExecutor(max_workers=2)
         service = None
         try:
-            service = RuntimeService(
+            service = self._make_service(
                 orchestrator=SuccessfulOrchestrator(),
                 orchestration_executor=executor,
                 run_store=InMemoryRunStore(),
@@ -353,8 +362,6 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
             status = await self._wait_for_terminal(service, submitted["run_id"])
             self.assertEqual(status["status"], "succeeded")
         finally:
-            if service is not None:
-                await service.shutdown()
             executor.shutdown(wait=False, cancel_futures=False)
 
     async def _wait_until_running(self, service, run_id):

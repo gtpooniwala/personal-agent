@@ -124,10 +124,12 @@ class MockOrchestrator:
         self,
         responses: List[Tuple[str, Any]],
         shared_index: Optional[List[int]] = None,
+        shared_lock: Optional[threading.Lock] = None,
     ) -> None:
         # responses: list of ("success", result_str) | ("error", msg) | ("raise", exc)
         self._responses = list(responses)
         self._shared_index = shared_index or [0]
+        self._shared_lock = shared_lock or threading.Lock()
         self._call_count = 0
 
     def create_conversation(self) -> str:
@@ -135,13 +137,14 @@ class MockOrchestrator:
 
     async def process_request(self, **kwargs: Any) -> Dict[str, Any]:
         self._call_count += 1
-        index = self._shared_index[0]
-        if index >= len(self._responses):
-            raise RuntimeError(
-                "MockOrchestrator exhausted: no more responses configured"
-            )
-        kind, payload = self._responses[index]
-        self._shared_index[0] += 1
+        with self._shared_lock:
+            index = self._shared_index[0]
+            if index >= len(self._responses):
+                raise RuntimeError(
+                    "MockOrchestrator exhausted: no more responses configured"
+                )
+            kind, payload = self._responses[index]
+            self._shared_index[0] += 1
         if kind == "raise":
             raise payload
         if kind == "error":
@@ -230,11 +233,14 @@ async def _case_lifecycle_queued_to_succeeded() -> Tuple[bool, List[str]]:
     mock_db_ops = MockDbOps()
     responses = [("success", "hello response")]
     shared_index = [0]
-    orchestrator = MockOrchestrator(responses, shared_index)
+    shared_lock = threading.Lock()
+    orchestrator = MockOrchestrator(responses, shared_index, shared_lock)
     store = InMemoryRunStore()
     service = RuntimeService(
         orchestrator=orchestrator,
-        orchestrator_factory=build_factory(MockOrchestrator, responses, shared_index),
+        orchestrator_factory=build_factory(
+            MockOrchestrator, responses, shared_index, shared_lock
+        ),
         run_store=store,
     )
 
@@ -273,11 +279,14 @@ async def _case_lifecycle_queued_to_failed() -> Tuple[bool, List[str]]:
     mock_db_ops = MockDbOps()
     responses = [("error", "something went wrong")]
     shared_index = [0]
-    orchestrator = MockOrchestrator(responses, shared_index)
+    shared_lock = threading.Lock()
+    orchestrator = MockOrchestrator(responses, shared_index, shared_lock)
     store = InMemoryRunStore()
     service = RuntimeService(
         orchestrator=orchestrator,
-        orchestrator_factory=build_factory(MockOrchestrator, responses, shared_index),
+        orchestrator_factory=build_factory(
+            MockOrchestrator, responses, shared_index, shared_lock
+        ),
         run_store=store,
     )
 
@@ -317,11 +326,14 @@ async def _case_retry_transient_then_success() -> Tuple[bool, List[str]]:
         ("success", "recovered ok"),
     ]
     shared_index = [0]
-    orchestrator = MockOrchestrator(responses, shared_index)
+    shared_lock = threading.Lock()
+    orchestrator = MockOrchestrator(responses, shared_index, shared_lock)
     store = InMemoryRunStore()
     service = RuntimeService(
         orchestrator=orchestrator,
-        orchestrator_factory=build_factory(MockOrchestrator, responses, shared_index),
+        orchestrator_factory=build_factory(
+            MockOrchestrator, responses, shared_index, shared_lock
+        ),
         run_store=store,
     )
 
@@ -366,11 +378,14 @@ async def _case_retry_exhaustion() -> Tuple[bool, List[str]]:
         ("raise", RuntimeError("fail 3")),
     ]
     shared_index = [0]
-    orchestrator = MockOrchestrator(responses, shared_index)
+    shared_lock = threading.Lock()
+    orchestrator = MockOrchestrator(responses, shared_index, shared_lock)
     store = InMemoryRunStore()
     service = RuntimeService(
         orchestrator=orchestrator,
-        orchestrator_factory=build_factory(MockOrchestrator, responses, shared_index),
+        orchestrator_factory=build_factory(
+            MockOrchestrator, responses, shared_index, shared_lock
+        ),
         run_store=store,
     )
 
@@ -410,11 +425,14 @@ async def _case_session_isolation_different_sessions() -> Tuple[bool, List[str]]
         ("success", "result-B"),
     ]
     shared_index = [0]
-    orchestrator = MockOrchestrator(responses, shared_index)
+    shared_lock = threading.Lock()
+    orchestrator = MockOrchestrator(responses, shared_index, shared_lock)
     store = InMemoryRunStore()
     service = RuntimeService(
         orchestrator=orchestrator,
-        orchestrator_factory=build_factory(MockOrchestrator, responses, shared_index),
+        orchestrator_factory=build_factory(
+            MockOrchestrator, responses, shared_index, shared_lock
+        ),
         run_store=store,
     )
 
