@@ -40,6 +40,10 @@ Use when:
 Typical commands:
 ```bash
 python3 tests/run_unit_tests.py
+```
+
+Optional if `pytest` is already available in your environment:
+```bash
 pytest tests -q
 ```
 
