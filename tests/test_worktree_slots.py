@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import unittest
+from tempfile import TemporaryDirectory
 
 from scripts import worktree_slots
 
@@ -69,6 +70,21 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
     def test_command_exists_rejects_invalid_names(self) -> None:
         self.assertFalse(worktree_slots.command_exists(""))
         self.assertFalse(worktree_slots.command_exists("bad name"))
+
+    def test_known_max_slots_honors_existing_overflow_leases(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            root = worktree_slots.Path(tmpdir)
+            ctx = worktree_slots.RepoContext(
+                cwd_root=root,
+                shared_root=root,
+                common_dir=root / ".git",
+                worktrees_dir=root / ".worktrees",
+                state_dir=root / ".worktrees" / "state",
+            )
+            ctx.state_dir.mkdir(parents=True)
+            (ctx.state_dir / "dyn-10.json").write_text("{}", encoding="utf-8")
+
+            self.assertEqual(worktree_slots.known_max_slots(ctx, worktree_slots.DEFAULT_MAX_SLOTS), 10)
 
 
 if __name__ == "__main__":

@@ -177,6 +177,14 @@ def known_slot_ids(ctx: RepoContext, max_slots: int) -> list[str]:
     return sorted(ids, key=slot_sort_key)
 
 
+def known_max_slots(ctx: RepoContext, configured_max: int) -> int:
+    highest = DEFAULT_STABLE_SLOTS
+    for slot_id in known_slot_ids(ctx, configured_max):
+        _, suffix = slot_id.split("-", 1)
+        highest = max(highest, int(suffix))
+    return max(validate_max_slots(configured_max), highest)
+
+
 def slot_sort_key(slot_id: str) -> tuple[int, int]:
     prefix, number = slot_id.split("-", 1)
     order = 0 if prefix == "slot" else 1
@@ -652,7 +660,7 @@ def mark_free(ctx: RepoContext, slot_id: str) -> None:
 def cmd_release(args: argparse.Namespace) -> int:
     ctx = repo_context()
     ensure_dirs(ctx)
-    slot_id = validate_slot_id(args.slot, validate_max_slots(DEFAULT_MAX_SLOTS))
+    slot_id = validate_slot_id(args.slot, known_max_slots(ctx, DEFAULT_MAX_SLOTS))
     with state_lock(ctx):
         lease = load_lease(ctx, slot_id)
         if lease["state"] == "free":
