@@ -79,5 +79,52 @@
     "path": "tests/README.md",
     "pattern": "Run Scenario Test Script",
     "description": "Tests README documents the scenario test workflow"
+  },
+  {
+    "id": "agents_contract_present",
+    "type": "contains",
+    "path": "AGENTS.md",
+    "pattern": "shared root checkout is control-plane/admin-only",
+    "description": "Repo-local AGENTS contract documents the managed slot workflow"
+  },
+  {
+    "id": "legacy_agent_shim_removed",
+    "type": "path_absent",
+    "path": "AGENT.md",
+    "description": "Legacy AGENT shim has been removed"
+  },
+  {
+    "id": "claude_contract_points_to_agents",
+    "type": "contains",
+    "path": "CLAUDE.md",
+    "pattern": "AGENTS.md",
+    "description": "Claude contract points to AGENTS.md as the canonical source"
+  },
+  {
+    "id": "slot_workflow_doc_present",
+    "type": "contains",
+    "path": "docs/WORKTREE_SLOTS.md",
+    "pattern": "scripts/start-agent.sh codex --app",
+    "description": "Worktree slot documentation covers Codex app launch flow"
+  },
+  {
+    "id": "workflow_skill_requires_issue_backed_branches",
+    "type": "contains",
+    "path": "skills/repo-workflow-env/SKILL.md",
+    "pattern": "do not invent issue-less scratch branches",
+    "description": "Repo workflow skill blocks issue-less scratch branches"
+  },
+  {
+    "id": "commit_skill_requires_issue_backed_branches",
+    "type": "contains",
+    "path": "skills/repo-commit-pr-flow/SKILL.md",
+    "pattern": "Branch must remain issue-backed",
+    "description": "Repo commit/PR skill keeps the issue-backed branch contract explicit"
+  },
+  {
+    "id": "legacy_worktree_helper_removed",
+    "type": "path_absent",
+    "path": "scripts/new_worktree.sh",
+    "description": "Legacy unmanaged worktree helper has been removed"
   }
 ]

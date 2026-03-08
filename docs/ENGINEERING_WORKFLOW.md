@@ -4,7 +4,7 @@ Last updated: March 8, 2026
 
 ## Goals
 - No direct commits to `main`
-- Every feature/change in a dedicated branch and worktree
+- Every feature/change in a dedicated branch and managed worktree slot
 - Granular commits
 - PR-based merges only after review + passing CI
 
@@ -19,12 +19,25 @@ Last updated: March 8, 2026
   - `claude/feat/16-runtime-worker`
 
 ## Worktree Rules
-- Use one worktree per active branch.
-- Recommended location: `.worktrees/<branch-name-sanitized>`.
+- The shared root checkout is control-plane/admin-only.
+- Use the managed slot workflow for normal work:
+  - `scripts/start-agent.sh codex --issue 7 --type fix --label "safe calculator"`
+  - `scripts/start-agent.sh codex --app --issue 7 --type fix --label "safe calculator"`
+- Stable reusable slots live at:
+  - `.worktrees/slot-01`
+  - `.worktrees/slot-02`
+  - `.worktrees/slot-03`
+  - `.worktrees/slot-04`
+- Overflow slots are created under `.worktrees/dyn-XX` only through the slot manager.
+- Lease metadata is stored under `.worktrees/state/`.
+- The managed slot flow is the single supported path for new work.
 
-Create:
+Inspect / clean up:
 ```bash
-scripts/new_worktree.sh codex fix 7 safe-calculator
+scripts/agent-status.sh
+scripts/release-slot.sh
+scripts/release-slot.sh --all
+scripts/reclaim-stale-slots.sh --dry-run
 ```
 
 Sync before work, before push, and before opening PR:
@@ -77,7 +90,7 @@ CI runs unit tests and deterministic repository checks only. LLM/workflow evals 
 1. Install hooks:
 ```bash
 git config core.hooksPath .githooks
-chmod +x .githooks/pre-push
+chmod +x .githooks/pre-commit .githooks/pre-push
 ```
 
 2. Configure branch protection (requires repo admin via `gh`):
@@ -95,7 +108,7 @@ scripts/sync_skills.sh
 - Runtime skill location is `${CODEX_HOME:-$HOME/.codex}/skills/`.
 - Sync from repository to runtime with `scripts/sync_skills.sh`.
 - Current workflow skills:
-  - `repo-workflow-env`: branch/worktree creation and rebase checkpoints
+  - `repo-workflow-env`: managed slot launch and rebase checkpoints
   - `repo-issue-flow`: issue creation, body normalization, and labeling
   - `repo-commit-pr-flow`: commit slicing, push/PR workflow, final checklist
   - `gh-address-comments`: triage and resolve PR comments/threads

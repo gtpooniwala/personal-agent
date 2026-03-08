@@ -11,8 +11,9 @@ Use this skill when changes are ready to commit, push, or publish as a PR.
 
 ## Non-negotiable contract
 - Keep commits granular and task-focused.
-- Do not commit or push feature work from `main`; use a dedicated branch/worktree.
+- Do not commit or push feature work from `main`; use a managed slot.
 - Keep branch rebased on latest `origin/main`.
+- Branch must remain issue-backed and match `<agent>/<type>/<issue>-<slug>`; do not rename or continue work on issue-less scratch branches.
 - PR must target `main` and include an issue reference (`Refs #<id>` minimum).
 - Use closing keywords (`Closes/Fixes/Resolves #<id>`) only when the PR fully completes that issue.
 - Merge strategy is squash-only.
@@ -34,6 +35,7 @@ Use this skill when changes are ready to commit, push, or publish as a PR.
 
 4. Rebase and push.
 - Run `scripts/sync_main.sh` before push.
+- Confirm the current branch still matches the issue-backed naming contract before pushing.
 - Push current branch to origin.
 
 5. Open or update PR.
@@ -47,6 +49,7 @@ Use this skill when changes are ready to commit, push, or publish as a PR.
   - `PR Policy / enforce-pr-policy`
 - Local validation: Automated Code Review (`cubic review --base main`) has been run and passed with no issues (this is a local check, not a PR status check).
 - Branch is up to date with `origin/main`.
+- Branch name still matches `<agent>/<type>/<issue>-<slug>`.
 - Merge method remains squash-and-merge.
 
 ## Output expectations

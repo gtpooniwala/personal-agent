@@ -46,4 +46,5 @@ Use this skill when the task involves creating a new issue, improving an existin
 ## Output expectations
 - Report the issue numbers created or updated.
 - Report the labels applied or changed.
+- Call out when a newly created or clarified issue unblocks `repo-workflow-env` for an issue-backed branch/slot claim.
 - Call out duplicates, tracker relationships, or planning-doc follow-ups explicitly.

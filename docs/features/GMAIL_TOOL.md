@@ -53,5 +53,5 @@ The Gmail Tool provides robust integration with Gmail, enabling the agent to sea
 - Tool is hidden from the active tool list unless dependencies and credentials checks pass (OAuth/token setup happens on first use)
 
 ## References
-- See [`README.md`](../../README.md) and [`AGENT.md`](../../AGENT.md) for user and workflow documentation
+- See [`README.md`](../../README.md) and [`AGENTS.md`](../../AGENTS.md) for user and workflow documentation
 - See `backend/orchestrator/tools/gmail.py` for implementation details

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ ! -f "AGENT.md" ] || [ ! -d "backend" ] || [ ! -d "tests" ]; then
-  echo "Run this script from the repository root."
+if [ ! -f "AGENTS.md" ] || [ ! -d "backend" ] || [ ! -d "tests" ]; then
+  echo "Run this script from the repository root or a managed worktree root."
   exit 1
 fi
 

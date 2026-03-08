@@ -34,5 +34,5 @@ This approach ensures the agent has access to recent details and a high-level su
 - Ensures recent and summarised context is always available
 
 ## References
-- See [`README.md`](../../README.md) and [`AGENT.md`](../../AGENT.md) for user and workflow documentation.
+- See [`README.md`](../../README.md) and [`AGENTS.md`](../../AGENTS.md) for user and workflow documentation.
 - See `backend/orchestrator/core.py` and `backend/orchestrator/tools/summarisation_agent.py` for implementation.

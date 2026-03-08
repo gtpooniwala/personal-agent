@@ -201,7 +201,7 @@ A sophisticated AI-powered personal assistant built with FastAPI, LangGraph, and
 
 - **Status**: 🚧 Placeholder
 - **Purpose**: Email, calendar, and task management
-- **Planned Features**: See AGENT.md and docs/features for details
+- **Planned Features**: See AGENTS.md and docs/features for details
 
 ### Information Flow Architecture
 
@@ -300,7 +300,7 @@ The architecture is designed for easy expansion:
 ```text
 personal-agent/
 ├── README.md                 # This file - User documentation
-├── AGENT.md                 # Workflow contract for AI coding agents
+├── AGENTS.md                # Workflow contract for AI coding agents
 ├── backend/                 # FastAPI backend with orchestrator architecture
 │   ├── main.py             # Application entry point
 │   ├── test_comprehensive.py # Main test suite (moved for easy access)
@@ -354,7 +354,7 @@ For detailed development information, see:
 - [`docs/DEVELOPMENT_GUIDE.md`](docs/DEVELOPMENT_GUIDE.md) - Development workflow
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) - Technical architecture
 - [`docs/API.md`](docs/API.md) - API documentation
-- [`AGENT.md`](AGENT.md) - Workflow contract for AI coding agents
+- [`AGENTS.md`](AGENTS.md) - Workflow contract for AI coding agents
 
 ## 📊 System Status
 

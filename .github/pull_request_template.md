@@ -12,7 +12,7 @@ Refs #
 - [ ] If this PR changes LLM/tool-calling behavior or agent workflow logic, run local eval(s) and include commands/results in PR description
 
 ## Workflow Checklist
-- [ ] Branch created via worktree (not `main`)
+- [ ] Branch created via managed worktree slot (not `main`)
 - [ ] Rebasing done against latest `origin/main` before push/PR
 - [ ] Commits are granular and focused
 - [ ] CI checks pass
