@@ -1,0 +1,25 @@
+docs/WORKBOARD.md
+  075a760a332c7d04 3,23-25,27-29,38-39,87-91
+tests/test_conversation_naming.py
+  075a760a332c7d04 38,53-57,61,71,81,91,101,111,125
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "cfda371bf05f9794ad3159b2421d30ca228ea56c",
+  "prompts": {
+    "075a760a332c7d04": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89792f0e-7e12-473f-b654-4c1ff18b020c",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 28,
+      "total_deletions": 19,
+      "accepted_lines": 27,
+      "overriden_lines": 0
+    }
+  }
+}
