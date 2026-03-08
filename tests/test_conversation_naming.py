@@ -47,14 +47,14 @@ def _make_conv(
     }
 
 
-@unittest.skipUnless(
-    NAMING_TESTS_AVAILABLE, f"Naming test dependencies unavailable: {NAMING_IMPORT_ERROR}"
-)
 def _close_coro(coro):
     """Side-effect for mocked asyncio.create_task: close the coroutine to avoid ResourceWarning."""
     coro.close()
 
 
+@unittest.skipUnless(
+    NAMING_TESTS_AVAILABLE, f"Naming test dependencies unavailable: {NAMING_IMPORT_ERROR}"
+)
 class TestCheckConversationMaintenance(unittest.TestCase):
     """Tests for check_conversation_maintenance scheduling logic."""
 
