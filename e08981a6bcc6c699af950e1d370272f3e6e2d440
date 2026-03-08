@@ -1,0 +1,23 @@
+frontend/package.json
+  ab908bccf2a8502f 27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "e08981a6bcc6c699af950e1d370272f3e6e2d440",
+  "prompts": {
+    "ab908bccf2a8502f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7872f580-9aeb-4a01-959d-d8ee9b202607",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
