@@ -181,4 +181,32 @@ describe('ChatPanel document context UX (issue #64)', () => {
     expect(within(sourceRegion).getByText("Bob's Contract.pdf")).toBeInTheDocument();
     expect(within(sourceRegion).getByText(/Section 4/i)).toBeInTheDocument();
   });
+
+  test('falls back to a looser parser when source formatting is not bolded', () => {
+    render(
+      <ChatPanel
+        {...defaultProps}
+        messages={[
+          {
+            id: 'assistant-3',
+            role: 'assistant',
+            content: 'Found another source.',
+            timestamp: new Date().toISOString(),
+            agent_actions: [
+              {
+                tool: 'search_documents',
+                input: '{ "query": "pricing" }',
+                output:
+                  "1. From 'Pricing Addendum.pdf' (section 7) - highly relevant:\nPricing updates require written approval.\n\n*Found 1 relevant passages from 1 document(s).*",
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    const sourceRegion = screen.getByLabelText('Document sources');
+    expect(within(sourceRegion).getByText('Pricing Addendum.pdf')).toBeInTheDocument();
+    expect(within(sourceRegion).getByText(/Pricing updates require written approval/i)).toBeInTheDocument();
+  });
 });

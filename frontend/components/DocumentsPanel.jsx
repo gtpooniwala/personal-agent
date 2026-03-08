@@ -176,7 +176,7 @@ export default function DocumentsPanel({
                       return (
                         <article
                           key={doc.id}
-                          className={`document-card ${isSelected ? "selected" : ""} ${isReady ? "ready" : "inactive"}`}
+                          className={`document-card ${isSelected ? "selected" : ""} ${isReady ? "" : "inactive"}`}
                         >
                           <label className="doc-main-row" htmlFor={`doc-${doc.id}`}>
                             <input

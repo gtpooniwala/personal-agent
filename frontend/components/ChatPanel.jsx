@@ -17,23 +17,89 @@ const DOCUMENT_PROMPT_STARTERS = [
   },
 ];
 
+function buildSourceId({ filename, section, relevance, excerpt }) {
+  return [filename, section, relevance, excerpt.slice(0, 80)].join("::");
+}
+
+function parseSourceHeader(line) {
+  if (!line) {
+    return null;
+  }
+
+  const patterns = [
+    /\*\*\d+\.\s+From '(.+?)' \(section (\d+)\) - ([^:*]+):\*\*/,
+    /\d+\.\s+From '(.+?)' \(section (\d+)\) - ([^:]+):?/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = line.match(pattern);
+    if (match) {
+      const [, filename, section, relevance] = match;
+      return {
+        filename: filename.trim(),
+        section: section.trim(),
+        relevance: relevance.trim(),
+      };
+    }
+  }
+
+  return null;
+}
+
 export function extractDocumentSources(actions) {
   const searchAction = (actions || []).find((action) => action?.tool === "search_documents");
   const output = String(searchAction?.output || "");
   const sources = [];
-  const sourcePattern =
-    /\*\*\d+\.\s+From '(.+?)' \(section (\d+)\) - ([^:*]+):\*\*\s*([\s\S]*?)(?=\n\*\*\d+\.\s+From '|\n\*Found |\n---\n\*\*Here is a list|$)/g;
 
-  for (const match of output.matchAll(sourcePattern)) {
-    const [, filename, section, relevance, excerpt] = match;
+  let currentSource = null;
+  const excerptLines = [];
+
+  const flushCurrentSource = () => {
+    if (!currentSource) {
+      return;
+    }
+
+    const excerpt = excerptLines.join(" ").trim();
+    if (!excerpt) {
+      currentSource = null;
+      excerptLines.length = 0;
+      return;
+    }
+
     sources.push({
-      filename,
-      section,
-      relevance: relevance.trim(),
-      excerpt: excerpt.trim(),
+      id: buildSourceId({ ...currentSource, excerpt }),
+      ...currentSource,
+      excerpt,
     });
+
+    currentSource = null;
+    excerptLines.length = 0;
+  };
+
+  for (const rawLine of output.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+
+    if (line.startsWith("*Found ") || line.startsWith("---")) {
+      flushCurrentSource();
+      continue;
+    }
+
+    const parsedHeader = parseSourceHeader(line);
+    if (parsedHeader) {
+      flushCurrentSource();
+      currentSource = parsedHeader;
+      continue;
+    }
+
+    if (currentSource) {
+      excerptLines.push(line.replace(/^\*\*|\*\*$/g, "").trim());
+    }
   }
 
+  flushCurrentSource();
   return sources;
 }
 
@@ -76,8 +142,8 @@ function SourceCards({ actions }) {
 
   return (
     <section className="source-card-list" aria-label="Document sources">
-      {sources.map((source, index) => (
-        <article key={`${source.filename}-${source.section}-${index}`} className="source-card">
+      {sources.map((source) => (
+        <article key={source.id} className="source-card">
           <div className="source-card-header">
             <strong>{source.filename}</strong>
             <span className="source-card-meta">
