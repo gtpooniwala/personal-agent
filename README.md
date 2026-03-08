@@ -105,7 +105,7 @@ cp .env.example .env
 
 ```bash
 # If you plan to use Gmail in docker compose, create the host auth directory first.
-mkdir -p backend/data/gmail
+mkdir -p data/gmail
 docker compose up --build
 ```
 
