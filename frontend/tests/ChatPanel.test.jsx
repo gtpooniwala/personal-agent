@@ -153,4 +153,32 @@ describe('ChatPanel document context UX (issue #64)', () => {
     expect(within(sourceRegion).getByText(/Section 2/i)).toBeInTheDocument();
     expect(within(sourceRegion).getByText(/Termination requires thirty days notice/i)).toBeInTheDocument();
   });
+
+  test('parses source cards when the document filename contains an apostrophe', () => {
+    render(
+      <ChatPanel
+        {...defaultProps}
+        messages={[
+          {
+            id: 'assistant-2',
+            role: 'assistant',
+            content: 'Found it.',
+            timestamp: new Date().toISOString(),
+            agent_actions: [
+              {
+                tool: 'search_documents',
+                input: '{ "query": "renewal" }',
+                output:
+                  "**1. From 'Bob's Contract.pdf' (section 4) - moderately relevant:**\nRenewal is automatic unless cancelled.\n\n*Found 1 relevant passages from 1 document(s).*",
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    const sourceRegion = screen.getByLabelText('Document sources');
+    expect(within(sourceRegion).getByText("Bob's Contract.pdf")).toBeInTheDocument();
+    expect(within(sourceRegion).getByText(/Section 4/i)).toBeInTheDocument();
+  });
 });

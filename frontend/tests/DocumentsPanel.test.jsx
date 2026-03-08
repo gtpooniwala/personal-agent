@@ -79,4 +79,37 @@ describe('DocumentsPanel document workflow UX (issue #64)', () => {
     await user.click(screen.getByRole('button', { name: /select ready/i }));
     expect(defaultProps.onSelectReadyDocuments).toHaveBeenCalledTimes(1);
   });
+
+  test('distinguishes queued documents from indexing documents', () => {
+    render(
+      <DocumentsPanel
+        {...defaultProps}
+        documents={[
+          {
+            id: 'doc-pending',
+            filename: 'Queued Upload.pdf',
+            file_size: 1024,
+            uploaded_at: new Date().toISOString(),
+            processed: 'pending',
+            total_chunks: 0,
+            summary: '',
+          },
+          {
+            id: 'doc-processing',
+            filename: 'Indexing Upload.pdf',
+            file_size: 1024,
+            uploaded_at: new Date().toISOString(),
+            processed: 'processing',
+            total_chunks: 0,
+            summary: '',
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('1 queued')).toBeInTheDocument();
+    expect(screen.getByText('1 indexing')).toBeInTheDocument();
+    expect(screen.getByText(/Queued for indexing/i)).toBeInTheDocument();
+    expect(screen.getByText(/Indexing in progress/i)).toBeInTheDocument();
+  });
 });

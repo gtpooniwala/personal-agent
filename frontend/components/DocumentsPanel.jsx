@@ -32,9 +32,8 @@ export default function DocumentsPanel({
   const selectedCount = selectedDocuments.size;
   const readyDocuments = documents.filter((doc) => doc.processed === "completed");
   const readyCount = readyDocuments.length;
-  const processingCount = documents.filter(
-    (doc) => doc.processed === "processing" || doc.processed === "pending",
-  ).length;
+  const processingCount = documents.filter((doc) => doc.processed === "processing").length;
+  const queuedCount = documents.filter((doc) => doc.processed === "pending").length;
   const failedCount = documents.filter((doc) => doc.processed === "failed").length;
 
   function buildDocumentSummary(doc) {
@@ -48,6 +47,10 @@ export default function DocumentsPanel({
 
     if (doc.processed === "failed") {
       return "Processing failed. Re-upload the file to retry indexing.";
+    }
+
+    if (doc.processed === "pending") {
+      return "Queued for indexing. Search will unlock when processing begins.";
     }
 
     return "Indexing in progress. Search will unlock when processing completes.";
@@ -103,6 +106,7 @@ export default function DocumentsPanel({
                 <div className="docs-overview">
                   <span className="context-chip">{documents.length} total</span>
                   <span className="context-chip">{readyCount} ready</span>
+                  {queuedCount > 0 ? <span className="context-chip">{queuedCount} queued</span> : null}
                   {processingCount > 0 ? (
                     <span className="context-chip">{processingCount} indexing</span>
                   ) : null}

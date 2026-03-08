@@ -22,7 +22,7 @@ export function extractDocumentSources(actions) {
   const output = String(searchAction?.output || "");
   const sources = [];
   const sourcePattern =
-    /\*\*\d+\.\s+From '([^']+)' \(section (\d+)\) - ([^:*]+):\*\*\s*([\s\S]*?)(?=\n\*\*\d+\.\s+From '|\n\*Found |\n---\n\*\*Here is a list|$)/g;
+    /\*\*\d+\.\s+From '(.+?)' \(section (\d+)\) - ([^:*]+):\*\*\s*([\s\S]*?)(?=\n\*\*\d+\.\s+From '|\n\*Found |\n---\n\*\*Here is a list|$)/g;
 
   for (const match of output.matchAll(sourcePattern)) {
     const [, filename, section, relevance, excerpt] = match;
@@ -189,7 +189,7 @@ const ChatPanel = forwardRef(function ChatPanel({
                 key={starter.label}
                 type="button"
                 className="secondary-button prompt-starter-button"
-                onClick={() => onChoosePromptStarter?.(starter.buildPrompt(selectedDocumentDetails))}
+                onClick={() => onChoosePromptStarter?.(starter.buildPrompt())}
               >
                 {starter.label}
               </button>
