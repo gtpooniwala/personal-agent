@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-08T05:59:01.292567+00:00",
+  "generated_at": "2026-03-08T06:14:15.421720+00:00",
   "mode": "runtime",
   "summary": {
     "total": 7,
@@ -20,7 +20,7 @@
       "case_id": "lifecycle_queued_to_succeeded",
       "passed": true,
       "failures": [],
-      "duration_ms": 174
+      "duration_ms": 182
     },
     {
       "suite": "runtime",
@@ -41,7 +41,7 @@
       "case_id": "retry_exhaustion",
       "passed": true,
       "failures": [],
-      "duration_ms": 21
+      "duration_ms": 20
     },
     {
       "suite": "runtime",
@@ -55,14 +55,14 @@
       "case_id": "session_isolation_same_session_blocked",
       "passed": true,
       "failures": [],
-      "duration_ms": 1538
+      "duration_ms": 1540
     },
     {
       "suite": "runtime",
       "case_id": "event_loop_responsive_during_blocking_orchestration",
       "passed": true,
       "failures": [],
-      "duration_ms": 365
+      "duration_ms": 360
     }
   ]
 }

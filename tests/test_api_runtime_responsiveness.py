@@ -23,7 +23,7 @@ try:
     from backend.api import runtime_routes
     from backend.runtime.service import RuntimeService
     from backend.runtime.store import InMemoryRunStore
-except Exception as exc:
+except (ImportError, ModuleNotFoundError) as exc:
     API_TESTS_AVAILABLE = False
     API_IMPORT_ERROR = str(exc)
 
