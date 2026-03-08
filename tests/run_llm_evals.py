@@ -634,6 +634,10 @@ def _resolve_expected(case: Dict[str, Any], mode: str) -> Dict[str, Any]:
         if isinstance(mode_override, dict):
             for key, value in mode_override.items():
                 if key == "per_turn":
+                    if value is not None and not isinstance(value, list):
+                        raise ValueError(
+                            f"Case '{case_id}' has invalid 'expected.by_mode.{mode}.per_turn': must be a list"
+                        )
                     resolved["per_turn"] = _merge_per_turn_expectations(
                         resolved.get("per_turn"),
                         value,
