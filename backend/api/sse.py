@@ -5,7 +5,7 @@ import json
 from time import monotonic
 from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Optional
 
-from backend.runtime import MAX_EVENTS_LIMIT
+from backend.runtime import MAX_EVENTS_LIMIT, RunNotFoundError
 from backend.runtime.contracts import RUN_TERMINAL_STATUSES
 
 SSE_POLL_INTERVAL_SECONDS = 0.25
@@ -42,6 +42,17 @@ def build_run_complete_payload(status: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def build_run_unavailable_payload(run_id: str, error: str) -> Dict[str, Any]:
+    return {
+        "run_id": run_id,
+        "conversation_id": None,
+        "status": "unavailable",
+        "timestamp": None,
+        "result": None,
+        "error": error,
+    }
+
+
 async def generate_run_sse(
     *,
     runtime_service,
@@ -52,7 +63,12 @@ async def generate_run_sse(
     heartbeat_interval_seconds: float = SSE_HEARTBEAT_INTERVAL_SECONDS,
     events_limit: int = MAX_EVENTS_LIMIT,
 ) -> AsyncIterator[str]:
-    status = initial_status or await runtime_service.get_run_status(run_id)
+    try:
+        status = initial_status or await runtime_service.get_run_status(run_id)
+    except RunNotFoundError as exc:
+        yield format_sse("run_complete", build_run_unavailable_payload(run_id, str(exc)))
+        return
+
     after = None
     last_sent_at = monotonic()
 
@@ -61,47 +77,66 @@ async def generate_run_sse(
             return False
         return await is_disconnected()
 
-    async def drain_new_events(cursor: Optional[str]) -> tuple[list[str], Optional[str], int]:
-        emitted = 0
-        chunks: list[str] = []
-        while True:
-            page = await runtime_service.get_run_events(
-                run_id=run_id,
-                after=cursor,
-                limit=events_limit,
-            )
-            events = page["events"]
-            if not events:
-                return chunks, cursor, emitted
-
-            for event in events:
-                chunks.append(format_sse("run_event", build_run_event_payload(run_id, event)))
-                emitted += 1
-                cursor = event["event_id"]
-
-            if not page["has_more"]:
-                return chunks, cursor, emitted
-
     while True:
         if await client_disconnected():
             return
 
-        chunks, after, _ = await drain_new_events(after)
-        for chunk in chunks:
-            yield chunk
-            last_sent_at = monotonic()
+        try:
+            while True:
+                page = await runtime_service.get_run_events(
+                    run_id=run_id,
+                    after=after,
+                    limit=events_limit,
+                )
+                events = page["events"]
+                if not events:
+                    break
 
-        status = await runtime_service.get_run_status(run_id)
+                for event in events:
+                    yield format_sse("run_event", build_run_event_payload(run_id, event))
+                    last_sent_at = monotonic()
+                    after = event["event_id"]
+
+                if not page["has_more"]:
+                    break
+
+            status = await runtime_service.get_run_status(run_id)
+        except RunNotFoundError as exc:
+            # A terminal run may be pruned while a delayed or long-lived subscriber is still connected.
+            yield format_sse("run_complete", build_run_unavailable_payload(run_id, str(exc)))
+            return
+
         if status["status"] in RUN_TERMINAL_STATUSES:
-            final_chunks, after, final_emitted = await drain_new_events(after)
-            for chunk in final_chunks:
-                yield chunk
-                last_sent_at = monotonic()
+            final_emitted = 0
+            try:
+                while True:
+                    page = await runtime_service.get_run_events(
+                        run_id=run_id,
+                        after=after,
+                        limit=events_limit,
+                    )
+                    events = page["events"]
+                    if not events:
+                        break
+
+                    for event in events:
+                        yield format_sse("run_event", build_run_event_payload(run_id, event))
+                        last_sent_at = monotonic()
+                        after = event["event_id"]
+                        final_emitted += 1
+
+                    if not page["has_more"]:
+                        break
+            except RunNotFoundError as exc:
+                yield format_sse("run_complete", build_run_unavailable_payload(run_id, str(exc)))
+                return
 
             if final_emitted == 0:
                 yield format_sse("run_complete", build_run_complete_payload(status))
                 return
-            continue
+
+            yield format_sse("run_complete", build_run_complete_payload(status))
+            return
 
         if monotonic() - last_sent_at >= heartbeat_interval_seconds:
             yield format_sse("heartbeat", {})

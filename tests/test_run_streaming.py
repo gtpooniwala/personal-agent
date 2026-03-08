@@ -1,8 +1,6 @@
 import asyncio
-import importlib.util
 import json
 import os
-from pathlib import Path
 import sys
 import unittest
 from unittest.mock import patch
@@ -19,20 +17,11 @@ ROUTE_STREAMING_IMPORT_ERROR = ""
 
 try:
     from backend.api.sse import generate_run_sse
+    from backend.runtime import RunNotFoundError
     from backend.runtime.store import InMemoryRunStore
 except (ImportError, ModuleNotFoundError) as exc:
-    try:
-        sse_path = Path(project_root) / "backend/api/sse.py"
-        spec = importlib.util.spec_from_file_location("test_backend_api_sse", sse_path)
-        if spec is None or spec.loader is None:
-            raise RuntimeError(f"Unable to load spec for {sse_path}")
-        sse_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(sse_module)
-        generate_run_sse = sse_module.generate_run_sse
-        from backend.runtime.store import InMemoryRunStore
-    except Exception:
-        STREAMING_TESTS_AVAILABLE = False
-        STREAMING_IMPORT_ERROR = str(exc)
+    STREAMING_TESTS_AVAILABLE = False
+    STREAMING_IMPORT_ERROR = str(exc)
 
 try:
     from fastapi import FastAPI
@@ -74,6 +63,18 @@ class FakeRuntimeService:
             "next_after": next_after,
             "has_more": has_more,
         }
+
+
+class PrunedRunRuntimeService(FakeRuntimeService):
+    def __init__(self, store):
+        super().__init__(store)
+        self._events_calls = 0
+
+    async def get_run_events(self, *, run_id, after, limit):
+        self._events_calls += 1
+        if self._events_calls == 2:
+            raise RunNotFoundError(f"Run '{run_id}' was not found")
+        return await super().get_run_events(run_id=run_id, after=after, limit=limit)
 
 
 @unittest.skipUnless(
@@ -257,6 +258,36 @@ class TestRunStreaming(unittest.IsolatedAsyncioTestCase):
         disconnected = True
         with self.assertRaises(StopAsyncIteration):
             await asyncio.wait_for(anext(stream), timeout=0.2)
+
+    async def test_generate_run_sse_closes_cleanly_if_run_is_pruned_mid_stream(self):
+        run = self.store.create_run(
+            conversation_id="conv-stream-pruned",
+            message="hello",
+            selected_documents=[],
+        )
+        self.store.append_event(
+            run_id=run.run_id,
+            event_type="queued",
+            status="queued",
+            message="Run accepted and queued",
+        )
+        self.store.update_run(run_id=run.run_id, status="succeeded", result="ok", error=None)
+
+        stream = generate_run_sse(
+            runtime_service=PrunedRunRuntimeService(self.store),
+            run_id=run.run_id,
+            poll_interval_seconds=0.01,
+            heartbeat_interval_seconds=1.0,
+            events_limit=1,
+        )
+
+        first = parse_sse_message(await asyncio.wait_for(anext(stream), timeout=0.2))
+        completion = parse_sse_message(await asyncio.wait_for(anext(stream), timeout=0.2))
+
+        self.assertEqual(first["event"], "run_event")
+        self.assertEqual(first["data"]["event_type"], "queued")
+        self.assertEqual(completion["event"], "run_complete")
+        self.assertEqual(completion["data"]["status"], "unavailable")
 
 @unittest.skipUnless(
     ROUTE_STREAMING_TESTS_AVAILABLE,

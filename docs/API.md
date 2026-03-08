@@ -355,6 +355,7 @@ while (['queued', 'running', 'retrying'].includes(status.status)) {
 
 ### Streaming Run Events (SSE)
 ```javascript
+const runId = 'run-uuid';
 const source = new EventSource(`/runs/${runId}/stream`);
 
 source.addEventListener('run_event', (event) => {
