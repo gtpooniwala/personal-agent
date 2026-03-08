@@ -1,0 +1,23 @@
+CLAUDE.md
+  ea3120976fadd6d2 22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "888e2a385645108636fd37093afea7401203a083",
+  "prompts": {
+    "ea3120976fadd6d2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8d953f5d-2848-4eb0-b6d8-481ca3de2b26",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
