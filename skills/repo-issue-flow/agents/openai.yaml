@@ -1,0 +1,4 @@
+interface:
+  display_name: "Repo Issue Flow"
+  short_description: "Create and triage issues consistently"
+  default_prompt: "Create or refine a GitHub issue for this repo, align it with the local issue policy, and apply the correct labels."

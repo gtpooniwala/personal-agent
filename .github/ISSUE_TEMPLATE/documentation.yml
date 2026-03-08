@@ -1,0 +1,106 @@
+name: Documentation
+description: Improve docs, planning docs, ADRs, or workflow documentation
+title: "docs: "
+labels:
+  - documentation
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What documentation needs to change?
+      placeholder: Describe the documentation task.
+    validations:
+      required: true
+
+  - type: textarea
+    id: gap
+    attributes:
+      label: Current gap
+      description: What is missing, misleading, or out of date?
+      placeholder: Describe the current documentation problem.
+    validations:
+      required: true
+
+  - type: textarea
+    id: audience
+    attributes:
+      label: Target audience
+      description: Who should benefit from this documentation?
+      placeholder: Contributors, operators, users, AI agents, or a combination.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_change
+    attributes:
+      label: Proposed change
+      description: What should the new or updated documentation cover?
+      placeholder: Describe the intended doc content and scope.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: primary_type
+    attributes:
+      label: Primary type label
+      options:
+        - type:architecture
+        - type:security
+        - type:cleanup
+        - type:improvement
+        - type:ops
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: additional_types
+    attributes:
+      label: Additional type labels
+      description: Optional. Select only if the issue clearly spans another concern.
+      options:
+        - label: type:architecture
+        - label: type:security
+        - label: type:cleanup
+        - label: type:improvement
+        - label: type:ops
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - priority:p0
+        - priority:p1
+        - priority:p2
+        - priority:p3
+    validations:
+      required: true
+
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size
+      options:
+        - size:S
+        - size:M
+        - size:L
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: tracks
+    attributes:
+      label: Track labels
+      description: Select only for durable multi-issue initiatives.
+      options:
+        - label: track:migration
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: What would make this issue done?
+      placeholder: Use bullet points for clear, testable completion criteria.
+    validations:
+      required: true
