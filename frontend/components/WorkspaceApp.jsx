@@ -172,9 +172,24 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
 
       const nextQuery = params.toString();
       const nextUrl = nextQuery ? `${currentPath}?${nextQuery}` : currentPath;
+      const currentUrl = `${window.location.pathname}${window.location.search}`;
+      if (currentUrl === nextUrl) {
+        return;
+      }
       window.history.replaceState(null, "", nextUrl);
     },
     [currentPath],
+  );
+
+  const setConversationSelection = useCallback(
+    (conversationId, { syncUrl = true } = {}) => {
+      activeConversationIdRef.current = conversationId;
+      setCurrentConversationId(conversationId);
+      if (syncUrl) {
+        syncConversationUrl(conversationId);
+      }
+    },
+    [syncConversationUrl],
   );
 
   const focusComposer = useCallback(() => {
@@ -265,25 +280,22 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
 
         const nextConversations = Array.isArray(payload) ? payload : [];
         setConversations(nextConversations);
+        const previousConversationId = activeConversationIdRef.current;
+        let resolvedConversationId = nextConversations[0]?.id || null;
 
-        setCurrentConversationId((previousConversationId) => {
-          let resolvedConversationId = nextConversations[0]?.id || null;
+        if (
+          preferredConversationId &&
+          nextConversations.some((conversation) => conversation.id === preferredConversationId)
+        ) {
+          resolvedConversationId = preferredConversationId;
+        } else if (
+          previousConversationId &&
+          nextConversations.some((conversation) => conversation.id === previousConversationId)
+        ) {
+          resolvedConversationId = previousConversationId;
+        }
 
-          if (
-            preferredConversationId &&
-            nextConversations.some((conversation) => conversation.id === preferredConversationId)
-          ) {
-            resolvedConversationId = preferredConversationId;
-          } else if (
-            previousConversationId &&
-            nextConversations.some((conversation) => conversation.id === previousConversationId)
-          ) {
-            resolvedConversationId = previousConversationId;
-          }
-
-          syncConversationUrl(resolvedConversationId);
-          return resolvedConversationId;
-        });
+        setConversationSelection(resolvedConversationId);
       } catch {
         if (requestId !== latestConversationsRequestRef.current) {
           return;
@@ -295,7 +307,7 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
         }
       }
     },
-    [syncConversationUrl],
+    [setConversationSelection],
   );
 
   const loadConversationMessages = useCallback(async (conversationId) => {
@@ -377,21 +389,20 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
       });
 
       const nextConversationId = created?.id || null;
-      syncConversationUrl(nextConversationId);
+      setConversationSelection(nextConversationId);
       await loadConversations(nextConversationId);
       setMessages([]);
       focusComposer();
     } catch {
       setConversationError("Failed to create conversation.");
     }
-  }, [focusComposer, loadConversations, syncConversationUrl]);
+  }, [focusComposer, loadConversations, setConversationSelection]);
 
   const handleSelectConversation = useCallback(
     (conversationId) => {
-      setCurrentConversationId(conversationId);
-      syncConversationUrl(conversationId);
+      setConversationSelection(conversationId);
     },
-    [syncConversationUrl],
+    [setConversationSelection],
   );
 
   const sendMessage = useCallback(async () => {
@@ -420,9 +431,7 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
         }
 
         sendingConversationKey = requestConversationId;
-        activeConversationIdRef.current = requestConversationId;
-        setCurrentConversationId(requestConversationId);
-        syncConversationUrl(requestConversationId);
+        setConversationSelection(requestConversationId);
         setMessages([]);
         setSendingConversations((prev) => {
           const next = new Set(prev);
@@ -583,7 +592,7 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
     messageInput,
     selectedDocuments,
     sendingConversations,
-    syncConversationUrl,
+    setConversationSelection,
     updateRunState,
   ]);
 
@@ -691,13 +700,13 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
   useEffect(() => {
     const preferredConversationId = initialConversationId || readConversationIdFromLocation();
     if (preferredConversationId) {
-      setCurrentConversationId(preferredConversationId);
+      setConversationSelection(preferredConversationId, { syncUrl: false });
     }
 
     void loadTools();
     void loadConversations(preferredConversationId);
     void loadDocuments();
-  }, [initialConversationId, loadConversations, loadDocuments, loadTools]);
+  }, [initialConversationId, loadConversations, loadDocuments, loadTools, setConversationSelection]);
 
   useEffect(() => {
     activeConversationIdRef.current = currentConversationId;
