@@ -37,6 +37,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
       - ./data:/app/data
+      - ./backend/data/gmail:/app/backend/data/gmail
       - ./logs:/app/logs
     restart: unless-stopped
     depends_on:
