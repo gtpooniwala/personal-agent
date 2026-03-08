@@ -1,8 +1,8 @@
 # API Documentation
 
-## Scope And Status (As Of March 6, 2026)
+## Scope And Status (As Of March 8, 2026)
 This document reflects the current split route model:
-- Bare runtime endpoints for async run submission and polling.
+- Bare runtime endpoints for async run submission, polling, and run streaming.
 - `/api/v1` endpoints for conversations, tools, documents, and health.
 
 ## Base URLs
@@ -114,6 +114,44 @@ Response body:
 Cursor contract:
 - `after`: fetch events strictly after this event cursor.
 - `limit`: page size (`1..200`, default `50`).
+
+#### GET `/runs/{run_id}/stream`
+Streams run progress over Server-Sent Events (SSE) using the same `runs` and `run_events` store as the polling endpoints.
+
+Behavior:
+- replays already-persisted events first, in order
+- polls the existing event store for new events and emits them as `run_event`
+- sends `heartbeat` events roughly every 15 seconds while the run is still active
+- sends one final `run_complete` event and closes once the stored run status reaches `succeeded`, `failed`, or `cancelled`
+
+Response headers:
+- `Content-Type: text/event-stream`
+- `Cache-Control: no-cache`
+
+SSE event shapes:
+
+`run_event`
+```text
+event: run_event
+data: {"run_id":"run-uuid","event_id":"2","event_type":"tool_result","status":"running","timestamp":"2026-03-08T10:00:02Z","payload":{"message":"Tool action completed","tool":"calculator","metadata":null}}
+```
+
+`run_complete`
+```text
+event: run_complete
+data: {"run_id":"run-uuid","conversation_id":"conv-uuid","status":"succeeded","timestamp":"2026-03-08T10:00:03Z","result":"4","error":null}
+```
+
+`heartbeat`
+```text
+event: heartbeat
+data: {}
+```
+
+Reconnect guidance:
+- the stream does not maintain a separate in-memory event buffer
+- reconnecting clients should open a fresh SSE connection and rely on backlog replay from the durable run/event store
+- polling via `/runs/{run_id}/status` and `/runs/{run_id}/events` remains supported as the fallback contract
 
 #### GET `/api/v1/conversations`
 Get all conversations.
@@ -315,6 +353,36 @@ while (['queued', 'running', 'retrying'].includes(status.status)) {
 }
 ```
 
+### Streaming Run Events (SSE)
+```javascript
+const source = new EventSource(`/runs/${runId}/stream`);
+
+source.addEventListener('run_event', (event) => {
+  const payload = JSON.parse(event.data);
+  console.log('run event', payload.event_type, payload.payload);
+});
+
+source.addEventListener('run_complete', (event) => {
+  const payload = JSON.parse(event.data);
+  console.log('run finished', payload.status, payload.result, payload.error);
+  source.close();
+});
+
+source.addEventListener('heartbeat', () => {
+  // Optional: update connection liveness metrics.
+});
+
+source.onerror = () => {
+  source.close();
+  // Fall back to the polling contract if SSE is unavailable.
+};
+```
+
 ## Realtime Notes
-Implemented now: polling style interactions.
-Planned target: SSE/WebSocket can be considered after async run lifecycle is stable.
+Implemented now:
+- polling via `/runs/{id}/status` and `/runs/{id}/events`
+- SSE streaming via `/runs/{id}/stream`
+
+Recommended client behavior:
+- prefer SSE for active runs when available
+- keep polling as a fallback path and reconnect-safe recovery mechanism

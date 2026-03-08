@@ -1,8 +1,10 @@
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 
 from backend.api.models import ChatRequest, RunEventsResponse, RunStatusResponse, RunSubmitResponse
+from backend.api.sse import generate_run_sse
 from backend.api.state import runtime_service
 from backend.observability import observe_operation, update_observation
 from backend.runtime import DEFAULT_EVENTS_LIMIT, MAX_EVENTS_LIMIT, InvalidEventsCursorError, RunNotFoundError
@@ -92,6 +94,45 @@ async def get_run_events(
     if invalid_cursor_error is not None:
         raise HTTPException(status_code=400, detail=str(invalid_cursor_error)) from invalid_cursor_error
     return RunEventsResponse(**payload)
+
+
+@runtime_router.get("/runs/{run_id}/stream")
+async def stream_run_events(run_id: str, request: Request):
+    """Stream ordered run events over SSE without changing the run ledger contract."""
+    payload = None
+    not_found_error = None
+    with observe_operation(
+        name="api.runtime.run_stream",
+        counter_prefix="api.runtime.run_stream",
+        as_type="retriever",
+        metadata={"component": "api", "endpoint": "/runs/{run_id}/stream", "run_id": run_id},
+    ) as observation:
+        try:
+            payload = await runtime_service.get_run_status(run_id)
+        except RunNotFoundError as exc:
+            not_found_error = exc
+        else:
+            update_observation(observation, output={"status": payload["status"], "stream": "opened"})
+
+    if not_found_error is not None:
+        raise HTTPException(status_code=404, detail=str(not_found_error)) from not_found_error
+
+    # TODO(#121): Extract shared replay/polling mechanics once the polling and SSE transports can share one adapter.
+    # TODO(#122): Keep this additive until the frontend prefers SSE with polling fallback.
+    return StreamingResponse(
+        generate_run_sse(
+            runtime_service=runtime_service,
+            run_id=run_id,
+            is_disconnected=request.is_disconnected,
+            initial_status=payload,
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 # TODO(#16): Attach cancellation endpoint + worker-queue cancellation handling here.
