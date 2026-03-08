@@ -44,6 +44,25 @@ Workflow:
 - [x] `done` Upgrade to latest LangChain/LangGraph stack (deferred major migration) ([#22](https://github.com/gtpooniwala/personal-agent/issues/22))
 
 ## Backlog
+
+### Cloud Deployment (GCP)
+- [ ] `todo` Migrate document storage from local filesystem to GCS ([#79](https://github.com/gtpooniwala/personal-agent/issues/79))
+- [ ] `todo` Cloud SQL setup and production database configuration ([#80](https://github.com/gtpooniwala/personal-agent/issues/80))
+- [ ] `todo` GCP deployment architecture decision record ([#81](https://github.com/gtpooniwala/personal-agent/issues/81))
+- [ ] `todo` Secret Manager integration for production API keys ([#82](https://github.com/gtpooniwala/personal-agent/issues/82))
+- [ ] `todo` IAP setup for personal cloud authentication ([#83](https://github.com/gtpooniwala/personal-agent/issues/83))
+- [ ] `todo` Cloud Run service definitions for backend and frontend ([#85](https://github.com/gtpooniwala/personal-agent/issues/85))
+- [ ] `todo` GitHub Actions CI/CD pipeline for Cloud Run deployment ([#86](https://github.com/gtpooniwala/personal-agent/issues/86))
+- [ ] `todo` Cold start optimization and min-instances strategy ([#87](https://github.com/gtpooniwala/personal-agent/issues/87))
+
+### Event-Driven Triggers + Mobile
+- [ ] `todo` Event trigger framework — unified infrastructure for external triggers ([#88](https://github.com/gtpooniwala/personal-agent/issues/88))
+- [ ] `todo` Scheduled task runner — cron-like recurring agent runs ([#89](https://github.com/gtpooniwala/personal-agent/issues/89)) — *extends #18*
+- [ ] `todo` Task-to-task chaining — trigger_run tool for agent-spawned runs ([#90](https://github.com/gtpooniwala/personal-agent/issues/90))
+- [ ] `todo` Email-triggered task execution ([#91](https://github.com/gtpooniwala/personal-agent/issues/91))
+- [ ] `todo` Telegram bot integration for mobile task monitoring and triggering ([#92](https://github.com/gtpooniwala/personal-agent/issues/92))
+
+### General Backlog
 - [ ] `todo` Chat naming polish ([#1](https://github.com/gtpooniwala/personal-agent/issues/1))
 - [ ] `todo` Internet search integration expansion ([#2](https://github.com/gtpooniwala/personal-agent/issues/2))
 - [ ] `todo` Email integration ([#3](https://github.com/gtpooniwala/personal-agent/issues/3))
@@ -76,5 +95,5 @@ Workflow:
 - `01 Foundation Hardening`: #7-#13, #40
 - `02 Runtime Migration Core`: #14-#17
 - `03 Workflow Automation`: #18-#19
-- `Backlog / Future`: #1-#6
+- `Backlog / Future`: #1-#6, #78-#83, #85-#92
 - Follow branch/worktree/PR policy in [`ENGINEERING_WORKFLOW.md`](ENGINEERING_WORKFLOW.md).

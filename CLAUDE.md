@@ -19,6 +19,7 @@ If this file and `AGENT.md` diverge, follow `AGENT.md` and then reconcile this f
 8. Merge via **Squash and merge** only.
 
 ## Commands
+- Automated code review (run before merging): `cubic review --base main` (or `cubic review --base` to auto-detect base branch). Repeat until no issues remain.
 - New worktree:
   - `scripts/new_worktree.sh claude <type> <issue> <slug>`
 - Sync with main:
