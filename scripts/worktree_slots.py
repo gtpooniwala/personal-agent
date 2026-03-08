@@ -302,7 +302,12 @@ def base_ref(ctx: RepoContext) -> str:
 
 
 def parse_worktree_list(ctx: RepoContext) -> list[dict[str, str]]:
-    output = git("worktree", "list", "--porcelain", cwd=ctx.shared_root)
+    return [dict(entry) for entry in _parse_worktree_list_cached(str(ctx.shared_root))]
+
+
+@lru_cache(maxsize=None)
+def _parse_worktree_list_cached(shared_root: str) -> tuple[dict[str, str], ...]:
+    output = git("worktree", "list", "--porcelain", cwd=Path(shared_root))
     entries: list[dict[str, str]] = []
     current: dict[str, str] = {}
     for line in output.splitlines():
@@ -319,7 +324,7 @@ def parse_worktree_list(ctx: RepoContext) -> list[dict[str, str]]:
             current[key] = value
     if current:
         entries.append(current)
-    return entries
+    return tuple(entries)
 
 
 def branch_worktree_map(ctx: RepoContext) -> dict[str, str]:
@@ -404,8 +409,13 @@ def observe_slot(ctx: RepoContext, lease: dict[str, Any], stale_hours: int) -> d
     path_branches = path_worktree_map(ctx)
     dirty = None
     checked_out_branch = path_branches.get(str(slot_dir))
-    if slot_dir.exists() and checked_out_branch:
-        dirty = git_status_dirty(slot_dir)
+    if slot_dir.exists():
+        try:
+            dirty = git_status_dirty(slot_dir)
+        except Exception:
+            # Unknown worktree status is treated as unsafe so release/reclaim
+            # paths do not discard uncommitted changes.
+            dirty = True
 
     merged = branch_merged_into_main(ctx, branch) if branch else None
     last_commit = branch_last_commit(ctx, branch) if branch else None
@@ -666,8 +676,8 @@ def cmd_release(args: argparse.Namespace) -> int:
         if lease["state"] == "free":
             raise SystemExit(f"Slot {slot_id} is already free.")
         obs = observe_slot(ctx, lease, args.stale_hours)
-        if obs["dirty"]:
-            raise SystemExit(f"Refusing to release {slot_id}: worktree has uncommitted changes.")
+        if obs["slot_path_exists"] and obs["dirty"] is not False:
+            raise SystemExit(f"Refusing to release {slot_id}: worktree has uncommitted or unknown changes.")
         if obs["merged"] is False and not args.keep_branch:
             raise SystemExit(
                 f"Refusing to release {slot_id}: branch {lease['branch']} is not merged into main. "
@@ -686,7 +696,7 @@ def cmd_release(args: argparse.Namespace) -> int:
 def cmd_reclaim(args: argparse.Namespace) -> int:
     ctx = repo_context()
     ensure_dirs(ctx)
-    max_slots = validate_max_slots(args.max_slots)
+    max_slots = known_max_slots(ctx, args.max_slots)
     actions: list[dict[str, str]] = []
     with state_lock(ctx):
         for slot_id in known_slot_ids(ctx, max_slots):
@@ -790,7 +800,7 @@ def print_status(rows: list[dict[str, Any]], unmanaged: list[dict[str, str]]) ->
 def cmd_status(args: argparse.Namespace) -> int:
     ctx = repo_context()
     ensure_dirs(ctx)
-    max_slots = validate_max_slots(args.max_slots)
+    max_slots = known_max_slots(ctx, args.max_slots)
     rows = status_rows(ctx, max_slots, args.stale_hours)
     unmanaged = unmanaged_worktrees(ctx, max_slots)
     if args.json:
@@ -823,6 +833,7 @@ def build_parser() -> argparse.ArgumentParser:
     release.set_defaults(func=cmd_release)
 
     reclaim = subparsers.add_parser("reclaim-stale", help="Mark stale slots and reclaim only when clearly safe.")
+    reclaim.add_argument("--all", action="store_true", help="Explicitly sweep every managed slot (same safety rules).")
     reclaim.add_argument("--dry-run", action="store_true")
     reclaim.add_argument("--json", action="store_true")
     reclaim.add_argument("--max-slots", type=int, default=DEFAULT_MAX_SLOTS)

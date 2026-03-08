@@ -86,6 +86,41 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
 
             self.assertEqual(worktree_slots.known_max_slots(ctx, worktree_slots.DEFAULT_MAX_SLOTS), 10)
 
+    def test_observe_slot_treats_unknown_dirty_state_as_unsafe(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            root = worktree_slots.Path(tmpdir)
+            ctx = worktree_slots.RepoContext(
+                cwd_root=root,
+                shared_root=root,
+                common_dir=root / ".git",
+                worktrees_dir=root / ".worktrees",
+                state_dir=root / ".worktrees" / "state",
+            )
+            slot_dir = ctx.worktrees_dir / "slot-01"
+            slot_dir.mkdir(parents=True)
+            lease = worktree_slots.blank_lease(ctx, "slot-01")
+            lease["state"] = "reserved"
+
+            original_branch_worktree_map = worktree_slots.branch_worktree_map
+            original_path_worktree_map = worktree_slots.path_worktree_map
+            original_git_status_dirty = worktree_slots.git_status_dirty
+            try:
+                worktree_slots.branch_worktree_map = lambda _ctx: {}
+                worktree_slots.path_worktree_map = lambda _ctx: {}
+
+                def boom(_path):
+                    raise RuntimeError("status unavailable")
+
+                worktree_slots.git_status_dirty = boom
+                observed = worktree_slots.observe_slot(ctx, lease, stale_hours=72)
+            finally:
+                worktree_slots.branch_worktree_map = original_branch_worktree_map
+                worktree_slots.path_worktree_map = original_path_worktree_map
+                worktree_slots.git_status_dirty = original_git_status_dirty
+
+            self.assertTrue(observed["slot_path_exists"])
+            self.assertTrue(observed["dirty"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -35,6 +35,8 @@ Last updated: March 8, 2026
 Inspect / clean up:
 ```bash
 scripts/agent-status.sh
+scripts/release-slot.sh
+scripts/release-slot.sh --all
 scripts/reclaim-stale-slots.sh --dry-run
 ```
 

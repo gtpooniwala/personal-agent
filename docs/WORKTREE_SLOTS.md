@@ -69,6 +69,17 @@ scripts/start-agent.sh codex --branch codex/chore/59-workflow-hardening
 scripts/release-slot.sh --slot slot-02
 ```
 
+Without a slot argument, `release-slot.sh` falls back to the same conservative reclaim flow as `reclaim-stale-slots.sh`:
+```bash
+scripts/release-slot.sh
+```
+
+If you want to make the full-slot sweep explicit, use `--all`:
+```bash
+scripts/release-slot.sh --all
+scripts/reclaim-stale-slots.sh --all
+```
+
 Keep an unmerged branch for later reuse:
 ```bash
 scripts/release-slot.sh --slot slot-02 --keep-branch

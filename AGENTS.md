@@ -47,6 +47,8 @@ Canonical workflow contract for coding agents in this repository.
 - Claim without launch: `scripts/claim-slot.sh --agent <codex|claude> ...`
 - Start agent in a managed slot: `scripts/start-agent.sh <codex|claude> ...`
 - Release a slot: `scripts/release-slot.sh --slot <slot-id> [--keep-branch]`
+- Shortcut cleanup sweep: `scripts/release-slot.sh` runs the same reclaim flow as `scripts/reclaim-stale-slots.sh`
+- Explicit full sweep: `scripts/release-slot.sh --all` or `scripts/reclaim-stale-slots.sh --all`
 - Conservative cleanup: `scripts/reclaim-stale-slots.sh [--dry-run]`
 - Sync with main: `scripts/sync_main.sh`
 - Sync repo-managed skills into Codex home: `scripts/sync_skills.sh`
