@@ -25,7 +25,9 @@ jobs:
             }
 
             function getSection(title) {
-              const pattern = new RegExp(`^### ${escapeRegExp(title)}\\n([\\s\\S]*?)(?=\\n### |$)`, "m");
+              const pattern = new RegExp(
+                `(?:^|\\n)### ${escapeRegExp(title)}\\n([\\s\\S]*?)(?=\\n### |$)`
+              );
               const match = body.match(pattern);
               return match ? match[1].trim() : "";
             }
