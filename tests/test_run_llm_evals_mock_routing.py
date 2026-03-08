@@ -152,6 +152,57 @@ class TestRunLLMEvalsMockRouting(unittest.TestCase):
         self.assertIn("Live eval database is not reachable: db down", error)
         self.assertIn("Docker Compose exposes Postgres on host port 5433", error)
 
+    def test_resolve_expected_merges_per_turn_mode_overrides(self):
+        case = {
+            "id": "capability_boundary",
+            "expected": {
+                "per_turn": [
+                    {
+                        "must_not_call": ["search_documents"],
+                        "response_contains": ["contract"],
+                    }
+                ],
+                "by_mode": {
+                    "mock": {
+                        "per_turn": [
+                            {
+                                "response_contains": ["no documents are currently selected"]
+                            }
+                        ]
+                    }
+                },
+            },
+        }
+
+        resolved = self.harness._resolve_expected(case, "mock")
+        self.assertEqual(
+            resolved["per_turn"],
+            [
+                {
+                    "must_not_call": ["search_documents"],
+                    "response_contains": ["no documents are currently selected"],
+                }
+            ],
+        )
+
+    def test_live_eval_database_connectivity_does_not_require_admin_when_db_is_reachable(self):
+        test_url = "postgresql+psycopg://user:pass@127.0.0.1:5432/personal_agent_eval"
+        engine = Mock()
+        sql_text = object()
+        connection = unittest.mock.MagicMock()
+        engine_cm = unittest.mock.MagicMock()
+        engine_cm.__enter__.return_value = connection
+        engine.connect = unittest.mock.MagicMock(return_value=engine_cm)
+        engine.dispose = unittest.mock.MagicMock()
+
+        with patch.dict(os.environ, {"EVAL_DATABASE_URL": test_url}, clear=True):
+            with patch.object(self.harness, "_ensure_live_eval_database_exists") as ensure_db:
+                with patch.object(self.harness, "_create_live_eval_engine", return_value=(engine, lambda _: sql_text)):
+                    error = self.harness._check_live_eval_database_connectivity()
+        self.assertIsNone(error)
+        ensure_db.assert_not_called()
+        connection.execute.assert_called_once_with(sql_text)
+
     def test_live_mode_requested_parses_flag_and_assignment_forms(self):
         self.assertTrue(self.harness._live_mode_requested(["run_llm_evals.py", "--mode", "live"]))
         self.assertTrue(self.harness._live_mode_requested(["run_llm_evals.py", "--mode=live"]))
@@ -182,7 +233,7 @@ class TestRunLLMEvalsMockRouting(unittest.TestCase):
         self.assertIn(self.harness.DOTENV_PATH, candidates)
         self.assertIn(common_dir.parent / ".env", candidates)
 
-    def test_live_eval_database_connectivity_ensures_database_exists_first(self):
+    def test_live_eval_database_connectivity_creates_missing_database_then_retries(self):
         test_url = "postgresql+psycopg://user:pass@127.0.0.1:5432/personal_agent_eval"
         engine = Mock()
         sql_text = object()
@@ -194,7 +245,15 @@ class TestRunLLMEvalsMockRouting(unittest.TestCase):
 
         with patch.dict(os.environ, {"EVAL_DATABASE_URL": test_url}, clear=True):
             with patch.object(self.harness, "_ensure_live_eval_database_exists") as ensure_db:
-                with patch.object(self.harness, "_create_live_eval_engine", return_value=(engine, lambda _: sql_text)):
+                with patch.object(
+                    self.harness,
+                    "_create_live_eval_engine",
+                    return_value=(engine, lambda _: sql_text),
+                ):
+                    engine.connect.side_effect = [
+                        RuntimeError('database "personal_agent_eval" does not exist'),
+                        engine_cm,
+                    ]
                     error = self.harness._check_live_eval_database_connectivity()
         self.assertIsNone(error)
         ensure_db.assert_called_once_with(test_url)

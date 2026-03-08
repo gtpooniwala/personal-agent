@@ -240,6 +240,19 @@ def _live_eval_connection_hint(database_url: str) -> Optional[str]:
     return None
 
 
+def _looks_like_missing_database_error(exc: Exception, database_url: str) -> bool:
+    database_name = urlsplit(database_url).path.rsplit("/", 1)[-1]
+    message = str(exc).lower()
+    if not database_name:
+        return False
+    return (
+        "does not exist" in message
+        or "unknown database" in message
+        or f'database "{database_name.lower()}"' in message
+        or f"database '{database_name.lower()}'" in message
+    )
+
+
 def _ensure_live_eval_database_exists(database_url: str) -> None:
     try:
         from sqlalchemy.engine import make_url
@@ -284,7 +297,6 @@ def _check_live_eval_database_connectivity() -> Optional[str]:
     if error:
         return error
     try:
-        _ensure_live_eval_database_exists(str(database_url))
         engine, sql_text = _create_live_eval_engine(str(database_url))
         try:
             with engine.connect() as connection:
@@ -292,6 +304,18 @@ def _check_live_eval_database_connectivity() -> Optional[str]:
         finally:
             engine.dispose()
     except Exception as exc:
+        if _looks_like_missing_database_error(exc, str(database_url)):
+            try:
+                _ensure_live_eval_database_exists(str(database_url))
+                engine, sql_text = _create_live_eval_engine(str(database_url))
+                try:
+                    with engine.connect() as connection:
+                        connection.execute(sql_text("SELECT 1"))
+                finally:
+                    engine.dispose()
+                return None
+            except Exception:
+                pass
         hint = _live_eval_connection_hint(str(database_url))
         if hint:
             return f"Live eval database is not reachable: {exc}\n{hint}"
@@ -570,6 +594,25 @@ def _check_turn_expectation(index: int, expectation: Dict[str, Any], actual: Tur
     return failures
 
 
+def _merge_per_turn_expectations(
+    base: Optional[List[Dict[str, Any]]],
+    override: Optional[List[Dict[str, Any]]],
+) -> List[Dict[str, Any]]:
+    merged: List[Dict[str, Any]] = []
+    base_list = base or []
+    override_list = override or []
+    length = max(len(base_list), len(override_list))
+
+    for index in range(length):
+        base_item = base_list[index] if index < len(base_list) else {}
+        override_item = override_list[index] if index < len(override_list) else {}
+        if not isinstance(base_item, dict) or not isinstance(override_item, dict):
+            raise ValueError("per_turn expectations must contain only objects")
+        merged.append({**base_item, **override_item})
+
+    return merged
+
+
 def _resolve_expected(case: Dict[str, Any], mode: str) -> Dict[str, Any]:
     case_id = str(case.get("id", "unknown"))
     expected = case.get("expected")
@@ -589,7 +632,14 @@ def _resolve_expected(case: Dict[str, Any], mode: str) -> Dict[str, Any]:
                 f"Case '{case_id}' has invalid 'expected.by_mode.{mode}': must be an object"
             )
         if isinstance(mode_override, dict):
-            resolved.update(mode_override)
+            for key, value in mode_override.items():
+                if key == "per_turn":
+                    resolved["per_turn"] = _merge_per_turn_expectations(
+                        resolved.get("per_turn"),
+                        value,
+                    )
+                else:
+                    resolved[key] = value
 
     if "per_turn" in resolved and not isinstance(resolved["per_turn"], list):
         raise ValueError(f"Case '{case_id}' has invalid 'expected.per_turn': must be a list")
