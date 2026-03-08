@@ -1,4 +1,4 @@
 interface:
   display_name: "Repo Workflow Env"
-  short_description: "Set up branch/worktree + rebase checkpoints"
-  default_prompt: "Set up this task in a compliant worktree/branch, verify workflow guardrails, and report the ready-to-code environment."
+  short_description: "Set up an issue-backed slot/branch + rebase checkpoints"
+  default_prompt: "Set up this task in a compliant managed worktree slot and issue-backed branch, verify workflow guardrails, and report the ready-to-code environment. If the task lacks an issue number, stop and surface that blocker instead of creating a scratch branch."

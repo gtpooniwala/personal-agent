@@ -201,6 +201,7 @@ Note: `scripts/run_local_checks.sh` forces tests onto `TEST_DATABASE_URL` to avo
 Guardrails:
 - no discovered tests = non-pass
 - skip-only unit test runs = non-pass
+- active implementation work belongs in managed worktree slots, not the shared root checkout
 
 Optional direct unit-test runner:
 
@@ -351,6 +352,7 @@ Design choices reflected in this implementation:
 - [Workboard](docs/WORKBOARD.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Engineering Workflow](docs/ENGINEERING_WORKFLOW.md)
+- [Worktree Slot Workflow](docs/WORKTREE_SLOTS.md)
 - [GitHub Issues](https://github.com/gtpooniwala/personal-agent/issues)
 
 ## License

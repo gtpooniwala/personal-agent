@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+
+if [ -x "${ROOT_DIR}/scripts/assert_not_shared_root.sh" ]; then
+  "${ROOT_DIR}/scripts/assert_not_shared_root.sh"
+fi
+
+exit 0

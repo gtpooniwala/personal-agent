@@ -2,12 +2,12 @@
 
 Repository workflow contract for Claude Code.
 
-Canonical source of truth: `AGENT.md` at repository root.
-If this file and `AGENT.md` diverge, follow `AGENT.md` and then reconcile this file.
+Canonical source of truth: `AGENTS.md` at repository root.
+If this file and `AGENTS.md` diverge, follow `AGENTS.md` and then reconcile this file.
 
 ## Mandatory Git Process
 1. Never commit directly to `main`.
-2. Always create a dedicated branch and worktree for each feature/fix.
+2. Never implement from the shared root checkout; use the managed slot workflow.
 3. Branch prefix for Claude: `claude/`.
 4. Use granular commits.
 5. Open PRs to `main` only.
@@ -20,8 +20,14 @@ If this file and `AGENT.md` diverge, follow `AGENT.md` and then reconcile this f
 
 ## Commands
 - Automated code review (run before merging): `cubic review --base main` (or `cubic review --base` to auto-detect base branch). Repeat until no issues remain.
-- New worktree:
-  - `scripts/new_worktree.sh claude <type> <issue> <slug>`
+- Launch into a managed slot:
+  - `scripts/start-agent.sh claude --issue <issue> --type <type> --label <label>`
+- Resume a parked branch:
+  - `scripts/start-agent.sh claude --branch <branch>`
+- Status / cleanup:
+  - `scripts/agent-status.sh`
+  - `scripts/release-slot.sh --slot <slot-id> [--keep-branch]`
+  - `scripts/reclaim-stale-slots.sh --dry-run`
 - Sync with main:
   - `scripts/sync_main.sh`
 

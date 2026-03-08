@@ -4,19 +4,21 @@ This file is the practical contributor workflow on top of the stricter policy in
 
 ## Standard Change Flow
 1. Sync with latest `origin/main`.
-2. Create a dedicated worktree and branch.
+2. Claim a managed worktree slot and branch.
 3. Make the smallest focused change that moves one issue or task forward.
 4. Run the smallest validation set that honestly matches the scope.
 5. Update docs if behavior, status, or sequencing changed.
 6. Commit, push, and open a PR that references the relevant issue.
 
 ## Worktrees And Branches
-Use one worktree per active branch.
+Use one managed worktree slot per active branch.
 
 Preferred command:
 ```bash
-scripts/new_worktree.sh codex docs 59 planning-refresh
+scripts/start-agent.sh codex --issue 59 --type docs --label "planning refresh"
 ```
+
+Prefer the slot workflow documented in [`WORKTREE_SLOTS.md`](WORKTREE_SLOTS.md). Use `scripts/new_worktree.sh` only when you explicitly need an unmanaged compatibility worktree.
 
 Sync before work and before push:
 ```bash
