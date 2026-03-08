@@ -19,6 +19,14 @@ while [ "$#" -gt 0 ]; do
     --cli)
       MODE="cli"
       ;;
+    --mode|--format)
+      echo "$1 is managed by scripts/start-agent.sh and cannot be forwarded."
+      exit 1
+      ;;
+    --mode=*|--format=*)
+      echo "${1%%=*} is managed by scripts/start-agent.sh and cannot be forwarded."
+      exit 1
+      ;;
     *)
       FORWARD_ARGS+=("$1")
       ;;

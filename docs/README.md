@@ -24,7 +24,6 @@ These are still useful, but they are supporting references rather than the prima
 - [`DEPLOYMENT.md`](DEPLOYMENT.md): GCP deployment ADR and rollout order
 - [`EVENT_TRIGGERS.md`](EVENT_TRIGGERS.md): trigger framework and mobile automation design
 - [`DEVELOPMENT_GUIDE.md`](DEVELOPMENT_GUIDE.md): contributor workflow on top of the engineering policy
-- [`WORKTREE_SLOTS.md`](WORKTREE_SLOTS.md): slot lifecycle, status, and cleanup commands
 
 ## Reference And Historical Context
 These docs remain in the repo because they are still useful to a reader or agent, but they should not be treated as the primary status source.

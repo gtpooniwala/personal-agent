@@ -4,7 +4,7 @@ Canonical workflow contract for coding agents in this repository.
 
 ## Root Checkout Rule
 - The shared root checkout is control-plane/admin-only.
-- If `git rev-parse --show-toplevel` equals the parent of `git rev-parse --git-common-dir`, stop before editing.
+- If `python3 -c 'from pathlib import Path; import subprocess; top = Path(subprocess.check_output(["git","rev-parse","--show-toplevel"], text=True).strip()).resolve(); common = Path(subprocess.check_output(["git","rev-parse","--git-common-dir"], text=True).strip()).resolve(); print(top == common.parent.resolve())'` prints `True`, stop before editing.
 - From the shared root checkout, only do control-plane actions such as:
   - `scripts/agent-status.sh`
   - `scripts/claim-slot.sh`

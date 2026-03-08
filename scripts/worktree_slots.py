@@ -27,6 +27,7 @@ BRANCH_RE = re.compile(
     r"^(?P<agent>codex|claude)/(?P<type>[a-z0-9][a-z0-9-]*)/(?P<issue>[0-9]+)-(?P<slug>[a-z0-9][a-z0-9-]*)$"
 )
 SLOT_RE = re.compile(r"^(slot|dyn)-[0-9]{2}$")
+TYPE_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
 @dataclass
@@ -185,6 +186,30 @@ def sanitize_slug(value: str) -> str:
     return slug
 
 
+def validate_type(value: str) -> str:
+    if not TYPE_RE.match(value):
+        raise SystemExit("Type must match: ^[a-z0-9][a-z0-9-]*$")
+    return value
+
+
+def validate_slot_id(slot_id: str, max_slots: int) -> str:
+    if not SLOT_RE.match(slot_id):
+        raise SystemExit(f"Invalid slot id: {slot_id}. Expected slot-XX or dyn-XX.")
+    if slot_id not in all_slot_ids(max_slots):
+        supported = all_slot_ids(max_slots)
+        raise SystemExit(f"Unknown slot {slot_id}. Supported slots range from {supported[0]} to {supported[-1]}.")
+    return slot_id
+
+
+def validate_max_slots(max_slots: int) -> int:
+    if max_slots < DEFAULT_STABLE_SLOTS:
+        raise SystemExit(
+            f"WORKTREE_SLOT_MAX / --max-slots must be at least {DEFAULT_STABLE_SLOTS} "
+            f"to cover the stable slot set."
+        )
+    return max_slots
+
+
 def parse_branch(branch: str) -> dict[str, str]:
     match = BRANCH_RE.match(branch)
     if not match:
@@ -274,8 +299,12 @@ def parse_worktree_list(ctx: RepoContext) -> list[dict[str, str]]:
                 entries.append(current)
                 current = {}
             continue
-        key, value = line.split(" ", 1)
-        current[key] = value
+        parts = line.split(" ", 1)
+        if len(parts) == 1:
+            current[parts[0]] = "true"
+        else:
+            key, value = parts
+            current[key] = value
     if current:
         entries.append(current)
     return entries
@@ -453,12 +482,10 @@ def create_or_attach_worktree(ctx: RepoContext, slot_id: str, branch: str) -> No
 
 
 def choose_slot(ctx: RepoContext, requested_slot: str | None, max_slots: int) -> str:
+    max_slots = validate_max_slots(max_slots)
     slots = all_slot_ids(max_slots)
     if requested_slot:
-        if requested_slot not in slots:
-            raise SystemExit(
-                f"Unknown slot {requested_slot}. Supported slots range from {slots[0]} to {slots[-1]}."
-            )
+        requested_slot = validate_slot_id(requested_slot, max_slots)
         lease = load_lease(ctx, requested_slot)
         if lease["state"] == "free":
             return requested_slot
@@ -481,6 +508,7 @@ def choose_slot(ctx: RepoContext, requested_slot: str | None, max_slots: int) ->
 
 
 def build_capacity_error(ctx: RepoContext, max_slots: int) -> str:
+    max_slots = validate_max_slots(max_slots)
     lines = [
         f"No free managed worktree slots are available (stable={DEFAULT_STABLE_SLOTS}, max={max_slots}).",
         "Run scripts/agent-status.sh to inspect leases, then release or reclaim slots explicitly.",
@@ -519,6 +547,7 @@ def print_payload(payload: dict[str, Any], output_format: str) -> None:
 def cmd_claim(args: argparse.Namespace) -> int:
     ctx = repo_context()
     ensure_dirs(ctx)
+    max_slots = validate_max_slots(args.max_slots)
 
     if args.agent not in ALLOWED_AGENTS:
         raise SystemExit(f"Agent must be one of: {', '.join(sorted(ALLOWED_AGENTS))}.")
@@ -544,10 +573,10 @@ def cmd_claim(args: argparse.Namespace) -> int:
         else:
             issue_id = args.issue
             task_label = args.label
-            branch = f"{args.agent}/{args.type}/{args.issue}-{sanitize_slug(args.label)}"
+            branch = f"{args.agent}/{validate_type(args.type)}/{args.issue}-{sanitize_slug(args.label)}"
 
         # Reuse an existing lease for this branch when possible.
-        for slot_id in known_slot_ids(ctx, args.max_slots):
+        for slot_id in known_slot_ids(ctx, max_slots):
             lease = load_lease(ctx, slot_id)
             if lease.get("branch") == branch and lease["state"] != "free":
                 create_or_attach_worktree(ctx, slot_id, branch)
@@ -558,9 +587,11 @@ def cmd_claim(args: argparse.Namespace) -> int:
                         "issue_id": issue_id,
                         "task_label": task_label,
                         "mode": args.mode,
-                        "state": lease["state"],
+                        "state": "reserved",
+                        "claimed_at": lease.get("claimed_at") or now_iso(),
                         "last_opened_at": now_iso(),
                         "last_checked_at": now_iso(),
+                        "stale_reason": None,
                     }
                 )
                 save_lease(ctx, lease)
@@ -576,7 +607,7 @@ def cmd_claim(args: argparse.Namespace) -> int:
                 )
                 return 0
 
-        slot_id = choose_slot(ctx, args.slot, args.max_slots)
+        slot_id = choose_slot(ctx, args.slot, max_slots)
         create_or_attach_worktree(ctx, slot_id, branch)
         lease = blank_lease(ctx, slot_id)
         timestamp = now_iso()
@@ -617,23 +648,24 @@ def mark_free(ctx: RepoContext, slot_id: str) -> None:
 def cmd_release(args: argparse.Namespace) -> int:
     ctx = repo_context()
     ensure_dirs(ctx)
+    slot_id = validate_slot_id(args.slot, validate_max_slots(DEFAULT_MAX_SLOTS))
     with state_lock(ctx):
-        lease = load_lease(ctx, args.slot)
+        lease = load_lease(ctx, slot_id)
         if lease["state"] == "free":
-            raise SystemExit(f"Slot {args.slot} is already free.")
+            raise SystemExit(f"Slot {slot_id} is already free.")
         obs = observe_slot(ctx, lease, args.stale_hours)
         if obs["dirty"]:
-            raise SystemExit(f"Refusing to release {args.slot}: worktree has uncommitted changes.")
+            raise SystemExit(f"Refusing to release {slot_id}: worktree has uncommitted changes.")
         if obs["merged"] is False and not args.keep_branch:
             raise SystemExit(
-                f"Refusing to release {args.slot}: branch {lease['branch']} is not merged into main. "
+                f"Refusing to release {slot_id}: branch {lease['branch']} is not merged into main. "
                 "Re-run with --keep-branch to park the branch and free the slot."
             )
-        slot_dir = slot_path(ctx, args.slot)
+        slot_dir = slot_path(ctx, slot_id)
         if slot_dir.exists():
             run("git", "worktree", "remove", str(slot_dir), cwd=ctx.shared_root)
-        mark_free(ctx, args.slot)
-        print(f"Released {args.slot}.")
+        mark_free(ctx, slot_id)
+        print(f"Released {slot_id}.")
         if lease.get("branch") and args.keep_branch:
             print(f"Branch kept for later reuse: {lease['branch']}")
     return 0
@@ -642,9 +674,10 @@ def cmd_release(args: argparse.Namespace) -> int:
 def cmd_reclaim(args: argparse.Namespace) -> int:
     ctx = repo_context()
     ensure_dirs(ctx)
+    max_slots = validate_max_slots(args.max_slots)
     actions: list[dict[str, str]] = []
     with state_lock(ctx):
-        for slot_id in known_slot_ids(ctx, args.max_slots):
+        for slot_id in known_slot_ids(ctx, max_slots):
             lease = load_lease(ctx, slot_id)
             if lease["state"] == "free":
                 continue
@@ -679,7 +712,7 @@ def cmd_reclaim(args: argparse.Namespace) -> int:
 
 
 def unmanaged_worktrees(ctx: RepoContext, max_slots: int) -> list[dict[str, str]]:
-    managed_paths = {str(slot_path(ctx, slot_id)) for slot_id in all_slot_ids(max_slots)}
+    managed_paths = {str(slot_path(ctx, slot_id)) for slot_id in all_slot_ids(validate_max_slots(max_slots))}
     items: list[dict[str, str]] = []
     for entry in parse_worktree_list(ctx):
         worktree = entry.get("worktree")
@@ -702,6 +735,7 @@ def unmanaged_worktrees(ctx: RepoContext, max_slots: int) -> list[dict[str, str]
 
 
 def status_rows(ctx: RepoContext, max_slots: int, stale_hours: int) -> list[dict[str, Any]]:
+    max_slots = validate_max_slots(max_slots)
     rows: list[dict[str, Any]] = []
     for slot_id in known_slot_ids(ctx, max_slots):
         lease = load_lease(ctx, slot_id)
@@ -744,8 +778,9 @@ def print_status(rows: list[dict[str, Any]], unmanaged: list[dict[str, str]]) ->
 def cmd_status(args: argparse.Namespace) -> int:
     ctx = repo_context()
     ensure_dirs(ctx)
-    rows = status_rows(ctx, args.max_slots, args.stale_hours)
-    unmanaged = unmanaged_worktrees(ctx, args.max_slots)
+    max_slots = validate_max_slots(args.max_slots)
+    rows = status_rows(ctx, max_slots, args.stale_hours)
+    unmanaged = unmanaged_worktrees(ctx, max_slots)
     if args.json:
         print(json.dumps({"slots": rows, "unmanaged_worktrees": unmanaged}, indent=2, sort_keys=True))
     else:
