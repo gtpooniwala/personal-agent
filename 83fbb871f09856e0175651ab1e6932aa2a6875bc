@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "83fbb871f09856e0175651ab1e6932aa2a6875bc",
+  "prompts": {
+    "3d4c2b679f367c40": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ccb44-59a3-77c0-af65-d2b6664d73c0",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
