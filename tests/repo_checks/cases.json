@@ -88,11 +88,10 @@
     "description": "Repo-local AGENTS contract documents the managed slot workflow"
   },
   {
-    "id": "agent_shim_points_to_agents",
-    "type": "contains",
+    "id": "legacy_agent_shim_removed",
+    "type": "path_absent",
     "path": "AGENT.md",
-    "pattern": "AGENTS.md",
-    "description": "Legacy AGENT shim points to AGENTS.md"
+    "description": "Legacy AGENT shim has been removed"
   },
   {
     "id": "claude_contract_points_to_agents",
@@ -121,5 +120,11 @@
     "path": "skills/repo-commit-pr-flow/SKILL.md",
     "pattern": "Branch must remain issue-backed",
     "description": "Repo commit/PR skill keeps the issue-backed branch contract explicit"
+  },
+  {
+    "id": "legacy_worktree_helper_removed",
+    "type": "path_absent",
+    "path": "scripts/new_worktree.sh",
+    "description": "Legacy unmanaged worktree helper has been removed"
   }
 ]

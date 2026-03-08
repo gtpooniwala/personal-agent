@@ -54,5 +54,4 @@ Canonical workflow contract for coding agents in this repository.
 
 ## Notes
 - Issue and PR status are advisory cleanup hints only; they are not authoritative slot ownership signals.
-- `scripts/new_worktree.sh` remains available as a low-level compatibility helper, but the managed slot flow above is the default path for future agents.
 - If you are already running inside a managed slot, continue working there instead of claiming a second slot for the same branch.

@@ -18,7 +18,7 @@ Preferred command:
 scripts/start-agent.sh codex --issue 59 --type docs --label "planning refresh"
 ```
 
-Prefer the slot workflow documented in [`WORKTREE_SLOTS.md`](WORKTREE_SLOTS.md). Use `scripts/new_worktree.sh` only when you explicitly need an unmanaged compatibility worktree.
+Use the slot workflow documented in [`WORKTREE_SLOTS.md`](WORKTREE_SLOTS.md) for all new work.
 
 Sync before work and before push:
 ```bash

@@ -30,7 +30,7 @@ Last updated: March 8, 2026
   - `.worktrees/slot-04`
 - Overflow slots are created under `.worktrees/dyn-XX` only through the slot manager.
 - Lease metadata is stored under `.worktrees/state/`.
-- `scripts/new_worktree.sh` remains available as a low-level compatibility helper, but the slot manager is the standard path.
+- The managed slot flow is the single supported path for new work.
 
 Inspect / clean up:
 ```bash

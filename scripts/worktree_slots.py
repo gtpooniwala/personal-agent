@@ -735,8 +735,8 @@ def print_status(rows: list[dict[str, Any]], unmanaged: list[dict[str, str]]) ->
             f"{(row.get('branch') or '-'): <42} {note_text}"
         )
     if unmanaged:
-        print("\nUnmanaged legacy worktrees")
-        print("-------------------------")
+        print("\nUnmanaged worktrees")
+        print("-------------------")
         for item in unmanaged:
             print(f"- {item['path']} [{item['branch']}]")
 

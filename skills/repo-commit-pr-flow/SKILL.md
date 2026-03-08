@@ -11,7 +11,7 @@ Use this skill when changes are ready to commit, push, or publish as a PR.
 
 ## Non-negotiable contract
 - Keep commits granular and task-focused.
-- Do not commit or push feature work from `main`; use a managed slot or compatible dedicated worktree.
+- Do not commit or push feature work from `main`; use a managed slot.
 - Keep branch rebased on latest `origin/main`.
 - Branch must remain issue-backed and match `<agent>/<type>/<issue>-<slug>`; do not rename or continue work on issue-less scratch branches.
 - PR must target `main` and include an issue reference (`Refs #<id>` minimum).

@@ -114,5 +114,5 @@ These are hints, not ownership signals.
 
 ## Migration Notes
 - Existing branch-named worktrees under `.worktrees/` can coexist during migration.
-- The slot tools report unmanaged legacy worktrees in status output so they are visible during cleanup.
-- `scripts/new_worktree.sh` remains as a low-level compatibility helper, but new work should use the slot launchers.
+- The slot tools report unmanaged worktrees in status output so they are visible during cleanup.
+- New work must use the slot launchers; the old branch-named worktree helper has been removed.
