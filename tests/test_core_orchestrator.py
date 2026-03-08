@@ -210,19 +210,19 @@ class TestCoreOrchestrator(unittest.TestCase):
         Each call must build its own ToolRegistry so that selected_documents from
         one run cannot leak into another run that uses different documents.
         """
-        captured_registries = []
+        captured_registries = {}
         capture_lock = threading.Lock()
-        overlap_barrier = threading.Barrier(2)
+        overlap_barrier = threading.Barrier(2, timeout=5)
 
         def capturing_build(conversation_id, tool_registry):
             with capture_lock:
-                captured_registries.append(tool_registry)
+                captured_registries[conversation_id] = tool_registry
 
             # Return a minimal mock agent that mimics the LangGraph interface
             mock_agent = MagicMock()
 
             def invoke(*args, **kwargs):
-                overlap_barrier.wait(timeout=2)
+                overlap_barrier.wait()
                 return {"messages": []}
 
             mock_agent.invoke.side_effect = invoke
@@ -253,11 +253,14 @@ class TestCoreOrchestrator(unittest.TestCase):
                 for future in futures:
                     future.result(timeout=5)
 
-        self.assertEqual(len(captured_registries), 2)
-        self.assertIsNot(captured_registries[0], captured_registries[1],
-                         "Each run must receive a distinct ToolRegistry instance")
-        self.assertEqual(captured_registries[0].selected_documents, docs_a)
-        self.assertEqual(captured_registries[1].selected_documents, docs_b)
+        self.assertEqual(set(captured_registries), {"conv-a", "conv-b"})
+        self.assertIsNot(
+            captured_registries["conv-a"],
+            captured_registries["conv-b"],
+            "Each run must receive a distinct ToolRegistry instance",
+        )
+        self.assertEqual(captured_registries["conv-a"].selected_documents, docs_a)
+        self.assertEqual(captured_registries["conv-b"].selected_documents, docs_b)
 
     def test_process_request_does_not_store_agent_on_self(self):
         """process_request must not write orchestrator_agent back to self."""
