@@ -33,6 +33,10 @@ except (ImportError, ModuleNotFoundError) as exc:
     ROUTE_STREAMING_TESTS_AVAILABLE = False
     ROUTE_STREAMING_IMPORT_ERROR = str(exc)
 
+if not STREAMING_TESTS_AVAILABLE:
+    ROUTE_STREAMING_TESTS_AVAILABLE = False
+    ROUTE_STREAMING_IMPORT_ERROR = STREAMING_IMPORT_ERROR
+
 
 def parse_sse_message(message: str):
     event_type = None
