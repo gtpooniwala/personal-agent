@@ -598,6 +598,11 @@ def _merge_per_turn_expectations(
     base: Optional[List[Dict[str, Any]]],
     override: Optional[List[Dict[str, Any]]],
 ) -> List[Dict[str, Any]]:
+    if base is not None and not isinstance(base, list):
+        raise ValueError("Case has invalid 'expected.per_turn': must be a list")
+    if override is not None and not isinstance(override, list):
+        raise ValueError("Case has invalid mode-specific 'per_turn': must be a list")
+
     merged: List[Dict[str, Any]] = []
     base_list = base or []
     override_list = override or []
@@ -622,6 +627,8 @@ def _resolve_expected(case: Dict[str, Any], mode: str) -> Dict[str, Any]:
         raise ValueError(f"Case '{case_id}' has invalid 'expected': must be an object")
 
     resolved = {k: v for k, v in expected.items() if k != "by_mode"}
+    if "per_turn" in resolved and not isinstance(resolved["per_turn"], list):
+        raise ValueError(f"Case '{case_id}' has invalid 'expected.per_turn': must be a list")
     by_mode = expected.get("by_mode")
     if by_mode is not None and not isinstance(by_mode, dict):
         raise ValueError(f"Case '{case_id}' has invalid 'expected.by_mode': must be an object")

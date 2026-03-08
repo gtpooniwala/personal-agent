@@ -210,6 +210,31 @@ class TestRunLLMEvalsMockRouting(unittest.TestCase):
         ):
             self.harness._resolve_expected(case, "mock")
 
+    def test_resolve_expected_rejects_non_list_base_per_turn_before_mode_merge(self):
+        case = {
+            "id": "invalid_base_per_turn",
+            "expected": {
+                "per_turn": {
+                    "must_not_call": ["search_documents"],
+                },
+                "by_mode": {
+                    "mock": {
+                        "per_turn": [
+                            {
+                                "response_contains": ["no documents are currently selected"]
+                            }
+                        ]
+                    }
+                },
+            },
+        }
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "expected.per_turn': must be a list",
+        ):
+            self.harness._resolve_expected(case, "mock")
+
     def test_live_eval_database_connectivity_does_not_require_admin_when_db_is_reachable(self):
         test_url = "postgresql+psycopg://user:pass@127.0.0.1:5432/personal_agent_eval"
         engine = Mock()

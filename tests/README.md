@@ -64,7 +64,7 @@ python3 tests/run_llm_evals.py --mode live --set core
 
 It writes machine-readable reports to `tests/llm_evals/results/`.
 For live runs, the harness automatically re-execs into `.venv` when the system `python3` lacks backend dependencies.
-When using the Docker Compose Postgres service, set `TEST_DATABASE_URL` / `EVAL_DATABASE_URL` to `127.0.0.1:5433`.
+When using the Docker Compose Postgres service, set `TEST_DATABASE_URL` / `EVAL_DATABASE_URL` to full PostgreSQL DSNs that use `127.0.0.1:5433` as the host port, for example `postgresql+psycopg://personal_agent:personal_agent@127.0.0.1:5433/personal_agent_test`.
 If the provider key is missing, or if `EVAL_DATABASE_URL` / `TEST_DATABASE_URL` does not point to a dedicated PostgreSQL `*_test` database, live mode exits with a clear `blocked` message.
 Use `--set extended` for broader scenario coverage and `--set all` to run both core and extended cases together.
 
