@@ -48,7 +48,10 @@ ROOT_DIR="$(git rev-parse --show-toplevel)"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 
 CLAIM_JSON="$("${PYTHON_BIN}" "${ROOT_DIR}/scripts/worktree_slots.py" claim --agent "${AGENT}" --mode "${MODE}" --format json "${FORWARD_ARGS[@]}")"
-mapfile -t CLAIM_FIELDS < <(
+CLAIM_FIELDS=()
+while IFS= read -r line; do
+  CLAIM_FIELDS+=("${line}")
+done < <(
   printf '%s\n' "${CLAIM_JSON}" | "${PYTHON_BIN}" -c '
 import json
 import sys
