@@ -47,7 +47,22 @@ fi
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 
-eval "$("${PYTHON_BIN}" "${ROOT_DIR}/scripts/worktree_slots.py" claim --agent "${AGENT}" --mode "${MODE}" --format shell "${FORWARD_ARGS[@]}")"
+CLAIM_JSON="$("${PYTHON_BIN}" "${ROOT_DIR}/scripts/worktree_slots.py" claim --agent "${AGENT}" --mode "${MODE}" --format json "${FORWARD_ARGS[@]}")"
+mapfile -t CLAIM_FIELDS < <(
+  printf '%s\n' "${CLAIM_JSON}" | "${PYTHON_BIN}" -c '
+import json
+import sys
+
+payload = json.load(sys.stdin)
+print(payload["slot_id"])
+print(payload["slot_path"])
+print(payload["branch"])
+'
+)
+
+slot_id="${CLAIM_FIELDS[0]}"
+slot_path="${CLAIM_FIELDS[1]}"
+branch="${CLAIM_FIELDS[2]}"
 
 echo "Claimed ${slot_id} at ${slot_path} on branch ${branch}"
 

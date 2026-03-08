@@ -66,6 +66,10 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             worktree_slots.validate_max_slots(3)
 
+    def test_command_exists_rejects_invalid_names(self) -> None:
+        self.assertFalse(worktree_slots.command_exists(""))
+        self.assertFalse(worktree_slots.command_exists("bad name"))
+
 
 if __name__ == "__main__":
     unittest.main()

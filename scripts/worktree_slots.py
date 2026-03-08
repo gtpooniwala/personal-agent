@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 from contextlib import contextmanager
@@ -28,6 +29,7 @@ BRANCH_RE = re.compile(
 )
 SLOT_RE = re.compile(r"^(slot|dyn)-[0-9]{2}$")
 TYPE_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+COMMAND_RE = re.compile(r"^[A-Za-z0-9._+-]+$")
 
 
 @dataclass
@@ -71,7 +73,9 @@ def git(*args: str, cwd: Path | None = None, check: bool = True) -> str:
 
 
 def command_exists(name: str) -> bool:
-    return run("sh", "-lc", f"command -v {shlex.quote(name)} >/dev/null 2>&1", check=False).returncode == 0
+    if not name or not COMMAND_RE.fullmatch(name):
+        return False
+    return shutil.which(name) is not None
 
 
 def repo_context() -> RepoContext:
