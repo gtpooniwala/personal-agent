@@ -30,10 +30,10 @@ class ToolRegistry:
     
     def __init__(self, user_id: str = "default", selected_documents: Optional[List[str]] = None):
         self.user_id = user_id
-        self.selected_documents = selected_documents or []
+        self.selected_documents = list(selected_documents or [])
         self._tools = {}
         self._initialize_tools()
-    
+
     def _initialize_tools(self):
         """
         Initialize all available tools/agents.
@@ -42,10 +42,6 @@ class ToolRegistry:
         self._tools["calculator"] = CalculatorTool()
         self._tools["current_time"] = CurrentTimeTool()
         self._tools["scratchpad"] = ScratchpadTool(self.user_id)
-
-        # Context-dependent tools (only if documents are selected)
-        if self.selected_documents and len(self.selected_documents) > 0:
-            self._tools["search_documents"] = SearchDocumentsTool(self.user_id, self.selected_documents)
 
         gmail_ready, gmail_reasons = get_gmail_readiness(settings.enable_gmail_integration)
         if gmail_ready:
@@ -66,18 +62,34 @@ class ToolRegistry:
         self._tools["user_profile"] = UserProfileTool(self.user_id)
         # Summarisation agent (always available)
         self._tools["summarisation_agent"] = SummarisationAgent()
+        self._set_search_documents_tool(self.selected_documents)
+
+    def _set_search_documents_tool(self, selected_documents: Optional[List[str]]) -> None:
+        """Refresh the document-scoped search tool without rebuilding static tools."""
+        self.selected_documents = list(selected_documents or [])
+        if self.selected_documents:
+            self._tools["search_documents"] = SearchDocumentsTool(self.user_id, self.selected_documents)
+        else:
+            self._tools.pop("search_documents", None)
 
     def update_selected_documents(self, selected_documents: List[str]):
         """
         Update the context for document-dependent tools.
         """
-        self.selected_documents = selected_documents
-        # Reinitialize document search tool with new context
-        if self.selected_documents and len(self.selected_documents) > 0:
-            self._tools["search_documents"] = SearchDocumentsTool(self.user_id, self.selected_documents)
-        elif "search_documents" in self._tools:
-            del self._tools["search_documents"]
+        self._set_search_documents_tool(selected_documents)
         logger.info(f"Updated tool registry with {len(selected_documents)} selected documents")
+
+    def clone_with_selected_documents(self, selected_documents: Optional[List[str]] = None) -> "ToolRegistry":
+        """
+        Create a run-scoped registry that reuses static tool instances and rebuilds
+        only document-dependent state.
+        """
+        clone = object.__new__(ToolRegistry)
+        clone.user_id = self.user_id
+        clone._tools = {name: tool for name, tool in self._tools.items() if name != "search_documents"}
+        clone.selected_documents = []
+        clone._set_search_documents_tool(selected_documents)
+        return clone
 
     def get_available_tools(self) -> List[Any]:
         """

@@ -18,21 +18,20 @@ def debug_orchestrator():
     try:
         orchestrator = CoreOrchestrator('test_user')
         print("✅ Orchestrator created")
-        
-        # Setup the agent
-        orchestrator._setup_orchestrator_agent('test_conv')
-        print("✅ Agent setup called")
-        
-        # Check if agent was created
-        if orchestrator.orchestrator_agent:
+
+        run_registry = orchestrator.tool_registry.clone_with_selected_documents([])
+        agent = orchestrator._build_orchestrator_agent('test_conv', run_registry)
+        print("✅ Agent built")
+
+        if agent:
             print("✅ Agent created successfully")
-            print(f"Agent type: {type(orchestrator.orchestrator_agent)}")
+            print(f"Agent type: {type(agent)}")
         else:
             print("❌ Agent is None")
             return
-            
+
         # Show available tools
-        tools = orchestrator.tool_registry.get_available_tools()
+        tools = run_registry.get_available_tools()
         print(f"🔧 Available tools: {[tool.name for tool in tools]}")
         
         # Try to show the prompt (this might not work directly)
