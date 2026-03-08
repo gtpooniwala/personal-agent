@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "193d827fbee43ab997b944ed07201b7a2adc9f05",
+  "prompts": {
+    "075a760a332c7d04": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89792f0e-7e12-473f-b654-4c1ff18b020c",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 3,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}
