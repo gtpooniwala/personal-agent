@@ -1,223 +1,106 @@
-# Testing Documentation
+# Testing
 
-## Overview
+This repo uses a layered validation model. The right command depends on what changed.
 
-The Personal Agent project includes a comprehensive testing framework designed to ensure proper agent behavior, tool usage, and system reliability. Testing is organized across multiple categories including unit tests, integration tests, behavior validation, and frontend testing.
-
-## Test Architecture
-
-### Test Categories
-
-The testing framework validates several key aspects of agent behavior:
-
-1. **Conversational Responses** - Ensures greetings and general conversation don't inappropriately use tools
-2. **Tool Usage Validation** - Verifies tools are only called when necessary
-3. **Mathematical Calculations** - Confirms calculator tool is used for computational queries
-4. **Time Queries** - Validates current_time tool usage for temporal questions
-5. **Document Q&A (RAG)** - Tests document-based question answering behavior
-6. **Edge Cases** - Handles problematic or unusual input scenarios
-
-### Testing Infrastructure
-
-```text
-tests/
-├── backend/tests/
-│   ├── test_comprehensive.py          # Main test suite (22 test cases)
-│   └── legacy/                        # Historical test scripts
-├── html/                              # Frontend testing files
-│   ├── chat_time_test.html
-│   ├── current_time_test.html
-│   ├── debug_time_format.html
-│   ├── test_time_formatting_live.html
-│   ├── time_formatting_test.html
-│   └── test_title_generation.html
-└── README.md                          # Test organization documentation
-```
-
-## Running Tests
-
-### Main Comprehensive Test Suite
-
-The primary test suite provides complete behavior validation:
+## Default Command
+For most code changes, start here:
 
 ```bash
-cd backend
-python tests/test_comprehensive.py
+scripts/run_local_checks.sh
 ```
 
-**Test Coverage:**
-- ✅ Greetings (5 tests) - Should not use tools
-- ✅ General conversation (4 tests) - Should not use tools  
-- ✅ Mathematical calculations (4 tests) - Should use calculator
-- ✅ Time queries (3 tests) - Should use current_time tool
-- ✅ Document Q&A behavior (3 tests) - Should handle RAG appropriately
-- ✅ Historical problem cases (3 tests) - Previously problematic scenarios
+This command:
+- creates `.venv` if needed
+- installs backend dependencies
+- runs guarded unit tests
+- runs deterministic repository checks
 
-**Total: 22 tests with expected 100% pass rate**
+## Validation Layers
 
-### Legacy Test Scripts
+### Deterministic Repository Checks
+Use when:
+- docs changed
+- workflow files changed
+- config or repo-policy files changed
 
-Several historical test scripts are available for specific testing scenarios:
-
+Command:
 ```bash
-# Basic import validation
-python backend/test_imports.py
-
-# Manual step-by-step testing
-python backend/test_manual.py
-
-# Alternative comprehensive test versions
-python backend/test_comprehensive_agent.py
-python backend/test_comprehensive_agent_clean.py
-python backend/test_comprehensive_agent_fixed.py
+python tests/run_repo_checks.py
 ```
 
-### Frontend Tests
+Artifact:
+- `tests/repo_checks/results.json`
 
-Frontend functionality can be tested by opening HTML files in a web browser:
+### Unit And API Tests
+Use when:
+- backend logic changed
+- API behavior changed
+- runtime logic changed
 
+Typical commands:
 ```bash
-# Navigate to test files
-open tests/html/chat_time_test.html
-open tests/html/current_time_test.html
-open tests/html/time_formatting_test.html
+python3 tests/run_unit_tests.py
+pytest tests -q
 ```
 
-## Test Implementation Details
-
-### AgentTester Class
-
-The main testing infrastructure is built around the `AgentTester` class:
-
-```python
-class AgentTester:
-    def __init__(self):
-        self.agent = PersonalAgent()
-        self.results = []
-        self.failed_tests = []
-    
-    async def test_query(self, query: str, expected_tool_usage: Optional[str] = None, 
-                        should_not_use_tools: bool = False, 
-                        description: str = "") -> Dict[str, Any]:
-        # Test execution logic
-        
-    def _extract_tools_used(self, response: str, result: Dict[str, Any]) -> List[str]:
-        # Tool usage detection
-        
-    def print_summary(self):
-        # Test results reporting
+Targeted examples:
+```bash
+.venv/bin/python -m unittest tests.test_runtime_service -v
+.venv/bin/python -m unittest tests.test_api_runtime_responsiveness -v
 ```
 
-### Test Validation Logic
+### Runtime Evals
+Use when:
+- runtime lifecycle behavior changed
+- retry logic changed
+- event-loop responsiveness changed
+- scheduler or background execution behavior changed
 
-Each test validates multiple aspects:
-
-1. **Tool Usage Validation**
-   - Checks if tools were used when expected
-   - Validates correct tool selection
-   - Ensures tools aren't used unnecessarily
-
-2. **Response Quality**
-   - Verifies non-empty responses
-   - Checks for appropriate content
-   - Validates against expected keywords
-
-3. **Error Handling**
-   - Catches and reports exceptions
-   - Provides detailed failure reasons
-   - Maintains test execution continuity
-
-### Test Result Reporting
-
-The testing framework provides comprehensive reporting:
-
-```text
-🚀 Starting Comprehensive Agent Test Suite
-========================================================================================
-
-📋 Category 1: Greetings (should NOT use tools)
-   Testing: hi (Simple greeting)
-   Result: ✅ Correctly avoided using tools
-   Response: Hello! I'm here to help you with questions, calculations, and information...
-
-📊 TEST SUMMARY
-========================================================================================
-Total Tests: 22
-Passed: 22 ✅
-Failed: 0 ❌
-Pass Rate: 100.0%
+Command:
+```bash
+python tests/run_runtime_evals.py
 ```
 
-## Test Data and Configuration
+Why this matters:
+- the `#51` migration step added explicit responsiveness expectations while blocking orchestration runs in the worker pool
 
-### Test Cases
+### LLM And Workflow Evals
+Use when:
+- prompts changed
+- tool-calling behavior changed
+- orchestration policy changed
+- model-facing output quality is part of the change
 
-The comprehensive test suite includes carefully selected test cases:
-
-**Greeting Tests:**
-- "hi", "hello", "hey there", "how are you?", "what's up"
-
-**Mathematical Tests:**
-- "What is 15 + 27?", "Calculate 123 * 456", "What's 1000 divided by 25?"
-
-**Time Query Tests:**
-- "What time is it?", "What's the current time?", "Tell me the time"
-
-**Edge Cases:**
-- Empty queries, single words, mixed requests, historical problem cases
-
-### Historical Problem Cases
-
-The test suite specifically addresses previously problematic scenarios:
-
-- Greetings returning calculator results (e.g., "hi" → "12")
-- Empty responses to basic queries
-- Inappropriate tool usage for conversational requests
-
-## Test Automation and CI/CD
-
-### Test Result Persistence
-
-Test results are automatically saved for analysis:
-
-```python
-# Save detailed results to file
-with open("test_results.json", "w") as f:
-    json.dump(tester.results, f, indent=2)
+Deterministic harness:
+```bash
+python tests/run_llm_evals.py --mode mock
 ```
 
-### Exit Code Handling
-
-Tests return appropriate exit codes for automation:
-
-```python
-# Exit with appropriate code for CI/CD
-sys.exit(0 if success else 1)
+Live run:
+```bash
+python tests/run_llm_evals.py --mode live
 ```
 
-## Debugging and Troubleshooting
+Artifacts:
+- `tests/llm_evals/results/latest.json`
+- timestamped result files under `tests/llm_evals/results/`
 
-### Common Test Failures
+## Environment Notes
+- `TEST_DATABASE_URL` should point to a dedicated destructive test database.
+- `EVAL_DATABASE_URL` should point to a dedicated evaluation database.
+- Live LLM evals need provider credentials and will report `blocked` if the key is missing.
 
-1. **Tool Usage Issues**
-   - Agent using tools when it shouldn't
-   - Agent not using required tools
-   - Wrong tool selection
+## Minimum Honest Validation By Change Type
+- Docs-only updates: `python tests/run_repo_checks.py`
+- General backend change: `scripts/run_local_checks.sh`
+- Runtime/orchestrator change: `scripts/run_local_checks.sh` plus `python tests/run_runtime_evals.py`
+- Prompt/tool-routing change: `scripts/run_local_checks.sh` plus `python tests/run_llm_evals.py --mode mock`
 
-2. **Response Quality Issues**
-   - Empty or "N/A" responses
-   - Inappropriate responses to queries
-
-3. **System Errors**
-   - Import failures
-   - Configuration issues
-   - API connection problems
-
-### Debugging Tools
-
-- **Verbose Logging**: Enable detailed logging for test execution
-- **Individual Test Scripts**: Run specific test categories
-- **Manual Testing**: Step-by-step agent interaction validation
+## Reporting In PRs
+Include:
+- exact commands run
+- whether results passed, failed, or were blocked
+- any gaps you intentionally left unrun
 
 ### Test Environment Setup
 

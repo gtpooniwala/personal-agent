@@ -2,94 +2,96 @@
 
 Last updated: March 8, 2026
 
-## Objective
-Move from strong prototype to production-ready personal AI agent with reliable behavior, safer defaults, and measurable quality.
+## Goal
+Turn the repository from a strong local prototype into a durable personal-agent platform that an implementation agent can extend without rediscovering architecture intent each time.
 
-Current high-priority execution objective: finish landing runtime responsiveness work for [#51](https://github.com/gtpooniwala/personal-agent/issues/51) via [PR #107](https://github.com/gtpooniwala/personal-agent/pull/107), then tackle the scoped runtime follow-ups opened from that work (`#102`, `#103`, `#104`, `#105`, `#106`, `#109`).
+That means:
+- the runtime accepts work quickly and exposes durable progress,
+- orchestration behavior is easier to reason about,
+- background follow-up work is explicit and observable,
+- the path to cloud deployment and event-driven automation is already sequenced.
 
-## Now (Stabilize Core + Raise Quality Bar)
-- Async run lifecycle schema + submission/status/event contracts complete (`#15`, `#16`, `#17`).
-- Runtime state isolation refactor complete (`#50`).
+## Current State
 
-### Frontend Correctness (sequential)
-- Completed: Gmail reliability follow-up (`#40`).
-- Completed: frontend send correctness risk (`#31`) and IME Enter handling (`#30`).
-- Completed: summarisation/tooling cleanup follow-ups (`#28`, `#29`).
+### What Is Already Landed
+- Async run submission is the primary execution contract via `POST /chat` and `POST /runs`.
+- Run state is durable in PostgreSQL-backed runtime tables: `runs`, `run_events`, and `leases`.
+- Polling clients can observe progress through `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events`.
+- Per-conversation serialization, retry behavior, orphan recovery heartbeat, and scheduled task support are already implemented.
+- The `#51` migration step is landed: runtime coordination stays on the event loop while blocking orchestration attempts run on a bounded worker pool.
+- Frontend is on Next.js and the local workflow, eval harness, naming behavior, and Gmail Docker path have all been tightened recently.
 
-### Runtime Quality (parallel with frontend)
-- Completed: runtime eval coverage for lifecycle transitions, retries, and session isolation (`#19`).
-- Completed: scheduler/heartbeat primitives for autonomous workflows (`#18`).
-- In progress: move blocking orchestration work off the event loop (`#51`, PR `#107`).
+### What Still Matters Most
+- Tool-selection ownership is still split between the LangGraph agent and rule-based fallback logic.
+- Some follow-up work still runs as in-process background tasks instead of durable queued work.
+- The runtime is responsive during blocking orchestration now, but it still relies on a worker-pool execution plane rather than true end-to-end async internals.
+- Executor lifecycle policy and background execution budgeting still need a cleaner final contract.
 
-Success criteria:
-- Core tests runnable in one documented command.
-- Request/run lifecycle events and counters are visible in logs/metrics.
-- `/runs` + async `/chat` submission and status/events paths operational with verified correctness.
-- Assistant responses stay bound to originating conversation during in-flight requests.
-- Machine-readable runtime eval report with CI-friendly pass/fail signals.
-- Scheduler primitives enable autonomous long-running workflow orchestration.
+## Recommended Execution Order
 
-## Next (Async Cleanup + Hardening)
-- Land and verify runtime responsiveness work from `#51`.
-- Define executor lifecycle and graceful shutdown semantics (`#102`).
-- Investigate true async runtime/orchestrator execution paths (`#103`).
-- Add streaming run updates via SSE while keeping polling as fallback (`#104`).
-- Move follow-up background work onto persisted queued task types (`#105`).
-- Refactor `CoreOrchestrator` toward stateless per-request execution (`#106`).
-- Separate follow-up execution budget from foreground run attempts (`#109`).
+### Phase 1: Make Runtime Ownership Clear
+1. [#101](https://github.com/gtpooniwala/personal-agent/issues/101) Move normal tool selection fully into the orchestrator LLM contract.
+2. [#102](https://github.com/gtpooniwala/personal-agent/issues/102) Define executor ownership and graceful shutdown behavior.
+3. [#109](https://github.com/gtpooniwala/personal-agent/issues/109) Separate background execution budget from foreground run attempts.
 
-Success criteria:
-- Machine-readable runtime eval report with CI-friendly pass/fail signals.
-- Event loop remains responsive during blocking orchestration attempts.
-- Stable worker behavior under retry and per-session serialization.
-- Clear ownership and shutdown behavior for runtime execution resources.
-- Clear capability gating in `/tools` and orchestrator behavior.
+Why this first:
+- It removes the biggest reasoning ambiguity in the current architecture.
+- It makes later runtime changes easier to test and document.
+- It turns the post-`#51` worker-pool runtime from "responsive" into "predictable."
 
-## Later (Scale And Productize)
-- Add authentication and user/tenant isolation.
-- Offer PostgreSQL + vector store deployment profile.
-- Add tracing/metrics for response time, token usage, and tool activity.
-- Introduce deployment hardening (secrets, structured logs, health probes).
+### Phase 2: Make Follow-Up Work Durable
+1. [#105](https://github.com/gtpooniwala/personal-agent/issues/105) Persist summarisation and other follow-up work as queued task types.
+2. [#106](https://github.com/gtpooniwala/personal-agent/issues/106) Refactor `CoreOrchestrator` toward stateless execution.
+3. [#103](https://github.com/gtpooniwala/personal-agent/issues/103) Investigate true async runtime/orchestrator paths.
 
-Success criteria:
-- Multi-user safe architecture.
-- Production deployment path documented and validated.
-- Runtime observability sufficient for incident debugging.
+Why this second:
+- It removes ephemeral behavior that is hard to observe and recover.
+- It keeps concurrency decisions out of hidden in-memory task scheduling.
+- It positions the runtime for broader automation and cloud hosting.
 
-## Cloud Deployment (GCP)
-- GCS document storage migration — replace local-only `./data` volume ([#79](https://github.com/gtpooniwala/personal-agent/issues/79))
-- Cloud SQL setup and production database configuration ([#80](https://github.com/gtpooniwala/personal-agent/issues/80))
-- Architecture decision record and deployment plan ([#81](https://github.com/gtpooniwala/personal-agent/issues/81))
-- Secret Manager integration for all production API keys ([#82](https://github.com/gtpooniwala/personal-agent/issues/82))
-- IAP setup for personal cloud authentication ([#83](https://github.com/gtpooniwala/personal-agent/issues/83))
-- Cloud Run service definitions for backend and frontend ([#85](https://github.com/gtpooniwala/personal-agent/issues/85))
-- GitHub Actions CI/CD pipeline for Cloud Run deployment ([#86](https://github.com/gtpooniwala/personal-agent/issues/86))
-- Cold start optimization and min-instances strategy ([#87](https://github.com/gtpooniwala/personal-agent/issues/87))
+### Phase 3: Improve Client Experience On Top Of Stable Runtime
+1. [#104](https://github.com/gtpooniwala/personal-agent/issues/104) Add SSE streaming while keeping polling as fallback.
+2. [#64](https://github.com/gtpooniwala/personal-agent/issues/64) Improve document UX and RAG clarity.
+3. [#68](https://github.com/gtpooniwala/personal-agent/issues/68) Continue prompt architecture hardening.
 
-## Event-Driven Triggers + Mobile
-- Event trigger framework — unified infrastructure for all trigger types ([#88](https://github.com/gtpooniwala/personal-agent/issues/88))
-- Scheduled task runner — cron-like recurring agent runs ([#89](https://github.com/gtpooniwala/personal-agent/issues/89))
-- Task-to-task chaining — trigger_run tool for agent-spawned runs ([#90](https://github.com/gtpooniwala/personal-agent/issues/90))
-- Email-triggered task execution ([#91](https://github.com/gtpooniwala/personal-agent/issues/91))
-- Telegram bot integration for mobile task monitoring and triggering ([#92](https://github.com/gtpooniwala/personal-agent/issues/92))
+Why this third:
+- Streaming and UX polish are more valuable once the underlying runtime contract is stable.
+- Prompt and UX changes are safer after routing ownership is simplified.
 
-## Idea Backlog (Potential New Features)
-- Calendar and task integrations beyond placeholder level.
-- Better long-term memory controls (review/edit/delete profile facts).
-- Citation-grade RAG responses with source snippet controls.
-- Voice input/output and multimodal document ingestion.
+## Cloud Deployment Track
+This remains a real goal, but it should build on the runtime order above rather than compete with it.
 
-## Execution Mapping (GitHub)
-- Foundation hardening milestone: [01 Foundation Hardening](https://github.com/gtpooniwala/personal-agent/milestone/1)
-- Runtime migration core milestone: [02 Runtime Migration Core](https://github.com/gtpooniwala/personal-agent/milestone/2)
-- Workflow automation milestone: [03 Workflow Automation](https://github.com/gtpooniwala/personal-agent/milestone/3)
-- Future backlog milestone: [Backlog / Future](https://github.com/gtpooniwala/personal-agent/milestone/4)
-- Completed migration prerequisites: [#14](https://github.com/gtpooniwala/personal-agent/issues/14) (design + PR decomposition), [#22](https://github.com/gtpooniwala/personal-agent/issues/22), [#23](https://github.com/gtpooniwala/personal-agent/issues/23)
-- Completed core migration implementation: [#15](https://github.com/gtpooniwala/personal-agent/issues/15) (run lifecycle schema), [#16](https://github.com/gtpooniwala/personal-agent/issues/16) (worker queue + per-session serialization), [#17](https://github.com/gtpooniwala/personal-agent/issues/17) (async contracts)
-- Completed workflow automation items: [#18](https://github.com/gtpooniwala/personal-agent/issues/18) (scheduler/heartbeat), [#19](https://github.com/gtpooniwala/personal-agent/issues/19) (runtime evals)
-- Completed hardening follow-ups: [#28](https://github.com/gtpooniwala/personal-agent/issues/28), [#29](https://github.com/gtpooniwala/personal-agent/issues/29), [#30](https://github.com/gtpooniwala/personal-agent/issues/30), [#31](https://github.com/gtpooniwala/personal-agent/issues/31), [#40](https://github.com/gtpooniwala/personal-agent/issues/40), [#50](https://github.com/gtpooniwala/personal-agent/issues/50)
-- Active runtime responsiveness work: [#51](https://github.com/gtpooniwala/personal-agent/issues/51) via [PR #107](https://github.com/gtpooniwala/personal-agent/pull/107)
-- Runtime follow-up issues opened from `#51`: [#102](https://github.com/gtpooniwala/personal-agent/issues/102), [#103](https://github.com/gtpooniwala/personal-agent/issues/103), [#104](https://github.com/gtpooniwala/personal-agent/issues/104), [#105](https://github.com/gtpooniwala/personal-agent/issues/105), [#106](https://github.com/gtpooniwala/personal-agent/issues/106), [#109](https://github.com/gtpooniwala/personal-agent/issues/109)
-- GCP deployment planning tracking: [#78](https://github.com/gtpooniwala/personal-agent/issues/78)
-- GCP deployment sub-issues: [#79](https://github.com/gtpooniwala/personal-agent/issues/79), [#80](https://github.com/gtpooniwala/personal-agent/issues/80), [#81](https://github.com/gtpooniwala/personal-agent/issues/81), [#82](https://github.com/gtpooniwala/personal-agent/issues/82), [#83](https://github.com/gtpooniwala/personal-agent/issues/83), [#85](https://github.com/gtpooniwala/personal-agent/issues/85), [#86](https://github.com/gtpooniwala/personal-agent/issues/86), [#87](https://github.com/gtpooniwala/personal-agent/issues/87)
-- Event-driven triggers sub-issues: [#88](https://github.com/gtpooniwala/personal-agent/issues/88), [#89](https://github.com/gtpooniwala/personal-agent/issues/89), [#90](https://github.com/gtpooniwala/personal-agent/issues/90), [#91](https://github.com/gtpooniwala/personal-agent/issues/91), [#92](https://github.com/gtpooniwala/personal-agent/issues/92)
+Recommended order:
+1. [#81](https://github.com/gtpooniwala/personal-agent/issues/81) Keep the GCP ADR current and resolve remaining design decisions.
+2. [#80](https://github.com/gtpooniwala/personal-agent/issues/80) Cloud SQL production baseline.
+3. [#82](https://github.com/gtpooniwala/personal-agent/issues/82) Secret Manager integration.
+4. [#79](https://github.com/gtpooniwala/personal-agent/issues/79) GCS-backed document storage.
+5. [#85](https://github.com/gtpooniwala/personal-agent/issues/85) Cloud Run service definitions.
+6. [#83](https://github.com/gtpooniwala/personal-agent/issues/83) IAP and authentication boundary.
+7. [#86](https://github.com/gtpooniwala/personal-agent/issues/86) CI/CD deployment pipeline.
+8. [#87](https://github.com/gtpooniwala/personal-agent/issues/87) Cold-start and min-instances tuning.
+
+## Event-Driven Automation Track
+The runtime already includes scheduler primitives and scheduled tasks. The remaining work is the external trigger layer and mobile-facing surfaces.
+
+Recommended order:
+1. [#88](https://github.com/gtpooniwala/personal-agent/issues/88) Trigger framework and dispatcher.
+2. [#90](https://github.com/gtpooniwala/personal-agent/issues/90) `trigger_run` for agent-spawned runs.
+3. [#91](https://github.com/gtpooniwala/personal-agent/issues/91) Email-triggered execution.
+4. [#92](https://github.com/gtpooniwala/personal-agent/issues/92) Telegram bot integration.
+
+Already done:
+- [#89](https://github.com/gtpooniwala/personal-agent/issues/89) Scheduled recurring task runner.
+
+## Vision
+The target shape is a personal agent with:
+- durable runs and explicit background task types,
+- orchestration policy owned primarily by prompt and tool contracts rather than ad hoc routing branches,
+- optional streaming and richer trigger surfaces on top of the same run ledger,
+- a cloud deployment path that stays simple enough for a single-user system.
+
+## Compressed Completed Context
+- `#7` to `#13`, `#20`, `#40`: baseline hardening and local workflow quality.
+- `#14` to `#19`: async runtime design, storage, API contract, worker semantics, scheduler, and eval coverage.
+- `#50`, `#51`, `#72`, `#73`, `#74`, `#89`: follow-up runtime isolation, worker-pool responsiveness, naming, validation, and recurring task support.
+- `#78`: deployment and trigger planning docs.

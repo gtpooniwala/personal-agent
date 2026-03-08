@@ -1,74 +1,74 @@
-# Quick Reference: Adding New Features
+# Development Guide
 
-## 📝 Documentation Workflow
+This file is the practical contributor workflow on top of the stricter policy in [`ENGINEERING_WORKFLOW.md`](ENGINEERING_WORKFLOW.md).
 
-When implementing a new feature:
+## Standard Change Flow
+1. Sync with latest `origin/main`.
+2. Create a dedicated worktree and branch.
+3. Make the smallest focused change that moves one issue or task forward.
+4. Run the smallest validation set that honestly matches the scope.
+5. Update docs if behavior, status, or sequencing changed.
+6. Commit, push, and open a PR that references the relevant issue.
 
-### 1. **Create Feature Documentation**
+## Worktrees And Branches
+Use one worktree per active branch.
+
+Preferred command:
 ```bash
-# Copy the template
-cp docs/FEATURE_TEMPLATE.md docs/features/YOUR_FEATURE_NAME.md
-
-# Edit the new file with your feature details
-# Follow the template structure for consistency
+scripts/new_worktree.sh codex docs 59 planning-refresh
 ```
 
-### 2. **Update Documentation Index**
-Add your feature to `docs/README.md`:
-```markdown
-- **[Your Feature Name](features/YOUR_FEATURE_NAME.md)** - Brief description
+Sync before work and before push:
+```bash
+scripts/sync_main.sh
 ```
 
-### 3. **Update Main README (if major feature)**
-Add reference in the main `README.md` documentation section if it's a significant user-facing feature.
+## Validation Expectations
 
-## 📁 File Organization
+### Docs-only changes
+- run repository checks if links, file references, or policy-sensitive docs changed
 
-```
-docs/
-├── README.md                    # Documentation index
-├── FEATURE_TEMPLATE.md         # Template for new features
-└── features/                   # Individual feature docs
-    ├── TIME_FORMATTING_IMPROVEMENT.md
-    ├── TITLE_GENERATION_SYSTEM.md
-    ├── SELECTIVE_RAG_VALIDATION.md
-    ├── DOCUMENT_QA_CONTEXT.txt
-    └── YOUR_NEW_FEATURE.md     # Your new feature here
-```
+### Code changes
+- run `scripts/run_local_checks.sh`
+- add targeted unit or API tests when behavior changes
 
-## 🎯 Best Practices
+### Prompt, orchestration, or tool-routing changes
+- run the relevant deterministic tests
+- run `python tests/run_llm_evals.py --mode mock`
+- run live evals when the behavior change is meaningful and credentials are available
 
-### Documentation Standards
-- **Naming**: Use `FEATURE_NAME_SYSTEM.md` format (UPPERCASE)
-- **Structure**: Follow the template structure
-- **Content**: Include technical details, user experience, and testing
-- **Examples**: Provide usage examples and code snippets
-- **Cross-references**: Link to related features when applicable
+### Runtime changes
+- run runtime-specific tests and `python tests/run_runtime_evals.py`
 
-### File Management
-- **Location**: Always create new feature docs in `docs/features/`
-- **Template**: Start with `FEATURE_TEMPLATE.md`
-- **Index**: Update `docs/README.md` with new entries
-- **Consistency**: Follow existing documentation patterns
+## Documentation Expectations
+Update docs whenever one of these changes:
+- runtime behavior or architecture
+- work sequencing or issue status
+- setup or validation commands
+- deployment or trigger assumptions
 
-### Content Guidelines
-- **Technical Details**: Include backend and frontend implementation
-- **User Experience**: Document the user-facing behavior
-- **Configuration**: List any configurable parameters
-- **Testing**: Provide testing instructions
-- **Future Work**: Note potential enhancements
+Primary status docs:
+- [`WORKBOARD.md`](WORKBOARD.md)
+- [`ROADMAP.md`](ROADMAP.md)
 
-## 🔄 Maintenance
+Primary implementation docs:
+- [`ARCHITECTURE.md`](ARCHITECTURE.md)
+- [`SYSTEM_FLOW.md`](SYSTEM_FLOW.md)
+- [`API.md`](API.md)
 
-### Regular Updates
-- Keep feature docs current with code changes
-- Update examples when APIs change
-- Archive outdated documentation in `docs/archive/`
+If you add a new feature doc:
+1. start from [`FEATURE_TEMPLATE.md`](FEATURE_TEMPLATE.md)
+2. place it under `docs/features/` unless it is broader than one feature
+3. link it from [`README.md`](README.md) when useful
 
-### Review Process
-- Ensure new docs follow template structure
-- Verify all links work correctly
-- Check for technical accuracy
-- Maintain consistent formatting
+## Review Standard
+Prefer:
+- small commits
+- explicit issue linkage
+- updated docs when behavior changed
+- accurate validation notes in the PR body
 
-This organized approach ensures our documentation grows cleanly with the project while remaining easy to navigate and maintain.
+Avoid:
+- feature work directly on `main`
+- stale status docs
+- claiming validation you did not run

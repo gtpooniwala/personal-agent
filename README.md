@@ -1,6 +1,6 @@
 # Personal Agent
 
-A local-first AI assistant platform built around a LangGraph orchestrator, with tool-calling, persistent conversation memory, and PDF-based retrieval.
+A local-first AI assistant platform built around a LangGraph orchestrator, a durable async runtime, and a Next.js frontend.
 
 This project demonstrates practical AI product engineering: orchestration patterns, modular tooling, RAG over user documents, and a production-style backend/frontend split.
 
@@ -18,7 +18,10 @@ The assistant can:
 ```mermaid
 flowchart LR
     UI["Frontend (Next.js App Router)"] --> API["FastAPI API Layer"]
-    API --> ORCH["LangGraph ReAct Orchestrator"]
+    API --> RT["RuntimeService"]
+    RT --> STORE["RunStore<br/>runs + run_events + leases"]
+    RT --> PLANE["OrchestrationExecutionPlane"]
+    PLANE --> ORCH["LangGraph ReAct Orchestrator"]
     ORCH --> REG["Tool Registry"]
     ORCH --> LLM["Gemini Chat Model (Default)"]
 
@@ -40,7 +43,7 @@ flowchart LR
 Current runtime path:
 1. User sends a message from the frontend.
 2. `POST /chat` or `POST /runs` submits asynchronous work and returns a `run_id`.
-3. Backend executes run steps asynchronously with per-session serialization (tool selection, tool execution, synthesis).
+3. Runtime coordination stays on the event loop while blocking orchestration attempts run in a bounded worker pool with per-conversation serialization.
 4. Frontend polls `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events` for real-time updates.
 
 ## Implemented Capabilities
@@ -65,21 +68,24 @@ Current runtime path:
 - Frontend: Next.js + React
 - Storage: PostgreSQL + local filesystem (`data/`)
 
-## Runtime and Migration Status
+## Runtime Architecture Today
 
 Contributor reference for current implementation:
 - Dependency source of truth:
   - Backend: `backend/requirements.txt`
   - Frontend: `frontend/package.json`
-- Completed baseline:
-  - LangGraph ReAct orchestration is the active architecture.
-  - Tool routing is centralized in the orchestrator tool registry.
-- Async runtime (completed `#15`, `#16`, `#17`):
-  - Run lifecycle schema with per-session durability and retry logic.
+- Landed runtime baseline:
+  - Durable run lifecycle schema plus event and lease tables.
   - Async submission via `POST /runs` and `POST /chat`.
-  - Real-time status and event polling via `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events`.
-  - Background worker execution with per-session serialization guarantees.
-  - `/api/v1/*` remains active for non-runtime endpoints (conversations/tools/documents/health).
+  - Real-time polling via `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events`.
+  - Per-conversation serialization and retry handling.
+  - Heartbeat orphan recovery and scheduler-backed recurring task support.
+  - `#51` worker-pool step landed: runtime coordination remains async while full orchestration attempts are offloaded from the FastAPI event loop.
+- Important remaining follow-ups:
+  - Tool-selection ownership is still partly split between the LLM and deterministic fallback logic.
+  - Some follow-up work still runs as in-process background tasks.
+  - SSE streaming and true end-to-end async internals are not implemented yet.
+  - `/api/v1/*` remains active for non-runtime endpoints (conversations, tools, documents, health, observability).
 
 ## Quick Start (Docker, Recommended)
 
@@ -304,7 +310,7 @@ personal-agent/
 ## Engineering Notes
 
 Design choices reflected in this implementation:
-- **Graph-based orchestration** over hardcoded routing, so behavior can evolve by adding tools and prompt policy.
+- **Graph-based orchestration as the primary path**, with some remaining deterministic fallback logic that is being removed incrementally.
 - **Context-aware tool gating** (e.g., document search appears only when documents are selected).
 - **Separation of orchestration and response synthesis**, which keeps tool execution traces inspectable while preserving fluent final responses.
 - **Local-first persistence** for fast iteration and debuggability.
@@ -314,23 +320,31 @@ Design choices reflected in this implementation:
 - Single-user default (`user_id="default"`) across most flows.
 - Document retrieval computes similarity from embeddings stored in PostgreSQL; not yet an external vector DB.
 - Tool/model config exists, but some model selections are still hardcoded in tool/orchestrator paths.
+- Follow-up work such as summarisation is not yet modeled as durable queued task types.
+- Streaming updates are not available yet; clients rely on polling.
 - Integration tools (Gmail/Calendar/Todoist) have different maturity levels and setup requirements.
 
 ## Roadmap (High-Impact)
 
+- Simplify orchestration ownership so the LLM is the canonical normal-path tool selector
+- Make follow-up/background work durable and explicitly budgeted
+- Add streaming and richer trigger surfaces on top of the same run ledger
+- Production deployment profile (GCP, secrets, auth boundary, storage migration)
 - Multi-user auth + tenant isolation
-- Managed vector store option
-- Expand eval coverage for tool-selection accuracy and regression checks
-- Observability for latency/token/tool metrics
-- Production deployment profile (secrets, health checks, structured logging)
 
 ## Documentation
 
+- [Documentation Index](docs/README.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [API](docs/API.md)
 - [Runtime Migration Architecture](docs/MIGRATION_RUNTIME_ARCHITECTURE.md)
+- [System Flow](docs/SYSTEM_FLOW.md)
 - [Feature Overview](docs/FEATURES_OVERVIEW.md)
+- [Setup](docs/SETUP.md)
 - [Development Guide](docs/DEVELOPMENT_GUIDE.md)
+- [Testing](docs/TESTING.md)
+- [Deployment ADR](docs/DEPLOYMENT.md)
+- [Event Triggers](docs/EVENT_TRIGGERS.md)
 - [Workboard](docs/WORKBOARD.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Engineering Workflow](docs/ENGINEERING_WORKFLOW.md)

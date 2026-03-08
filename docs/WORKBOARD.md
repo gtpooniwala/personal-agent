@@ -2,106 +2,83 @@
 
 Last updated: March 8, 2026
 
-## How This Is Used
-This file is the AI execution board for this repo.
+## How To Use This File
+This is the execution board an agent should follow.
 
-Workflow:
-1. Pick the top item from `Now`.
-2. Implement in a small, stable change.
-3. Run tests/repo-checks and any relevant local LLM/workflow evals.
-4. Commit and push.
-5. Update GitHub issue and move the item state in this file.
+Default loop:
+1. Start with the first unchecked item in `Recommended Order`.
+2. Land the smallest stable change that moves that item forward.
+3. Run repo checks and any relevant evals.
+4. Update the linked issue plus this file and [`ROADMAP.md`](ROADMAP.md).
 
-## Status Legend
-- `todo`
-- `in_progress`
-- `blocked`
-- `done`
+Important rule:
+- This board tracks merged `main` behavior, not unmerged branches or stale issue state.
 
-## Now (Parallel Tracks)
+## Current Status
+- Core async runtime is in place: durable `runs`, `run_events`, and `leases`; async `POST /chat` and `POST /runs`; polling via `GET /runs/{id}/status` and `GET /runs/{id}/events`.
+- Blocking orchestration work has already been moved off the FastAPI event loop into a bounded worker pool as the `#51` migration step.
+- Runtime support services are in place: orphan recovery heartbeat, scheduled task loop, scheduled task CRUD/API, and runtime shutdown wiring.
+- Frontend migration, Gmail Docker readiness, conversation naming, config validation, and runtime eval harness work are already landed.
+- The architecture still has important follow-up debt: mixed LLM plus rule-based tool routing, in-process follow-up tasks, no final lifecycle policy for in-flight/background work, no SSE stream, and true end-to-end async execution is still future work.
 
-### Test Coverage
-- [x] `done` Add schema validation tests for agent_config.yaml ([#73](https://github.com/gtpooniwala/personal-agent/issues/73))
-- [x] `done` Unit tests for check_conversation_maintenance and async_generate_title retry ([#74](https://github.com/gtpooniwala/personal-agent/issues/74))
+## Recommended Order
 
-### Orchestrator Hardening
-- [ ] `todo` Isolate orchestrator state per async run ([#50](https://github.com/gtpooniwala/personal-agent/issues/50))
-- [ ] `todo` Move blocking orchestration work off event loop ([#51](https://github.com/gtpooniwala/personal-agent/issues/51))
+### Core Runtime And Orchestrator
+- [ ] `todo` Let the orchestrator LLM own normal tool selection and reduce rule-based routing ([#101](https://github.com/gtpooniwala/personal-agent/issues/101))
+- [ ] `todo` Define the long-term lifecycle contract for the execution plane, shutdown behavior, and in-flight run handling ([#102](https://github.com/gtpooniwala/personal-agent/issues/102))
+- [ ] `todo` Separate background follow-up budget from foreground run attempts ([#109](https://github.com/gtpooniwala/personal-agent/issues/109))
+- [ ] `todo` Persist follow-up work such as summarisation as queued task types instead of `asyncio.create_task(...)` ([#105](https://github.com/gtpooniwala/personal-agent/issues/105))
+- [ ] `todo` Refactor `CoreOrchestrator` toward stateless per-request execution ([#106](https://github.com/gtpooniwala/personal-agent/issues/106))
+- [ ] `todo` Investigate true async orchestration/runtime paths instead of thread or sync islands ([#103](https://github.com/gtpooniwala/personal-agent/issues/103))
+- [ ] `todo` Add SSE streaming on top of the existing run/event store ([#104](https://github.com/gtpooniwala/personal-agent/issues/104))
 
-## Next
+### Product And Prompting Follow-Ups
+- [ ] `todo` Strengthen prompt architecture and prompting contracts ([#68](https://github.com/gtpooniwala/personal-agent/issues/68))
+- [ ] `todo` Improve document UX and RAG workflow clarity in the frontend ([#64](https://github.com/gtpooniwala/personal-agent/issues/64))
 
-### Orchestrator Architecture
-- [ ] `todo` Let the orchestrator LLM own tool selection ([#101](https://github.com/gtpooniwala/personal-agent/issues/101))
+## Deployment Track
+Work this track after the core runtime/orchestrator plan above is stable enough.
 
-## Migration Track
-- [x] `done` Publish migration architecture contract + PR decomposition for long-running runtime ([#14](https://github.com/gtpooniwala/personal-agent/issues/14))
-- [x] `done` Add run lifecycle schema (`runs`, `run_events`, `leases`) ([#15](https://github.com/gtpooniwala/personal-agent/issues/15))
-- [x] `done` Deliver async submission contracts for `/chat` and `/runs` plus status/events endpoints ([#17](https://github.com/gtpooniwala/personal-agent/issues/17))
-- [x] `done` Implement runtime worker queue with per-session serialization ([#16](https://github.com/gtpooniwala/personal-agent/issues/16))
-- [x] `done` Add scheduler/heartbeat for autonomous workflows ([#18](https://github.com/gtpooniwala/personal-agent/issues/18))
-- [x] `done` Add runtime evals for lifecycle/retry/session isolation ([#19](https://github.com/gtpooniwala/personal-agent/issues/19))
-- [ ] `todo` Make summarisation tool non-blocking in async path ([#28](https://github.com/gtpooniwala/personal-agent/issues/28))
-- [ ] `todo` Remove import-time global warning filter side effect ([#29](https://github.com/gtpooniwala/personal-agent/issues/29))
-- [x] `done` Build real LLM/workflow evaluation harness (separate from deterministic repo checks) ([#23](https://github.com/gtpooniwala/personal-agent/issues/23))
-- [x] `done` Upgrade to latest LangChain/LangGraph stack (deferred major migration) ([#22](https://github.com/gtpooniwala/personal-agent/issues/22))
-
-## Backlog
-
-### Cloud Deployment (GCP)
+- [ ] `todo` Keep the GCP ADR current and finalize remaining deployment decisions ([#81](https://github.com/gtpooniwala/personal-agent/issues/81))
+- [ ] `todo` Cloud SQL production database setup ([#80](https://github.com/gtpooniwala/personal-agent/issues/80))
+- [ ] `todo` Secret Manager integration for production secrets ([#82](https://github.com/gtpooniwala/personal-agent/issues/82))
 - [ ] `todo` Migrate document storage from local filesystem to GCS ([#79](https://github.com/gtpooniwala/personal-agent/issues/79))
-- [ ] `todo` Cloud SQL setup and production database configuration ([#80](https://github.com/gtpooniwala/personal-agent/issues/80))
-- [ ] `todo` GCP deployment architecture decision record ([#81](https://github.com/gtpooniwala/personal-agent/issues/81))
-- [ ] `todo` Secret Manager integration for production API keys ([#82](https://github.com/gtpooniwala/personal-agent/issues/82))
-- [ ] `todo` IAP setup for personal cloud authentication ([#83](https://github.com/gtpooniwala/personal-agent/issues/83))
 - [ ] `todo` Cloud Run service definitions for backend and frontend ([#85](https://github.com/gtpooniwala/personal-agent/issues/85))
+- [ ] `todo` IAP setup for personal cloud authentication ([#83](https://github.com/gtpooniwala/personal-agent/issues/83))
 - [ ] `todo` GitHub Actions CI/CD pipeline for Cloud Run deployment ([#86](https://github.com/gtpooniwala/personal-agent/issues/86))
-- [ ] `todo` Cold start optimization and min-instances strategy ([#87](https://github.com/gtpooniwala/personal-agent/issues/87))
+- [ ] `todo` Cold-start and min-instances tuning once the cloud baseline exists ([#87](https://github.com/gtpooniwala/personal-agent/issues/87))
 
-### Event-Driven Triggers + Mobile
-- [ ] `todo` Event trigger framework — unified infrastructure for external triggers ([#88](https://github.com/gtpooniwala/personal-agent/issues/88))
-- [ ] `todo` Scheduled task runner — cron-like recurring agent runs ([#89](https://github.com/gtpooniwala/personal-agent/issues/89)) — *extends #18*
-- [ ] `todo` Task-to-task chaining — trigger_run tool for agent-spawned runs ([#90](https://github.com/gtpooniwala/personal-agent/issues/90))
+## Trigger And Automation Track
+Current scheduler primitives already exist. The remaining work is the external trigger layer.
+
+- [x] `done` Scheduled task runner and scheduler-backed recurring runs ([#89](https://github.com/gtpooniwala/personal-agent/issues/89))
+- [ ] `todo` Event trigger framework for external trigger types ([#88](https://github.com/gtpooniwala/personal-agent/issues/88))
+- [ ] `todo` Add `trigger_run` for agent-spawned runs ([#90](https://github.com/gtpooniwala/personal-agent/issues/90))
 - [ ] `todo` Email-triggered task execution ([#91](https://github.com/gtpooniwala/personal-agent/issues/91))
 - [ ] `todo` Telegram bot integration for mobile task monitoring and triggering ([#92](https://github.com/gtpooniwala/personal-agent/issues/92))
 
-### General Backlog
+## Completed Context
+Keep this compressed. Use Git history and GitHub issues for detail.
+
+- [x] `done` Foundation hardening and local workflow reliability: `#7` to `#13`, `#20`, `#40`
+- [x] `done` Async runtime baseline: `#14` to `#19`
+- [x] `done` Event-loop responsiveness migration step with worker-pool orchestration offload: `#51`
+- [x] `done` Per-run orchestrator isolation and runtime correctness follow-ups: `#50`, `#72`, `#73`, `#74`
+- [x] `done` Scheduler-backed recurring task baseline: `#18`, `#89`
+- [x] `done` Planning docs for cloud deployment and event-driven triggers: `#78`
+
+## Backlog
 - [ ] `todo` Chat naming polish ([#1](https://github.com/gtpooniwala/personal-agent/issues/1))
-- [ ] `todo` Internet search integration expansion ([#2](https://github.com/gtpooniwala/personal-agent/issues/2))
-- [ ] `todo` Email integration ([#3](https://github.com/gtpooniwala/personal-agent/issues/3))
+- [ ] `todo` Internet search expansion ([#2](https://github.com/gtpooniwala/personal-agent/issues/2))
+- [ ] `todo` Email integration beyond current Gmail read support ([#3](https://github.com/gtpooniwala/personal-agent/issues/3))
 - [ ] `todo` Calendar integration ([#4](https://github.com/gtpooniwala/personal-agent/issues/4))
 - [ ] `todo` Task manager integration ([#5](https://github.com/gtpooniwala/personal-agent/issues/5))
 - [ ] `todo` Memory feature expansion ([#6](https://github.com/gtpooniwala/personal-agent/issues/6))
 
-## Done
-- [x] `done` Replace calculator `eval` with safe parser/evaluator ([#7](https://github.com/gtpooniwala/personal-agent/issues/7))
-- [x] `done` Remove XSS-prone `innerHTML` rendering in chat/conversation/document UIs ([#8](https://github.com/gtpooniwala/personal-agent/issues/8))
-- [x] `done` Fix upload error path referencing uninitialized `document_id` ([#9](https://github.com/gtpooniwala/personal-agent/issues/9))
-- [x] `done` Make local test workflow runnable and reduce skip-only passes ([#10](https://github.com/gtpooniwala/personal-agent/issues/10))
-- [x] `done` Add baseline observability and core runtime counters ([#11](https://github.com/gtpooniwala/personal-agent/issues/11))
-- [x] `done` Make Gmail tool optional in active tool list unless configured ([#12](https://github.com/gtpooniwala/personal-agent/issues/12))
-- [x] `done` Cleanup frontend rough edges and duplicate utility logic ([#13](https://github.com/gtpooniwala/personal-agent/issues/13))
-- [x] `done` Publish migration architecture contract + PR decomposition ([#14](https://github.com/gtpooniwala/personal-agent/issues/14))
-- [x] `done` Enforce branch/worktree/PR policy checks ([#20](https://github.com/gtpooniwala/personal-agent/issues/20))
-- [x] `done` Upgrade to latest LangChain/LangGraph stack ([#22](https://github.com/gtpooniwala/personal-agent/issues/22))
-- [x] `done` Build real LLM/workflow evaluation harness ([#23](https://github.com/gtpooniwala/personal-agent/issues/23))
-- [x] `done` Move frontend from static HTML/JS to Next.js ([#24](https://github.com/gtpooniwala/personal-agent/issues/24))
-- [x] `done` Legacy module cleanup + import hygiene baseline eval
-- [x] `done` README architecture/setup refresh
-- [x] `done` Fix Gmail auth flow and dependency packaging ([#40](https://github.com/gtpooniwala/personal-agent/issues/40))
-- [x] `done` Guard Enter key send during IME composition ([#30](https://github.com/gtpooniwala/personal-agent/issues/30))
-- [x] `done` Prevent cross-conversation message race on send ([#31](https://github.com/gtpooniwala/personal-agent/issues/31))
-- [x] `done` Robust async conversation auto-naming ([#72](https://github.com/gtpooniwala/personal-agent/issues/72))
-- [x] `done` GCP deployment and event-driven triggers planning docs ([#78](https://github.com/gtpooniwala/personal-agent/issues/78))
-
 ## Notes
 - Keep items small enough to land in one commit when possible.
 - Prefer one GitHub issue per item, linked directly above.
-- Status source of truth for execution tracking is this file + [`ROADMAP.md`](ROADMAP.md).
+- Status source of truth for execution tracking is this file plus [`ROADMAP.md`](ROADMAP.md).
 - Issue taxonomy and issue-creation rules live in [`ISSUE_MANAGEMENT.md`](ISSUE_MANAGEMENT.md).
-- Deprecated status docs removed: `PROJECT_STATUS.md` and `SUGGESTED_CHANGES.md`.
-- Milestone alignment:
-- `01 Foundation Hardening`: #7-#13, #40
-- `02 Runtime Migration Core`: #14-#17
-- `03 Workflow Automation`: #18-#19
-- `Backlog / Future`: #1-#6, #78-#83, #85-#92
-- Follow branch/worktree/PR policy in [`ENGINEERING_WORKFLOW.md`](ENGINEERING_WORKFLOW.md).
+- Follow the branch/worktree/PR rules in [`ENGINEERING_WORKFLOW.md`](ENGINEERING_WORKFLOW.md).
+- Use [`ARCHITECTURE.md`](ARCHITECTURE.md) and [`MIGRATION_RUNTIME_ARCHITECTURE.md`](MIGRATION_RUNTIME_ARCHITECTURE.md) for implementation detail.

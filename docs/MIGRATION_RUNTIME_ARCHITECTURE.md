@@ -1,129 +1,67 @@
-# Long-Running Runtime Architecture (OpenClaw-lite Direction)
+# Runtime Migration Architecture
 
-This document is the canonical design reference for the runtime migration in issue #14.
+This document started as the design reference for issue `#14`. The baseline migration is now landed, so this file is primarily useful for two things:
 
-## Why migrate now
-The legacy synchronous chat path (`POST /api/v1/chat`) makes long or complex workflows fragile because:
-- every request must complete in one HTTP response window,
-- recovery is impossible if the process crashes mid-run,
-- tool execution and background summarization are mixed in the request path,
-- there is no durable run ledger for retries, auditing, or status surfacing.
+1. understanding why the runtime is shaped around durable runs and events,
+2. understanding which hardening steps still remain after the initial migration.
 
-The migration intentionally introduces a run model:
-1. decouple request acceptance from execution,
-2. persist run state for restart-safe progress,
-3. expose status/events for client polling.
+## Why The Migration Happened
+The old synchronous chat path forced all work into one HTTP request window. That made long-running or failure-prone orchestration hard to recover, hard to inspect, and hard to extend into automation.
 
-Given this is a local single-user project, the design targets operational correctness first, then evolvability.
+The runtime migration introduced a run ledger so the system could:
+- accept work quickly,
+- persist lifecycle state,
+- expose observable progress,
+- serialize work per conversation,
+- recover more safely from partial failures.
 
-## Target architecture
-### 1) API contract
-- Primary notation is bare routes (`/runs`, `/chat`, ...). `/api/v1/...` notation is legacy.
-- `POST /runs` -> creates a run and returns `run_id` immediately.
-- `POST /chat` -> conversational async submission path that also returns `run_id`.
-- `GET /runs/{run_id}/status` -> returns latest run state and summary metadata.
-- `GET /runs/{run_id}/events` -> returns ordered progress/error messages for UI streaming or polling display.
+## What Is Already Implemented
 
-### 2) Execution model
-- A dedicated worker process consumes a run queue and executes actual orchestration work.
-- Workers write deterministic run events/state transitions so progress survives restarts.
-- Runs are scoped per conversation/session.
+### API Contract
+- `POST /chat` and `POST /runs` submit asynchronous work and return a `run_id`.
+- `GET /runs/{run_id}/status` returns the latest lifecycle snapshot.
+- `GET /runs/{run_id}/events` returns ordered run events with cursor-based pagination.
 
-### 3) Transitional API compatibility
-- `POST /chat` remains an active asynchronous API path (not deprecated by default).
-- Legacy synchronous `POST /api/v1/chat` is deprecated and removed after migration completion.
-- During transition, docs may describe both route notations; bare-route notation is canonical.
+### Durable Runtime State
+- `runs` stores the latest run status and result/error fields.
+- `run_events` is the append-only event stream used by polling clients.
+- `leases` provides per-conversation serialization and scheduler dispatch locking.
 
-## Run lifecycle and semantics
-Recommended canonical states (to be implemented in #15/#16/#17):
-- `queued` → `running` → `succeeded`
-- or `queued` → `running` → `retrying` → `succeeded`
-- failure path: `running` → `failed`
-- cancel path: `running` → `cancelling` → `cancelled`
+### Runtime Services
+- `RuntimeService` handles submission, retries, terminal status updates, and tool-result event emission.
+- `OrchestrationExecutionPlane` keeps blocking orchestration attempts off the FastAPI event loop via a bounded worker pool.
+- `HeartbeatService` sweeps orphaned runs.
+- `SchedulerService` dispatches due scheduled tasks into the same runtime path.
 
-Expected semantics:
-- State transitions are append-only in `run_events`.
-- Only one active worker path per conversation/session for ordering guarantees.
-- A failed run preserves partial result context for debugging and user messaging.
-- Retry path is bounded and visible via status/events.
+## What Is Not Finished
+The migration delivered the durable runtime baseline, but not the full architectural cleanup.
 
-## #15 schema contract (implemented)
-Lifecycle vocabulary is frozen in `backend/runtime/lifecycle.py` and reused by schema constraints.
+Open follow-ups:
+- [#101](https://github.com/gtpooniwala/personal-agent/issues/101): remove mixed tool-selection ownership
+- [#102](https://github.com/gtpooniwala/personal-agent/issues/102): define executor lifecycle and shutdown behavior
+- [#109](https://github.com/gtpooniwala/personal-agent/issues/109): budget follow-up work separately from foreground attempts
+- [#105](https://github.com/gtpooniwala/personal-agent/issues/105): persist follow-up work as queued task types
+- [#106](https://github.com/gtpooniwala/personal-agent/issues/106): make the orchestrator more stateless
+- [#103](https://github.com/gtpooniwala/personal-agent/issues/103): investigate true async internals
+- [#104](https://github.com/gtpooniwala/personal-agent/issues/104): add SSE streaming on top of the same event store
 
-### `runs`
-- durable per-run state row keyed by `id`
-- `status` constrained to canonical run statuses
-- indexed for polling/query patterns:
-  - `(status, created_at)`
-  - `(conversation_id, created_at)`
+## Canonical Runtime Semantics
+- Primary lifecycle: `queued -> running -> succeeded`
+- Retry lifecycle: `queued -> running -> retrying -> succeeded`
+- Failure lifecycle: `queued|running|retrying -> failed`
+- The first pass keeps one active run per conversation/session for ordering guarantees.
+- `run_events` is the durable source of truth for user-visible progress.
 
-### `run_events`
-- append-only log keyed by autoincrement event `id`
-- each row links to `run_id`, includes `event_type`, `status`, optional `message`/`tool`/`error`/`payload`
-- constraints enforce canonical event/status vocabulary
-- indexed by `(run_id, id)` for ordered event retrieval and by `(status, created_at)` for status-driven debugging
+## Practical Interpretation
+The migration should be thought of as complete for the baseline contract, but incomplete for the final runtime shape.
 
-### `leases`
-- key/value lease ownership table for worker serialization primitives
-- one row per `lease_key`, with `owner_id`, `fencing_token`, `acquired_at`, `expires_at`
-- safety rules:
-  - acquire succeeds only when lease is expired or already held by same owner
-  - renew requires current owner and unexpired lease
-  - release requires current owner
-  - `fencing_token` increments on takeover/reacquire updates
-  - index on `expires_at` supports expiry sweeps/observability
+In other words:
+- the repo already has a usable async runtime,
+- the `#51` step already delivered event-loop responsiveness by offloading blocking orchestration to a worker pool,
+- the next work is about ownership, durability of follow-up work, and operational clarity,
+- the next client and trigger features should build on the existing run/event store rather than bypass it.
 
-## Failure and resilience
-- Worker exceptions transition the run to `failed` and emit a terminal event with classification:
-  - input validation
-  - tool error
-  - dependency/provider issue
-  - unexpected crash
-- Retry policy:
-  - only non-permanent failures retry by default,
-  - attempts are capped and logged,
-  - users can resubmit manually (future enhancement).
-
-## Concurrency boundary
-- Per-session serialization is required in first pass.
-- Concurrent sessions may run in parallel where worker/process capacity allows.
-- This avoids cross-conversation state races without overcomplicating local workflow.
-
-## Operational visibility
-- Primary path for this migration: HTTP polling via status/events.
-- SSE/WebSocket can be added later without changing run schema when useful.
-
-## PR decomposition (from #14)
-This design is consumed by these future PRs:
-1. #15: run lifecycle schema and durable state tables
-2. #17: run submission + status/events API
-3. #16: dedicated worker and per-session serialization
-4. #19: runtime evals for lifecycle/retry/session isolation
-5. #18: scheduler/heartbeat after core run semantics are stable
-
-## Dependency matrix and merge gates
-| PR lane | Issue | Can start when | Must merge before |
-|---|---|---|---|
-| Data model baseline | #15 | immediately | #16 runtime worker completion |
-| API contract migration | #17 | immediately, using canonical run vocabulary | frontend runtime adoption + #16 integration tests |
-| Worker/runtime execution | #16 | #15 schema is available and #17 run vocabulary is frozen | #18 scheduler/autonomous workflows |
-| Runtime validation | #19 | #15 and #17 have landed | final migration closeout |
-| Scheduler/autonomous workflows | #18 | #16 worker runtime behavior is stable | optional post-core phase |
-
-Merge gates:
-1. Freeze run status/event vocabulary before landing #15 and #17.
-2. Do not merge #16 until #15 durable state shape is stable.
-3. Do not merge #18 until #16 + #19 show stable lifecycle behavior.
-
-## Confirmation-required open decisions
-The following are intentionally left flexible and require explicit user confirmation before final implementation:
-- Issue-scope discrepancy resolution for whether #22 and #23 are in or out of the migration execution lane.
-- `/runs/{run_id}/events` pagination/cursor semantics.
-- Cancellation API surface details (endpoint shape + response behavior).
-
-## Documentation contract
-All migration docs must:
-- describe the async run contract as primary,
-- mark legacy synchronous `/api/v1/chat` as deprecated while keeping async `/chat` active,
-- reuse the same run-state vocabulary,
-- include migration notes for client updates.
+## Related Docs
+- [`ARCHITECTURE.md`](ARCHITECTURE.md)
+- [`SYSTEM_FLOW.md`](SYSTEM_FLOW.md)
+- [`WORKBOARD.md`](WORKBOARD.md)

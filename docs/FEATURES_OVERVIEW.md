@@ -1,223 +1,58 @@
-# 🎯 Personal Agent Features Overview
+# Features Overview
 
-Comprehensive overview of all implemented features in the Personal Agent MVP.
+This file is a capability inventory, not a marketing snapshot. It lists what exists today and how mature each area is.
 
-## 🏗️ Core Architecture Features
+## Implemented Core Platform
+- Async runtime submission and polling via `/chat`, `/runs`, `/runs/{id}/status`, and `/runs/{id}/events`
+- Durable run ledger with retries, leases, and orphan recovery
+- Next.js frontend for chat, conversations, documents, and runtime status
+- PostgreSQL-backed persistence for conversations, documents, embeddings, counters, runs, and scheduled tasks
+- LangGraph-based orchestration with tool binding and response synthesis
 
-### LangGraph Orchestrator
-- **Implementation**: Modern graph-based agent orchestration
-- **Pattern**: ReAct (Reasoning + Acting) for intelligent decision making
-- **Capabilities**: Multi-step reasoning, tool chaining, context awareness
-- **Benefits**: Scalable, maintainable, and intelligent tool delegation
+## Implemented User-Facing Tools
 
-### Dynamic Tool Registry
-- **Implementation**: Automatic tool discovery and registration
-- **Context Awareness**: Tools available based on user context and authentication
-- **Extensibility**: Easy addition of new tools without core changes
-- **Management**: Runtime tool availability and configuration
+### Always Available
+- Calculator
+- Current time
+- Scratchpad
+- User profile memory
 
-### Memory Management
-- **Conversation Persistence**: Complete interaction history with SQLite
-- **Intelligent Summarization**: Automatic context window management
-- **User Profiles**: Persistent user preferences and personalization
-- **Context Retention**: Long-term memory across sessions
+### Context Or Config Dependent
+- Document search and RAG over uploaded PDFs
+- Internet search
+- Gmail read integration when credentials and dependencies are present
 
-## 🔧 Production-Ready Tools
+### Internal Helper Tools Or Flows
+- Response synthesis
+- Conversation summarisation
+- Conversation title generation
 
-### 1. Calculator Tool ✅
-**Status**: Production Ready | **Availability**: Always
+## Implemented Runtime Support
+- Per-conversation serialization via leases
+- Retry loop and terminal run state recording
+- Heartbeat orphan sweep
+- Scheduled recurring task storage and dispatch
+- Runtime counters and Langfuse-compatible observability hooks
 
-- **Functionality**: Mathematical expression evaluation
-- **Security**: Input sanitization and safe evaluation
-- **Features**: 
-  - Basic arithmetic operations (+, -, *, /)
-  - Exponentiation (^, **)
-  - Parentheses and order of operations
-  - Error handling for invalid expressions
+## Current Maturity Notes
+- The runtime contract itself is real and usable.
+- Tool selection is still partly split between LLM behavior and deterministic fallback branches.
+- Some background work is still in-process rather than durable.
+- Streaming updates are not implemented yet; the UI relies on polling.
 
-**Usage Examples**:
-```
-"What's 25 * 16?"
-"Calculate 2^8 + 5"
-"Solve (45 + 15) / 3"
-```
+## Placeholder Or Planned Capability Areas
+- Task-to-task chaining with `trigger_run`
+- External trigger framework
+- Email-triggered runs
+- Telegram/mobile interaction layer
+- Calendar and task-manager integrations
+- Multi-user auth and tenant isolation
+- Cloud deployment hardening
 
-### 2. Time Tool ✅
-**Status**: Production Ready | **Availability**: Always
-
-- **Functionality**: Current date and time information
-- **Features**:
-  - Multiple time formats
-  - Natural language queries
-  - Timezone awareness
-  - Date calculations
-
-**Usage Examples**:
-```
-"What time is it?"
-"What's today's date?"
-"What day of the week is it?"
-```
-
-### 3. Document Q&A Tool ✅
-**Status**: Production Ready | **Availability**: When documents uploaded
-
-- **Functionality**: RAG-powered document analysis and Q&A
-- **Technology**: OpenAI embeddings + vector search
-- **Features**:
-  - PDF document processing
-  - Semantic search capabilities
-  - Multi-document queries
-  - Source attribution
-  - Context-aware responses
-
-**Usage Examples**:
-```
-"What does my contract say about termination?"
-"Summarize the key points from my uploaded document"
-"Find information about payment terms"
-```
-
-### 4. Scratchpad Tool ✅
-**Status**: Production Ready | **Availability**: Always
-
-- **Functionality**: Persistent note-taking across conversations
-- **Features**:
-  - Save notes with automatic timestamping
-  - Search through saved notes
-  - Delete specific notes
-  - Clear all notes
-  - User-specific storage
-
-**Usage Examples**:
-```
-"Save a note that I need to call the dentist tomorrow"
-"Show me my notes"
-"Search for notes about dentist"
-"Delete note about meeting"
-```
-
-### 5. Internet Search Tool ✅
-**Status**: Production Ready | **Availability**: When enabled
-
-- **Functionality**: Real-time web search and information retrieval
-- **Features**:
-  - Multiple search providers (DuckDuckGo, Bing, Google)
-  - Result summarization
-  - Current information access
-  - Contextual search results
-
-**Usage Examples**:
-```
-"What's the latest news about AI?"
-"Search for Python best practices"
-"Find information about the weather in New York"
-```
-
-### 6. Gmail Integration Tool ✅
-**Status**: Production Ready | **Availability**: With OAuth setup
-
-- **Functionality**: Email reading and search capabilities
-- **Security**: OAuth 2.0 authentication
-- **Features**:
-  - Advanced Gmail search syntax
-  - Multiple email results
-  - Email metadata (sender, subject, date)
-  - Label-based filtering
-  - Secure access management
-
-**Usage Examples**:
-```
-"Show me emails from John last week"
-"Find unread emails with 'invoice' in subject"
-"Read my latest email"
-```
-
-### 7. User Profile Tool ✅
-**Status**: Production Ready | **Availability**: Always
-
-- **Functionality**: Persistent user memory and personalization
-- **Features**:
-  - Long-term user preference storage
-  - LLM-powered profile updates
-  - Natural language profile management
-  - Cross-session memory retention
-
-**Usage Examples**:
-```
-"Remember that my favorite color is blue"
-"What do you know about me?"
-"Update my profile with my work schedule"
-```
-
-### 8. Response Agent Tool ✅
-**Status**: Production Ready | **Availability**: Always (Internal)
-
-- **Functionality**: Final response synthesis and formatting
-- **Features**:
-  - Integration of multiple tool results
-  - Natural language response generation
-  - Context-aware formatting
-  - Consistent user experience
-
-## 🎯 System Capabilities
-
-### Multi-Tool Workflows
-- **Complex Queries**: Handle requests requiring multiple tools
-- **Tool Chaining**: Sequential tool execution with context passing
-- **Parallel Processing**: Independent tools executed simultaneously
-- **Result Integration**: Seamless combination of multiple tool outputs
-
-### Conversation Management
-- **Title Generation**: Automatic conversation titles
-- **Context Summarization**: Intelligent conversation history management
-- **Memory Optimization**: Efficient long conversation handling
-- **Session Persistence**: Conversations saved and retrievable
-
-### Error Handling & Recovery
-- **Graceful Degradation**: System continues functioning despite tool failures
-- **Error Context**: Meaningful error messages with suggested actions
-- **Fallback Strategies**: Alternative approaches when primary tools fail
-- **Recovery Mechanisms**: Automatic retry with exponential backoff
-
-## 🚀 Future Expansion Possibilities
-
-### Enhanced Integrations
-- **Calendar Management**: Google Calendar integration for scheduling
-- **Task Management**: Todoist integration for project management
-- **Cloud Storage**: Dropbox/Google Drive integration
-- **Communication**: Slack/Teams integration
-
-### Advanced Features
-- **Voice Interface**: Speech-to-text and text-to-speech capabilities
-- **Workflow Automation**: Custom workflow creation and execution
-- **Multi-language Support**: International language capabilities
-- **Advanced Analytics**: Usage patterns and optimization suggestions
-
-### Developer Tools
-- **API Extensions**: Custom tool development framework
-- **Plugin Marketplace**: Community-contributed tools
-- **Webhook Support**: External service integrations
-- **Custom Prompts**: User-defined agent behaviors
-
-## 📊 Quality Metrics
-
-### Test Coverage
-- **Unit Tests**: 55 comprehensive tests
-- **Integration Tests**: 20 end-to-end workflow validations
-- **Success Rate**: 97.3% test coverage with 100% critical path validation
-- **Continuous Testing**: Automated validation on all changes
-
-### Performance Benchmarks
-- **Average Response Time**: ~2.3 seconds
-- **Tool Selection Accuracy**: 98.5%
-- **Memory Efficiency**: Optimized conversation management
-- **Scalability**: Horizontal scaling ready
-
-### Production Readiness
-- **Error Handling**: Comprehensive error recovery
-- **Security**: Input validation and sanitization
-- **Monitoring**: Health checks and performance metrics
+## Where To Go Next
+- For current execution order, read [`WORKBOARD.md`](WORKBOARD.md).
+- For sequencing rationale, read [`ROADMAP.md`](ROADMAP.md).
+- For feature-specific behavior, read the docs under [`features/`](features/).
 - **Documentation**: Complete technical documentation
 
 ## 🎯 User Experience Features

@@ -1,223 +1,120 @@
 # Setup Guide
 
-This guide provides detailed instructions for setting up the Personal Agent project on your local machine.
+Use [`../README.md`](../README.md) for the shortest path. This file adds a little more detail and calls out the environment variables that matter most.
 
-## Prerequisites
+## Recommended Path: Docker
 
-### System Requirements
-- **Python**: 3.11 or higher
-- **Node.js**: 18.0 or higher (for frontend development)
-- **Operating System**: macOS, Linux, or Windows with WSL2
-- **Memory**: At least 4GB RAM available
-- **Storage**: 2GB free disk space
+### Prerequisites
+- Docker Desktop or Docker Engine with Compose
+- A Gemini API key or OpenAI API key
 
-### Required Accounts & API Keys
-- **OpenAI API Key**: Required for AI agent functionality
-- **Optional**: Other AI provider keys (Anthropic, etc.) for extended functionality
-
-## Installation Steps
-
-### 1. Clone the Repository
+### Basic Setup
 ```bash
-git clone <repository-url>
+git clone https://github.com/gtpooniwala/personal-agent.git
 cd personal-agent
-```
-
-### 2. Set Up Python Environment
-```bash
-# Create virtual environment
-python -m venv venv
-
-# Activate virtual environment
-# On macOS/Linux:
-source venv/bin/activate
-# On Windows:
-venv\Scripts\activate
-
-# Install Python dependencies
-cd backend
-pip install -r requirements.txt
-
-# (Optional) Install Gmail integration dependencies
-# Only if you plan to use Gmail features
-pip install -r requirements-gmail.txt
-```
-
-### 3. Configure Environment Variables
-Create a `.env` file in the project root:
-```bash
-# Copy the example environment file
 cp .env.example .env
 ```
 
-Edit the `.env` file with your configuration:
+Set at least one model provider key in `.env`:
 ```env
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_api_key_here
+GEMINI_API_KEY=...
+# or
+OPENAI_API_KEY=...
+```
 
-# Server Configuration
-HOST=localhost
-PORT=8000
-DEBUG=true
-
-# Database Configuration
+Useful database variables:
+```env
 DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent
 DATABASE_URL_DOCKER=postgresql+psycopg://personal_agent:personal_agent@postgres:5432/personal_agent
 TEST_DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent_test
 EVAL_DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent_test
-
-# CORS Configuration
-CORS_ORIGINS=http://localhost:3000,http://localhost:8080
-
-# Logging
-LOG_LEVEL=INFO
 ```
 
-### 4. Initialize the Database
-```bash
-# From the backend directory
-python -c "from database.models import init_db; init_db()"
-```
-
-### 5. Make Scripts Executable
-```bash
-# Make setup and start scripts executable
-chmod +x setup.sh
-chmod +x start_server.sh
-```
-
-### 6. Run Initial Setup
-```bash
-# Run the automated setup script
-./setup.sh
-```
-
-## Verification
-
-### 1. Test Backend Server
-```bash
-# Start the backend server
-./start_server.sh
-
-# In another terminal, test the API
-curl http://localhost:8000/api/v1/health
-```
-
-Expected response:
-```json
-{
-    "status": "healthy",
-    "timestamp": "2025-06-08T10:00:00Z",
-    "version": "1.0.0"
-}
-```
-
-### 2. Test Frontend
-Open your browser and navigate to:
-- Frontend: `http://localhost:8000` (served by FastAPI)
-- API Documentation: `http://localhost:8000/docs`
-
-### 3. Test Agent Functionality
-```bash
-# Run basic agent tests
-cd backend
-python test_basic_agent.py
-```
-
-## Configuration Options
-
-### Environment Variables Reference
-
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `OPENAI_API_KEY` | OpenAI API authentication key | - | Yes |
-| `HOST` | Server bind address | localhost | No |
-| `PORT` | Server port number | 8000 | No |
-| `DEBUG` | Enable debug mode | false | No |
-| `DATABASE_URL` | Database connection string | postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent | Yes |
-| `DATABASE_URL_DOCKER` | DB URL used by backend container in docker compose | postgresql+psycopg://personal_agent:personal_agent@postgres:5432/personal_agent | No |
-| `TEST_DATABASE_URL` | Dedicated destructive test DB URL | postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent_test | No |
-| `EVAL_DATABASE_URL` | Dedicated Postgres DB URL for live eval harnesses (falls back to `TEST_DATABASE_URL`) | postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent_test | No |
-| `CORS_ORIGINS` | Allowed CORS origins (comma-separated) | * | No |
-| `LOG_LEVEL` | Logging level (DEBUG/INFO/WARNING/ERROR) | INFO | No |
-| `MAX_FILE_SIZE` | Maximum upload file size (bytes) | 10485760 | No |
-| `MEMORY_RETENTION_DAYS` | Days to retain conversation memory | 30 | No |
-
-### Advanced Configuration
-
-#### Custom AI Models
-To use custom AI model mappings, modify `backend/config/llm_config.yaml`.
-
-#### Database Configuration
-PostgreSQL is the default runtime database:
+Optional observability:
 ```env
-DATABASE_URL=postgresql+psycopg://username:password@localhost:5432/personal_agent
+LANGFUSE_PUBLIC_KEY=...
+LANGFUSE_SECRET_KEY=...
+LANGFUSE_BASE_URL=https://cloud.langfuse.com
+LANGFUSE_ENABLED=true
 ```
 
-#### CORS Configuration
-For production deployment:
-```env
-CORS_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
-```
-
-## Troubleshooting
-
-### Common Issues
-
-#### 1. Import Errors
-**Problem**: `ModuleNotFoundError` when running the application
-**Solution**: 
+Optional Gmail in Docker:
 ```bash
-# Ensure you're in the correct directory and virtual environment is activated
-cd backend
-source ../venv/bin/activate
-pip install -r requirements.txt
+mkdir -p data/gmail
 ```
 
-#### 2. Database Connection Issues
-**Problem**: PostgreSQL connection errors
-**Solution**:
+Start services:
 ```bash
-# Verify PostgreSQL is running and reachable
+docker compose up --build
+```
+
+Access:
+- Frontend: `http://127.0.0.1:3000`
+- Backend: `http://127.0.0.1:8000`
+- Swagger: `http://127.0.0.1:8000/docs`
+
+## Local Debug Path
+Use this when you need local Python or frontend debugging outside containers.
+
+### Prerequisites
+- Python 3.11+
+- Node.js 20.9+
+- Local PostgreSQL
+
+### Backend
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+### Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+## Validation After Setup
+Run the standard local validation command:
+```bash
+scripts/run_local_checks.sh
+```
+
+If you changed runtime or orchestration behavior, also run:
+```bash
+python tests/run_runtime_evals.py
+```
+
+If you changed prompt behavior or tool-calling behavior, also run:
+```bash
+python tests/run_llm_evals.py --mode mock
+```
+
+## Common Problems
+
+### Database connection failures
+```bash
 pg_isready -h localhost -p 5432 -U personal_agent -d personal_agent
-
-# Validate DATABASE_URL credentials manually
-psql postgresql://personal_agent:personal_agent@localhost:5432/personal_agent -c "SELECT 1;"
 ```
 
-#### 3. OpenAI API Errors
-**Problem**: Authentication or rate limit errors
-**Solution**:
-- Verify your API key is correct and has sufficient credits
-- Check rate limits and consider implementing exponential backoff
-- Ensure API key has the required permissions
-
-#### 4. Port Already in Use
-**Problem**: `Address already in use` error
-**Solution**:
+### Port already in use
 ```bash
-# Find and kill the process using the port
 lsof -ti:8000 | xargs kill -9
-# Or use a different port
-PORT=8001 ./start_server.sh
+lsof -ti:3000 | xargs kill -9
 ```
 
-#### 5. File Upload Issues
-**Problem**: File upload failures or large file errors
-**Solution**:
-- Check file size limits in configuration
-- Ensure the `data/uploads/` directory exists and is writable
-- Verify file permissions
+### Missing provider key
+The app requires at least one of:
+- `GEMINI_API_KEY`
+- `OPENAI_API_KEY`
 
-### Logs and Debugging
-
-#### Enable Debug Mode
-```env
-DEBUG=true
-LOG_LEVEL=DEBUG
-```
-
-#### Check Logs
+### Gmail not available
+Gmail support is conditional. Make sure:
+- Gmail credentials are present
+- any required auth files are mounted or available
+- `ENABLE_GMAIL_INTEGRATION` is not disabling it
 ```bash
 # View server logs
 tail -f logs/server.log
