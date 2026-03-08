@@ -17,8 +17,23 @@ const DOCUMENT_PROMPT_STARTERS = [
   },
 ];
 
-function buildSourceId({ filename, section, relevance, excerpt }) {
-  return [filename, section, relevance, excerpt.slice(0, 80)].join("::");
+const RUN_STATUS_CLASSNAMES = new Set([
+  "queued",
+  "running",
+  "retrying",
+  "succeeded",
+  "failed",
+  "cancelling",
+  "cancelled",
+  "idle",
+]);
+
+function getRunStatusClassName(status) {
+  return RUN_STATUS_CLASSNAMES.has(status) ? status : "idle";
+}
+
+function buildSourceId({ filename, section, ordinal }) {
+  return [filename, section, ordinal].join("::");
 }
 
 function parseSourceHeader(line) {
@@ -50,6 +65,7 @@ export function extractDocumentSources(actions) {
   const searchAction = (actions || []).find((action) => action?.tool === "search_documents");
   const output = String(searchAction?.output || "");
   const sources = [];
+  let sourceOrdinal = 0;
 
   let currentSource = null;
   const excerptLines = [];
@@ -66,8 +82,9 @@ export function extractDocumentSources(actions) {
       return;
     }
 
+    sourceOrdinal += 1;
     sources.push({
-      id: buildSourceId({ ...currentSource, excerpt }),
+      id: buildSourceId({ ...currentSource, ordinal: sourceOrdinal }),
       ...currentSource,
       excerpt,
     });
@@ -229,15 +246,18 @@ const ChatPanel = forwardRef(function ChatPanel({
       {(activeRun?.status || hasSelectedDocuments) && (
         <section className="active-context-bar">
           {activeRun?.status ? (
-            <span className={`context-chip run-status ${activeRun.status}`}>
+            <span className={`context-chip run-status ${getRunStatusClassName(activeRun.status)}`}>
               Run {activeRun.status}
             </span>
           ) : null}
 
           {hasSelectedDocuments ? (
             <div className="selected-documents-strip" aria-label="Selected documents">
-              {selectedDocumentDetails.map((document) => (
-                <span key={document.id} className="context-chip selected-document-chip">
+              {selectedDocumentDetails.map((document, index) => (
+                <span
+                  key={`${document.id || "document"}-${document.filename || "untitled"}-${index}`}
+                  className="context-chip selected-document-chip"
+                >
                   {document.filename}
                 </span>
               ))}

@@ -112,4 +112,27 @@ describe('DocumentsPanel document workflow UX (issue #64)', () => {
     expect(screen.getByText(/Queued for indexing/i)).toBeInTheDocument();
     expect(screen.getByText(/Indexing in progress/i)).toBeInTheDocument();
   });
+
+  test('sanitizes unknown document status values before using them as CSS classes', () => {
+    render(
+      <DocumentsPanel
+        {...defaultProps}
+        documents={[
+          {
+            id: 'doc-weird',
+            filename: 'Odd Status.pdf',
+            file_size: 1024,
+            uploaded_at: new Date().toISOString(),
+            processed: 'unexpected-status',
+            total_chunks: 0,
+            summary: '',
+          },
+        ]}
+      />,
+    );
+
+    const badge = screen.getByText('Unknown');
+    expect(badge.className).toContain('pending');
+    expect(badge.className).not.toContain('unexpected-status');
+  });
 });

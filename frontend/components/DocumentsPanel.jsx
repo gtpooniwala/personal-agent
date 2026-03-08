@@ -5,6 +5,12 @@ import {
   truncateText,
 } from "@/lib/formatters";
 
+const DOCUMENT_STATUS_CLASSNAMES = new Set(["completed", "processing", "pending", "failed"]);
+
+function getDocumentStatusClassName(status) {
+  return DOCUMENT_STATUS_CLASSNAMES.has(status) ? status : "pending";
+}
+
 export default function DocumentsPanel({
   documents,
   selectedDocuments,
@@ -172,6 +178,7 @@ export default function DocumentsPanel({
                     documents.map((doc) => {
                       const isSelected = selectedDocuments.has(doc.id);
                       const isReady = doc.processed === "completed";
+                      const statusClassName = getDocumentStatusClassName(doc.processed);
                       const statusLabel = formatDocumentStatusLabel(doc.processed);
                       return (
                         <article
@@ -191,7 +198,7 @@ export default function DocumentsPanel({
                                 <span className="doc-name" title={doc.filename}>
                                   📄 {truncateText(doc.filename, 28)}
                                 </span>
-                                <span className={`doc-status-badge ${doc.processed}`}>
+                                <span className={`doc-status-badge ${statusClassName}`}>
                                   {statusLabel}
                                 </span>
                               </span>

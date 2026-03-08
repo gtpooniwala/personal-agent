@@ -209,4 +209,17 @@ describe('ChatPanel document context UX (issue #64)', () => {
     expect(within(sourceRegion).getByText('Pricing Addendum.pdf')).toBeInTheDocument();
     expect(within(sourceRegion).getByText(/Pricing updates require written approval/i)).toBeInTheDocument();
   });
+
+  test('sanitizes unknown run status values before using them as CSS classes', () => {
+    render(
+      <ChatPanel
+        {...defaultProps}
+        activeRun={{ status: 'totally-unknown-status' }}
+      />,
+    );
+
+    const runChip = screen.getByText(/Run totally-unknown-status/i);
+    expect(runChip.className).toContain('idle');
+    expect(runChip.className).not.toContain('totally-unknown-status');
+  });
 });
