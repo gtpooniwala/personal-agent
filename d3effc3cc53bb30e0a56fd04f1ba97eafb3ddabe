@@ -1,0 +1,29 @@
+frontend/components/ChatPanel.jsx
+  b6777f3faac0094c 25,192
+frontend/tests/ChatPanel.test.jsx
+  b6777f3faac0094c 156-183
+frontend/tests/DocumentsPanel.test.jsx
+  b6777f3faac0094c 82-114
+frontend/components/DocumentsPanel.jsx
+  b6777f3faac0094c 35-36,52-55,109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "d3effc3cc53bb30e0a56fd04f1ba97eafb3ddabe",
+  "prompts": {
+    "b6777f3faac0094c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ccbd0-3952-7da2-92d1-d226ce5df4e7",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 70,
+      "total_deletions": 5,
+      "accepted_lines": 70,
+      "overriden_lines": 0
+    }
+  }
+}
