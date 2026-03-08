@@ -84,7 +84,7 @@ class RuntimeService:
 
     async def submit_run(self, request) -> Dict[str, str]:
         """Create a run record and hand execution to the runtime coordinator."""
-        conversation_id = request.conversation_id or self._orchestrator.create_conversation()
+        conversation_id = await self._ensure_conversation_id(request.conversation_id)
         selected_documents = request.selected_documents or []
 
         with observe_operation(
@@ -130,6 +130,16 @@ class RuntimeService:
             "status": run.status,
             "conversation_id": conversation_id,
         }
+
+    async def _ensure_conversation_id(self, conversation_id: Optional[str]) -> str:
+        """Keep submission bookkeeping on the event loop and offload DB-backed creation."""
+        if conversation_id:
+            return conversation_id
+
+        return await self._execution_plane.run_orchestrator_method(
+            self._orchestrator,
+            "create_conversation",
+        )
 
     async def get_run_status(self, run_id: str) -> Dict[str, Optional[str]]:
         run = self._run_store.get_run(run_id)

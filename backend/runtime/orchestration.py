@@ -106,6 +106,17 @@ class OrchestrationExecutionPlane:
             return None
         return await self._run_coroutine_in_executor(lambda: method(*args, **kwargs))
 
+    async def run_orchestrator_method(
+        self,
+        orchestrator,
+        method_name: str,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        """Run a lightweight orchestrator method in the bounded worker pool."""
+        method = getattr(orchestrator, method_name)
+        return await self._run_coroutine_in_executor(lambda: method(*args, **kwargs))
+
     async def _run_coroutine_in_executor(
         self,
         coroutine_factory: Callable[[], Any],

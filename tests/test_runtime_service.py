@@ -333,6 +333,60 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         event_types = [event["type"] for event in events["events"]]
         self.assertIn("succeeded", event_types)
 
+    async def test_submit_run_offloads_blocking_conversation_creation(self):
+        started_event = threading.Event()
+
+        class BlockingConversationOrchestrator(BaseTestOrchestrator):
+            def create_conversation(self):
+                started_event.set()
+                time.sleep(0.35)
+                return "conv-created-in-worker"
+
+            async def process_request(
+                self, user_request, conversation_id, selected_documents=None
+            ):
+                await asyncio.sleep(0)
+                return {
+                    "response": "ok",
+                    "conversation_id": conversation_id,
+                    "orchestration_actions": [],
+                    "token_usage": 4,
+                }
+
+        service = self._make_service(
+            orchestrator=BlockingConversationOrchestrator(),
+            orchestrator_factory=build_factory(BlockingConversationOrchestrator),
+            run_store=InMemoryRunStore(),
+            orchestration_max_workers=1,
+        )
+
+        submit_task = asyncio.create_task(
+            service.submit_run(
+                RuntimeRequest(
+                    message="hello",
+                    conversation_id=None,
+                    selected_documents=[],
+                )
+            )
+        )
+
+        await asyncio.to_thread(started_event.wait, 1.0)
+        self.assertTrue(started_event.is_set())
+
+        latencies = []
+        for _ in range(5):
+            started = time.perf_counter()
+            await asyncio.wait_for(asyncio.sleep(0.01), timeout=0.1)
+            latencies.append(time.perf_counter() - started)
+
+        self.assertTrue(all(latency < 0.1 for latency in latencies), latencies)
+
+        submitted = await asyncio.wait_for(submit_task, timeout=1.0)
+        self.assertEqual(submitted["conversation_id"], "conv-created-in-worker")
+
+        status = await self._wait_for_terminal(service, submitted["run_id"])
+        self.assertEqual(status["status"], "succeeded")
+
     async def test_requires_factory_for_multi_worker_execution(self):
         with self.assertRaisesRegex(
             ValueError,
