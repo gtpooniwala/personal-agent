@@ -361,7 +361,11 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
 
       setSelectedDocuments((previousSelected) => {
         const nextSelected = new Set();
-        const validIds = new Set(nextDocuments.map((document) => document.id));
+        const validIds = new Set(
+          nextDocuments
+            .filter((document) => document.processed === "completed")
+            .map((document) => document.id),
+        );
 
         for (const documentId of previousSelected) {
           if (validIds.has(documentId)) {
@@ -872,6 +876,9 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
     (currentConversationId && runStateByConversation[currentConversationId]) ||
     runStateByConversation[NEW_CONVERSATION_KEY] ||
     null;
+  const selectedDocumentDetails = documents.filter(
+    (document) => selectedDocuments.has(document.id) && document.processed === "completed",
+  );
   const currentConversationKey = currentConversationId || NEW_CONVERSATION_KEY;
   const appRootStyle = {
     "--left-panel-width": `${leftCollapsed ? COLLAPSED_PANEL_WIDTH : leftPanelWidth}px`,
@@ -932,6 +939,8 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
           currentView={view}
           currentConversationId={currentConversationId}
           currentConversationTitle={currentConversation?.title || ""}
+          activeRun={activeRun}
+          selectedDocumentDetails={selectedDocumentDetails}
           tools={tools}
           messages={messages}
           isLoadingMessages={loadingMessages}
@@ -939,6 +948,10 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
           messageInput={messageInput}
           isSending={sendingConversations.has(currentConversationKey)}
           onChangeMessage={setMessageInput}
+          onChoosePromptStarter={(prompt) => {
+            setMessageInput(prompt);
+            focusComposer();
+          }}
           onSendMessage={sendMessage}
           onFocusComposer={focusComposer}
         />
@@ -996,12 +1009,23 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
           setSelectedDocuments((previousSelected) => {
             const nextSelected = new Set(previousSelected);
             if (checked) {
-              nextSelected.add(documentId);
+              const document = documents.find((item) => item.id === documentId);
+              if (document?.processed === "completed") {
+                nextSelected.add(documentId);
+              }
             } else {
               nextSelected.delete(documentId);
             }
             return nextSelected;
           });
+        }}
+        onSelectReadyDocuments={() => {
+          setSelectedDocuments(new Set(documents
+            .filter((document) => document.processed === "completed")
+            .map((document) => document.id)));
+        }}
+        onClearSelectedDocuments={() => {
+          setSelectedDocuments(new Set());
         }}
         onDeleteDocument={onDeleteDocument}
         fileInputRef={fileInputRef}

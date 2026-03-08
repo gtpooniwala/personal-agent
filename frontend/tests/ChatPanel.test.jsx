@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ChatPanel from '@/components/ChatPanel';
 
@@ -8,11 +8,14 @@ const defaultProps = {
   currentConversationId: 'conv-a',
   messages: [],
   currentConversationTitle: '',
+  activeRun: null,
   isLoadingMessages: false,
   chatError: '',
   messageInput: 'hello',
   isSending: false,
+  selectedDocumentDetails: [],
   onChangeMessage: jest.fn(),
+  onChoosePromptStarter: jest.fn(),
   onSendMessage: jest.fn(),
   onFocusComposer: jest.fn(),
   messageInputRef: { current: null },
@@ -94,5 +97,60 @@ describe('ChatPanel tool activity disclosure', () => {
 
     expect(screen.getByText(/Input:/i)).toBeVisible();
     expect(screen.getByText(/Output:/i)).toBeVisible();
+  });
+});
+
+describe('ChatPanel document context UX (issue #64)', () => {
+  test('shows selected document chips and prompt starters', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ChatPanel
+        {...defaultProps}
+        selectedDocumentDetails={[
+          { id: 'doc-1', filename: 'Master Services Agreement.pdf' },
+          { id: 'doc-2', filename: 'Pricing Appendix.pdf' },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Master Services Agreement.pdf')).toBeInTheDocument();
+    expect(screen.getByText('Pricing Appendix.pdf')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /summarize selected docs/i }));
+
+    expect(defaultProps.onChoosePromptStarter).toHaveBeenCalledWith(
+      'Summarize the selected documents and highlight the main decisions, dates, and risks.',
+    );
+  });
+
+  test('renders source cards when document search tool output includes citations', () => {
+    render(
+      <ChatPanel
+        {...defaultProps}
+        messages={[
+          {
+            id: 'assistant-1',
+            role: 'assistant',
+            content: 'Here is the answer.',
+            timestamp: new Date().toISOString(),
+            agent_actions: [
+              {
+                tool: 'search_documents',
+                input: '{ "query": "termination" }',
+                output:
+                  "**1. From 'MSA.pdf' (section 2) - highly relevant:**\nTermination requires thirty days notice.\n\n*Found 1 relevant passages from 1 document(s).*",
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    const sourceRegion = screen.getByLabelText('Document sources');
+    expect(sourceRegion).toBeInTheDocument();
+    expect(within(sourceRegion).getByText('MSA.pdf')).toBeInTheDocument();
+    expect(within(sourceRegion).getByText(/Section 2/i)).toBeInTheDocument();
+    expect(within(sourceRegion).getByText(/Termination requires thirty days notice/i)).toBeInTheDocument();
   });
 });

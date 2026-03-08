@@ -2,6 +2,41 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { formatRelativeTime } from "@/lib/formatters";
 import WorkspaceViewTabs from "@/components/WorkspaceViewTabs";
 
+const DOCUMENT_PROMPT_STARTERS = [
+  {
+    label: "Summarize selected docs",
+    buildPrompt: () => "Summarize the selected documents and highlight the main decisions, dates, and risks.",
+  },
+  {
+    label: "Key facts",
+    buildPrompt: () => "What are the most important facts, dates, and action items in the selected documents?",
+  },
+  {
+    label: "Find specific terms",
+    buildPrompt: () => "Search the selected documents for pricing, deadlines, renewal, termination, or obligation details.",
+  },
+];
+
+export function extractDocumentSources(actions) {
+  const searchAction = (actions || []).find((action) => action?.tool === "search_documents");
+  const output = String(searchAction?.output || "");
+  const sources = [];
+  const sourcePattern =
+    /\*\*\d+\.\s+From '([^']+)' \(section (\d+)\) - ([^:*]+):\*\*\s*([\s\S]*?)(?=\n\*\*\d+\.\s+From '|\n\*Found |\n---\n\*\*Here is a list|$)/g;
+
+  for (const match of output.matchAll(sourcePattern)) {
+    const [, filename, section, relevance, excerpt] = match;
+    sources.push({
+      filename,
+      section,
+      relevance: relevance.trim(),
+      excerpt: excerpt.trim(),
+    });
+  }
+
+  return sources;
+}
+
 function AgentActions({ actions }) {
   if (!actions || actions.length === 0) {
     return null;
@@ -33,6 +68,29 @@ function AgentActions({ actions }) {
   );
 }
 
+function SourceCards({ actions }) {
+  const sources = extractDocumentSources(actions);
+  if (sources.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="source-card-list" aria-label="Document sources">
+      {sources.map((source, index) => (
+        <article key={`${source.filename}-${source.section}-${index}`} className="source-card">
+          <div className="source-card-header">
+            <strong>{source.filename}</strong>
+            <span className="source-card-meta">
+              Section {source.section} • {source.relevance}
+            </span>
+          </div>
+          <p>{source.excerpt}</p>
+        </article>
+      ))}
+    </section>
+  );
+}
+
 function ChatBubble({ message }) {
   if (message.isThinking) {
     return (
@@ -47,6 +105,7 @@ function ChatBubble({ message }) {
   return (
     <article className={`chat-bubble ${isUser ? "user" : "assistant"}`}>
       <div className="bubble-content">{message.content || ""}</div>
+      {!isUser ? <SourceCards actions={message.agent_actions} /> : null}
       <AgentActions actions={message.agent_actions} />
       <p className="bubble-meta">
         {isUser ? "You" : "Agent"}
@@ -61,11 +120,14 @@ const ChatPanel = forwardRef(function ChatPanel({
   currentConversationId,
   messages,
   currentConversationTitle,
+  activeRun,
   isLoadingMessages,
   chatError,
   messageInput,
   isSending,
+  selectedDocumentDetails = [],
   onChangeMessage,
+  onChoosePromptStarter,
   onSendMessage,
   onFocusComposer,
 }, messageInputRef) {
@@ -83,6 +145,8 @@ const ChatPanel = forwardRef(function ChatPanel({
     input.style.height = `${Math.min(input.scrollHeight, 180)}px`;
   }, [messageInput]);
 
+  const hasSelectedDocuments = selectedDocumentDetails.length > 0;
+
   return (
     <section className="chat-shell">
       <header className="app-header">
@@ -95,6 +159,44 @@ const ChatPanel = forwardRef(function ChatPanel({
           </p>
         </div>
       </header>
+
+      {(activeRun?.status || hasSelectedDocuments) && (
+        <section className="active-context-bar">
+          {activeRun?.status ? (
+            <span className={`context-chip run-status ${activeRun.status}`}>
+              Run {activeRun.status}
+            </span>
+          ) : null}
+
+          {hasSelectedDocuments ? (
+            <div className="selected-documents-strip" aria-label="Selected documents">
+              {selectedDocumentDetails.map((document) => (
+                <span key={document.id} className="context-chip selected-document-chip">
+                  {document.filename}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      )}
+
+      {hasSelectedDocuments ? (
+        <section className="prompt-starter-bar" aria-label="Document prompt starters">
+          <p className="prompt-starter-label">Ask about your selected documents</p>
+          <div className="prompt-starter-list">
+            {DOCUMENT_PROMPT_STARTERS.map((starter) => (
+              <button
+                key={starter.label}
+                type="button"
+                className="secondary-button prompt-starter-button"
+                onClick={() => onChoosePromptStarter?.(starter.buildPrompt(selectedDocumentDetails))}
+              >
+                {starter.label}
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <main className="chat-stream" id="chat-container">
         {isLoadingMessages && <p className="panel-note">Loading messages...</p>}

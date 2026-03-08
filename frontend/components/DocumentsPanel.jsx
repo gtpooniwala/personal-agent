@@ -1,4 +1,9 @@
-import { formatFileSize, formatRelativeTime, truncateText } from "@/lib/formatters";
+import {
+  formatDocumentStatusLabel,
+  formatFileSize,
+  formatRelativeTime,
+  truncateText,
+} from "@/lib/formatters";
 
 export default function DocumentsPanel({
   documents,
@@ -19,10 +24,34 @@ export default function DocumentsPanel({
   onDragLeave,
   onDrop,
   onToggleDocument,
+  onSelectReadyDocuments,
+  onClearSelectedDocuments,
   onDeleteDocument,
   fileInputRef,
 }) {
   const selectedCount = selectedDocuments.size;
+  const readyDocuments = documents.filter((doc) => doc.processed === "completed");
+  const readyCount = readyDocuments.length;
+  const processingCount = documents.filter(
+    (doc) => doc.processed === "processing" || doc.processed === "pending",
+  ).length;
+  const failedCount = documents.filter((doc) => doc.processed === "failed").length;
+
+  function buildDocumentSummary(doc) {
+    if (doc.summary && doc.summary !== "Document content available for search") {
+      return doc.summary;
+    }
+
+    if (doc.processed === "completed") {
+      return `Ready for search across ${doc.total_chunks || 0} section${doc.total_chunks === 1 ? "" : "s"}.`;
+    }
+
+    if (doc.processed === "failed") {
+      return "Processing failed. Re-upload the file to retry indexing.";
+    }
+
+    return "Indexing in progress. Search will unlock when processing completes.";
+  }
 
   return (
     <aside className={`panel panel-right ${isCollapsed ? "collapsed" : ""}`}>
@@ -67,9 +96,37 @@ export default function DocumentsPanel({
               <>
                 <p className="panel-note docs-selection-note">
                   {selectedCount > 0
-                    ? `${selectedCount} selected file${selectedCount > 1 ? "s" : ""} will be used for document search.`
-                    : "Select files below to use document search in chat."}
+                    ? `${selectedCount} ready document${selectedCount > 1 ? "s" : ""} will be used in chat search.`
+                    : "Select ready documents below to use them in chat search."}
                 </p>
+
+                <div className="docs-overview">
+                  <span className="context-chip">{documents.length} total</span>
+                  <span className="context-chip">{readyCount} ready</span>
+                  {processingCount > 0 ? (
+                    <span className="context-chip">{processingCount} indexing</span>
+                  ) : null}
+                  {failedCount > 0 ? <span className="context-chip failed">{failedCount} failed</span> : null}
+                </div>
+
+                <div className="docs-actions">
+                  <button
+                    type="button"
+                    className="secondary-button docs-action-button"
+                    onClick={onSelectReadyDocuments}
+                    disabled={readyCount === 0}
+                  >
+                    Select ready
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-button docs-action-button"
+                    onClick={onClearSelectedDocuments}
+                    disabled={selectedCount === 0}
+                  >
+                    Clear
+                  </button>
+                </div>
 
                 <button
                   type="button"
@@ -110,27 +167,40 @@ export default function DocumentsPanel({
                     !error &&
                     documents.map((doc) => {
                       const isSelected = selectedDocuments.has(doc.id);
+                      const isReady = doc.processed === "completed";
+                      const statusLabel = formatDocumentStatusLabel(doc.processed);
                       return (
                         <article
                           key={doc.id}
-                          className={`document-card ${isSelected ? "selected" : ""}`}
+                          className={`document-card ${isSelected ? "selected" : ""} ${isReady ? "ready" : "inactive"}`}
                         >
                           <label className="doc-main-row" htmlFor={`doc-${doc.id}`}>
                             <input
                               id={`doc-${doc.id}`}
                               type="checkbox"
                               checked={isSelected}
+                              disabled={!isReady}
                               onChange={(event) => onToggleDocument(doc.id, event.target.checked)}
                             />
                             <span className="doc-text-wrap">
-                              <span className="doc-name" title={doc.filename}>
-                                📄 {truncateText(doc.filename, 28)}
+                              <span className="doc-header-row">
+                                <span className="doc-name" title={doc.filename}>
+                                  📄 {truncateText(doc.filename, 28)}
+                                </span>
+                                <span className={`doc-status-badge ${doc.processed}`}>
+                                  {statusLabel}
+                                </span>
                               </span>
                               <span className="doc-meta">
                                 {formatFileSize(doc.file_size)} • {formatRelativeTime(doc.uploaded_at)}
                               </span>
+                              <span className="doc-meta">
+                                {isReady
+                                  ? `${doc.total_chunks || 0} searchable section${doc.total_chunks === 1 ? "" : "s"}`
+                                  : "Not searchable yet"}
+                              </span>
                               <span className="doc-summary">
-                                {doc.summary || "No summary available."}
+                                {buildDocumentSummary(doc)}
                               </span>
                             </span>
                           </label>
