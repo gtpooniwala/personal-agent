@@ -51,7 +51,8 @@ class CoreOrchestrator:
     def __init__(self, user_id: str = "default"):
         self.user_id = user_id
         self.llm = None
-        self.tool_registry = ToolRegistry(user_id)  # used only for static tool listing
+        # Shared per-user registry for static tools, tool listing, and background summarisation.
+        self.tool_registry = ToolRegistry(user_id)
     
     def _setup_llm(self):
         """Setup the language model for the orchestrator."""
@@ -179,9 +180,9 @@ class CoreOrchestrator:
         ) as operation_observation:
             try:
                 self._ensure_llm()
-                # Build a fresh, run-scoped registry and agent to prevent cross-run
-                # state leakage when concurrent runs share the same orchestrator instance.
-                run_registry = ToolRegistry(self.user_id, selected_documents=selected_documents or [])
+                # Clone static tools and rebuild only document-scoped state per run
+                # so concurrent requests do not share mutable document context.
+                run_registry = self.tool_registry.clone_with_selected_documents(selected_documents)
                 run_agent = self._build_orchestrator_agent(conversation_id, run_registry)
 
                 # Save user message to database
@@ -227,7 +228,7 @@ class CoreOrchestrator:
                         result = run_agent.invoke({"messages": messages}, config=config)
                         orchestration_actions = self._extract_langgraph_actions(result["messages"]) if result and "messages" in result else []
                         tool_results = orchestration_actions if orchestration_actions else []
-                        response_agent_tool = run_registry._tools.get("response_agent")
+                        response_agent_tool = run_registry.get_tool("response_agent")
                         if response_agent_tool:
                             # Use condensed history for response agent as well
                             conversation_history = self.get_condensed_conversation_history(conversation_id)
@@ -254,7 +255,7 @@ class CoreOrchestrator:
                     fallback_used = True
                     orchestration_actions = self._run_rule_based_fallback(user_request, run_registry)
                     if orchestration_actions:
-                        response_agent_tool = run_registry._tools.get("response_agent")
+                        response_agent_tool = run_registry.get_tool("response_agent")
                         if response_agent_tool:
                             conversation_history = self.get_condensed_conversation_history(conversation_id)
                             response = response_agent_tool._run(
@@ -297,7 +298,6 @@ class CoreOrchestrator:
                 )
 
                 # Trigger summarisation in the background (do not await)
-                import asyncio
                 asyncio.create_task(self.maybe_summarise_conversation(conversation_id))
 
                 # Return response immediately
@@ -363,7 +363,7 @@ class CoreOrchestrator:
             token_count = len(history_text) // 4
             if token_count > int(context_window_tokens * threshold):
                 # Summarise
-                summarisation_agent = self.tool_registry._tools.get("summarisation_agent")
+                summarisation_agent = self.tool_registry.get_tool("summarisation_agent")
                 if summarisation_agent:
                     try:
                         summary = await summarisation_agent._arun(history_text)
@@ -453,7 +453,8 @@ class CoreOrchestrator:
         query_lower = query.lower()
 
         math_expression = self._extract_math_expression(query)
-        if math_expression and "calculator" in tool_registry._tools:
+        calculator_tool = tool_registry.get_tool("calculator")
+        if math_expression and calculator_tool:
             with observe_operation(
                 name="orchestrator.fallback.calculator",
                 counter_prefix="orchestrator.fallback.calculator",
@@ -461,14 +462,15 @@ class CoreOrchestrator:
                 input_data={"expression": math_expression},
                 metadata={"component": "orchestrator", "fallback": True},
             ):
-                output = tool_registry._tools["calculator"]._run(expression=math_expression)
+                output = calculator_tool._run(expression=math_expression)
                 actions.append({
                     "tool": "calculator",
                     "input": json.dumps({"expression": math_expression}, ensure_ascii=False),
                     "output": output,
                 })
 
-        if any(token in query_lower for token in ("time", "date", "day")) and "current_time" in tool_registry._tools:
+        current_time_tool = tool_registry.get_tool("current_time")
+        if any(token in query_lower for token in ("time", "date", "day")) and current_time_tool:
             with observe_operation(
                 name="orchestrator.fallback.current_time",
                 counter_prefix="orchestrator.fallback.current_time",
@@ -476,7 +478,7 @@ class CoreOrchestrator:
                 input_data={"query_chars": len(query)},
                 metadata={"component": "orchestrator", "fallback": True},
             ):
-                output = tool_registry._tools["current_time"]._run(query=query)
+                output = current_time_tool._run(query=query)
                 actions.append({
                     "tool": "current_time",
                     "input": json.dumps({"query": query}, ensure_ascii=False),
@@ -504,7 +506,8 @@ class CoreOrchestrator:
                 })
 
         internet_intent = any(token in query_lower for token in ("internet", "latest", "news", "headline", "headlines", "search the internet"))
-        if internet_intent and "internet_search" in tool_registry._tools:
+        internet_search_tool = tool_registry.get_tool("internet_search")
+        if internet_intent and internet_search_tool:
             with observe_operation(
                 name="orchestrator.fallback.internet_search",
                 counter_prefix="orchestrator.fallback.internet_search",
@@ -512,7 +515,7 @@ class CoreOrchestrator:
                 input_data={"query_chars": len(query), "provider": "duckduckgo"},
                 metadata={"component": "orchestrator", "fallback": True},
             ):
-                output = tool_registry._tools["internet_search"]._run(query=query, provider="duckduckgo")
+                output = internet_search_tool._run(query=query, provider="duckduckgo")
                 actions.append({
                     "tool": "internet_search",
                     "input": json.dumps({"query": query, "provider": "duckduckgo"}, ensure_ascii=False),

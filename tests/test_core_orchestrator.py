@@ -4,7 +4,9 @@ Comprehensive tests for the Core Orchestrator functionality.
 import sys
 import os
 import asyncio
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import AsyncMock, Mock, patch, MagicMock
 
 # Add project root to path
@@ -209,14 +211,21 @@ class TestCoreOrchestrator(unittest.TestCase):
         one run cannot leak into another run that uses different documents.
         """
         captured_registries = []
-
-        original_build = self.orchestrator._build_orchestrator_agent
+        capture_lock = threading.Lock()
+        overlap_barrier = threading.Barrier(2)
 
         def capturing_build(conversation_id, tool_registry):
-            captured_registries.append(tool_registry)
+            with capture_lock:
+                captured_registries.append(tool_registry)
+
             # Return a minimal mock agent that mimics the LangGraph interface
             mock_agent = MagicMock()
-            mock_agent.invoke.return_value = {"messages": []}
+
+            def invoke(*args, **kwargs):
+                overlap_barrier.wait(timeout=2)
+                return {"messages": []}
+
+            mock_agent.invoke.side_effect = invoke
             return mock_agent
 
         docs_a = ["doc-a"]
@@ -231,12 +240,18 @@ class TestCoreOrchestrator(unittest.TestCase):
             mock_db_ops.get_conversation_history.return_value = []
             mock_db_ops.save_message.return_value = None
 
-            asyncio.run(self.orchestrator.process_request(
-                "hello from A", "conv-a", selected_documents=docs_a
-            ))
-            asyncio.run(self.orchestrator.process_request(
-                "hello from B", "conv-b", selected_documents=docs_b
-            ))
+            def run_request(message, conversation_id, selected_documents):
+                asyncio.run(self.orchestrator.process_request(
+                    message, conversation_id, selected_documents=selected_documents
+                ))
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                futures = [
+                    executor.submit(run_request, "hello from A", "conv-a", docs_a),
+                    executor.submit(run_request, "hello from B", "conv-b", docs_b),
+                ]
+                for future in futures:
+                    future.result(timeout=5)
 
         self.assertEqual(len(captured_registries), 2)
         self.assertIsNot(captured_registries[0], captured_registries[1],

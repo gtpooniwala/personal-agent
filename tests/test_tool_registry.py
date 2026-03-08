@@ -80,6 +80,17 @@ class TestToolRegistry(unittest.TestCase):
         registry.update_selected_documents(["doc-123"])
         self.assertIn("search_documents", [t.name for t in registry.get_available_tools()])
 
+    def test_clone_with_selected_documents_reuses_static_tools(self):
+        registry = self._build_registry(selected_documents=[])
+        clone = registry.clone_with_selected_documents(["doc-123"])
+
+        self.assertIsNot(clone, registry)
+        self.assertEqual(clone.selected_documents, ["doc-123"])
+        self.assertIn("search_documents", [t.name for t in clone.get_available_tools()])
+        self.assertIs(clone.get_tool("calculator"), registry.get_tool("calculator"))
+        self.assertIs(clone.get_tool("response_agent"), registry.get_tool("response_agent"))
+        self.assertIsNone(registry.get_tool("search_documents"))
+
 
 if __name__ == "__main__":
     unittest.main()
