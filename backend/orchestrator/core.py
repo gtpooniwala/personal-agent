@@ -156,7 +156,8 @@ class CoreOrchestrator:
         self, 
         user_request: str, 
         conversation_id: str,
-        selected_documents: Optional[List[str]] = None
+        selected_documents: Optional[List[str]] = None,
+        spawn_background_tasks: bool = True,
     ) -> Dict[str, Any]:
         """
         Main orchestrator method that processes user requests.
@@ -297,8 +298,10 @@ class CoreOrchestrator:
                     token_usage=token_usage
                 )
 
-                # Trigger summarisation in the background (do not await)
-                asyncio.create_task(self.maybe_summarise_conversation(conversation_id))
+                # Worker-thread execution disables background task spawning so the
+                # runtime can schedule follow-up work from the main event loop.
+                if spawn_background_tasks:
+                    asyncio.create_task(self.maybe_summarise_conversation(conversation_id))
 
                 # Return response immediately
                 return {

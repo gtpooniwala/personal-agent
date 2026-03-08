@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+import threading
 import time
 import types
 from collections import defaultdict
@@ -141,6 +142,14 @@ class MockOrchestrator:
         if kind == "error":
             return {"error": True, "response": payload}
         return {"error": False, "response": payload, "orchestration_actions": []}
+
+    async def generate_conversation_title(self, conversation_id: str) -> Optional[str]:
+        return None
+
+    async def maybe_summarise_conversation(
+        self, conversation_id: str, **kwargs: Any
+    ) -> bool:
+        return False
 
 
 class RuntimeRequest:
@@ -400,15 +409,23 @@ async def _case_session_isolation_same_session_blocked() -> Tuple[bool, List[str
     mock_db_ops = MockDbOps()
 
     # Run 1 blocks until we release it; run 2 must exhaust all lease retries and fail
-    proceed_event = asyncio.Event()
+    proceed_event = threading.Event()
 
     class BlockingOrchestrator:
         def create_conversation(self) -> str:
             return str(uuid4())
 
         async def process_request(self, **kwargs: Any) -> Dict[str, Any]:
-            await proceed_event.wait()
+            proceed_event.wait()
             return {"error": False, "response": "run1 ok", "orchestration_actions": []}
+
+        async def generate_conversation_title(self, conversation_id: str) -> Optional[str]:
+            return None
+
+        async def maybe_summarise_conversation(
+            self, conversation_id: str, **kwargs: Any
+        ) -> bool:
+            return False
 
     store = InMemoryRunStore()
     service = RuntimeService(orchestrator=BlockingOrchestrator(), run_store=store)
@@ -455,6 +472,75 @@ async def _case_session_isolation_same_session_blocked() -> Tuple[bool, List[str
     return len(failures) == 0, failures
 
 
+async def _case_event_loop_responsive_during_blocking_orchestration() -> Tuple[bool, List[str]]:
+    """Status polling stays responsive while a blocking attempt runs in the executor."""
+    failures: List[str] = []
+    mock_db_ops = MockDbOps()
+    started_event = threading.Event()
+
+    class BlockingOrchestrator:
+        def create_conversation(self) -> str:
+            return str(uuid4())
+
+        async def process_request(self, **kwargs: Any) -> Dict[str, Any]:
+            started_event.set()
+            time.sleep(0.35)
+            return {"error": False, "response": "run ok", "orchestration_actions": []}
+
+        async def generate_conversation_title(self, conversation_id: str) -> Optional[str]:
+            return None
+
+        async def maybe_summarise_conversation(self, conversation_id: str, **kwargs: Any) -> bool:
+            return False
+
+    store = InMemoryRunStore()
+    service = RuntimeService(
+        orchestrator=BlockingOrchestrator(),
+        orchestrator_factory=BlockingOrchestrator,
+        orchestration_max_workers=1,
+        run_store=store,
+    )
+
+    with patch("backend.database.operations.db_ops", mock_db_ops):
+        sub = await service.submit_run(RuntimeRequest("hello", "conv-responsive"))
+        run_id = sub["run_id"]
+
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            status = await service.get_run_status(run_id)
+            if status["status"] == "running" and started_event.is_set():
+                break
+            await asyncio.sleep(0.01)
+        else:
+            failures.append("run did not reach running state before responsiveness polling")
+
+        max_latency = 0.0
+        for _ in range(5):
+            started = time.perf_counter()
+            status = await asyncio.wait_for(service.get_run_status(run_id), timeout=0.1)
+            latency = time.perf_counter() - started
+            max_latency = max(max_latency, latency)
+            if status["status"] not in {"running", RUN_STATUS_SUCCEEDED}:
+                failures.append(
+                    f"expected status polling during run to return running/succeeded, got '{status['status']}'"
+                )
+            await asyncio.sleep(0.01)
+
+        if max_latency >= 0.1:
+            failures.append(
+                f"expected max status polling latency < 0.1s, got {max_latency:.3f}s"
+            )
+
+        status = await _wait_terminal(service, run_id)
+        if status["status"] != RUN_STATUS_SUCCEEDED:
+            failures.append(
+                f"expected terminal status '{RUN_STATUS_SUCCEEDED}', got '{status['status']}'"
+            )
+
+    await service.shutdown()
+    return len(failures) == 0, failures
+
+
 # ---------------------------------------------------------------------------
 # Eval registry
 # ---------------------------------------------------------------------------
@@ -475,6 +561,11 @@ EVAL_CASES: List[EvalCase] = [
         "runtime",
         "session_isolation_same_session_blocked",
         _case_session_isolation_same_session_blocked,
+    ),
+    (
+        "runtime",
+        "event_loop_responsive_during_blocking_orchestration",
+        _case_event_loop_responsive_during_blocking_orchestration,
     ),
 ]
 

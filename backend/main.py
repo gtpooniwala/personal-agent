@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
         )
     langfuse_manager.initialize()
 
-    from backend.api.state import heartbeat_service, scheduler_service
+    from backend.api.state import heartbeat_service, runtime_service, scheduler_service
 
     await heartbeat_service.start()
     await scheduler_service.start()
@@ -56,6 +56,7 @@ async def lifespan(app: FastAPI):
     logger.info("Personal Agent API shutting down...")
     await scheduler_service.stop()
     await heartbeat_service.stop()
+    await runtime_service.shutdown()
     langfuse_manager.shutdown()
 
 
