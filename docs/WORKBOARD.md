@@ -30,6 +30,9 @@ Workflow:
 
 ## Next
 
+### Orchestrator Architecture
+- [ ] `todo` Let the orchestrator LLM own tool selection ([#101](https://github.com/gtpooniwala/personal-agent/issues/101))
+
 ## Migration Track
 - [x] `done` Publish migration architecture contract + PR decomposition for long-running runtime ([#14](https://github.com/gtpooniwala/personal-agent/issues/14))
 - [x] `done` Add run lifecycle schema (`runs`, `run_events`, `leases`) ([#15](https://github.com/gtpooniwala/personal-agent/issues/15))
