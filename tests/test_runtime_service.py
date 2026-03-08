@@ -355,8 +355,7 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         finally:
             if service is not None:
                 await service.shutdown()
-            else:
-                executor.shutdown(wait=False, cancel_futures=False)
+            executor.shutdown(wait=False, cancel_futures=False)
 
     async def _wait_until_running(self, service, run_id):
         for _ in range(80):
