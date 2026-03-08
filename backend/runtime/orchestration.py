@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import contextvars
 import inspect
+import threading
 from concurrent.futures import Executor, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Sequence
@@ -49,14 +50,23 @@ class OrchestrationExecutionPlane:
         self._fallback_orchestrator = orchestrator
         self._orchestrator_factory = orchestrator_factory
         self._owns_executor = orchestration_executor is None
-        self._executor = orchestration_executor or ThreadPoolExecutor(
-            max_workers=orchestration_max_workers,
-            thread_name_prefix="orchestration",
-        )
+        self._orchestration_max_workers = orchestration_max_workers
+        self._executor_lock = threading.Lock()
+        self._executor = orchestration_executor or self._new_executor()
 
     async def shutdown(self) -> None:
-        if self._owns_executor:
-            self._executor.shutdown(wait=False, cancel_futures=False)
+        if not self._owns_executor:
+            return
+
+        # The app reuses a module-level RuntimeService across repeated FastAPI
+        # lifespan starts in tests. Clearing the owned executor here lets the
+        # next orchestration attempt recreate it cleanly.
+        with self._executor_lock:
+            executor = self._executor
+            self._executor = None
+
+        if executor is not None:
+            executor.shutdown(wait=False, cancel_futures=False)
 
     def create_orchestrator(self):
         if self._orchestrator_factory is None:
@@ -102,6 +112,7 @@ class OrchestrationExecutionPlane:
     ) -> Any:
         loop = asyncio.get_running_loop()
         context = contextvars.copy_context()
+        executor = self._get_executor()
 
         def run_coroutine() -> Any:
             def runner() -> Any:
@@ -112,4 +123,19 @@ class OrchestrationExecutionPlane:
 
             return context.run(runner)
 
-        return await loop.run_in_executor(self._executor, run_coroutine)
+        return await loop.run_in_executor(executor, run_coroutine)
+
+    def _get_executor(self) -> Executor:
+        if not self._owns_executor:
+            return self._executor
+
+        with self._executor_lock:
+            if self._executor is None:
+                self._executor = self._new_executor()
+            return self._executor
+
+    def _new_executor(self) -> ThreadPoolExecutor:
+        return ThreadPoolExecutor(
+            max_workers=self._orchestration_max_workers,
+            thread_name_prefix="orchestration",
+        )

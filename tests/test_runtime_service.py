@@ -364,6 +364,38 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         finally:
             executor.shutdown(wait=False, cancel_futures=False)
 
+    async def test_shutdown_allows_owned_executor_to_restart_on_next_submission(self):
+        service = self._make_service(
+            orchestrator=SuccessfulOrchestrator(),
+            orchestrator_factory=build_factory(SuccessfulOrchestrator),
+            run_store=InMemoryRunStore(),
+            orchestration_max_workers=1,
+        )
+
+        first_submission = await service.submit_run(
+            RuntimeRequest(
+                message="first",
+                conversation_id="conv-restartable-service",
+                selected_documents=[],
+            )
+        )
+        first_status = await self._wait_for_terminal(service, first_submission["run_id"])
+        self.assertEqual(first_status["status"], "succeeded")
+
+        await service.shutdown()
+
+        second_submission = await service.submit_run(
+            RuntimeRequest(
+                message="second",
+                conversation_id="conv-restartable-service",
+                selected_documents=[],
+            )
+        )
+        second_status = await self._wait_for_terminal(
+            service, second_submission["run_id"]
+        )
+        self.assertEqual(second_status["status"], "succeeded")
+
     async def _wait_until_running(self, service, run_id):
         for _ in range(80):
             status = await service.get_run_status(run_id)
