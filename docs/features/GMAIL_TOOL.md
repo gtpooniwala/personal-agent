@@ -36,6 +36,7 @@ The Gmail Tool provides robust integration with Gmail, enabling the agent to sea
   3. Configure OAuth consent screen (add your email as a test user).
   4. Create OAuth 2.0 Desktop App credentials.
   5. Download the JSON file and save it as `backend/data/gmail/client_secret.json` (or set `GMAIL_CREDENTIALS_PATH`).
+  6. If you run the backend via `docker compose`, create the host directory first with `mkdir -p backend/data/gmail` so the bind mount exists before startup.
 - **First Run**:
   - The first time the tool is used, it will launch a local browser window to authorize access.
   - A token will be saved to `backend/data/gmail/token.pickle` for future use.
