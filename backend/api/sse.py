@@ -3,13 +3,25 @@ from __future__ import annotations
 import asyncio
 import json
 from time import monotonic
-from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Optional
+from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Optional, Protocol
 
 from backend.runtime import MAX_EVENTS_LIMIT, RunNotFoundError
 from backend.runtime.contracts import RUN_TERMINAL_STATUSES
 
 SSE_POLL_INTERVAL_SECONDS = 0.25
 SSE_HEARTBEAT_INTERVAL_SECONDS = 15.0
+
+
+class RunStreamRuntimeService(Protocol):
+    async def get_run_status(self, run_id: str) -> Dict[str, Any]: ...
+
+    async def get_run_events(
+        self,
+        *,
+        run_id: str,
+        after: Optional[str],
+        limit: int,
+    ) -> Dict[str, Any]: ...
 
 
 def format_sse(event_type: str, payload: Dict[str, Any]) -> str:
@@ -55,7 +67,7 @@ def build_run_unavailable_payload(run_id: str, error: str) -> Dict[str, Any]:
 
 async def generate_run_sse(
     *,
-    runtime_service,
+    runtime_service: RunStreamRuntimeService,
     run_id: str,
     is_disconnected: Optional[Callable[[], Awaitable[bool]]] = None,
     initial_status: Optional[Dict[str, Any]] = None,

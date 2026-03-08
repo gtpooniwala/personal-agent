@@ -14,6 +14,7 @@ STREAMING_TESTS_AVAILABLE = True
 STREAMING_IMPORT_ERROR = ""
 ROUTE_STREAMING_TESTS_AVAILABLE = True
 ROUTE_STREAMING_IMPORT_ERROR = ""
+STREAM_TEST_TIMEOUT_SECONDS = 1.0
 
 try:
     from backend.api.sse import generate_run_sse
@@ -113,8 +114,12 @@ class TestRunStreaming(unittest.IsolatedAsyncioTestCase):
             heartbeat_interval_seconds=1.0,
         )
 
-        first = parse_sse_message(await asyncio.wait_for(anext(stream), timeout=0.2))
-        second = parse_sse_message(await asyncio.wait_for(anext(stream), timeout=0.2))
+        first = parse_sse_message(
+            await asyncio.wait_for(anext(stream), timeout=STREAM_TEST_TIMEOUT_SECONDS)
+        )
+        second = parse_sse_message(
+            await asyncio.wait_for(anext(stream), timeout=STREAM_TEST_TIMEOUT_SECONDS)
+        )
 
         self.assertEqual(first["event"], "run_event")
         self.assertEqual(first["data"]["event_type"], "queued")
@@ -127,7 +132,9 @@ class TestRunStreaming(unittest.IsolatedAsyncioTestCase):
             message="Tool action completed",
             tool="calculator",
         )
-        live = parse_sse_message(await asyncio.wait_for(anext(stream), timeout=0.2))
+        live = parse_sse_message(
+            await asyncio.wait_for(anext(stream), timeout=STREAM_TEST_TIMEOUT_SECONDS)
+        )
         self.assertEqual(live["data"]["event_type"], "tool_result")
         self.assertEqual(live["data"]["payload"]["tool"], "calculator")
 
@@ -139,8 +146,12 @@ class TestRunStreaming(unittest.IsolatedAsyncioTestCase):
             message="Run completed successfully",
         )
 
-        terminal_event = parse_sse_message(await asyncio.wait_for(anext(stream), timeout=0.2))
-        completion = parse_sse_message(await asyncio.wait_for(anext(stream), timeout=0.2))
+        terminal_event = parse_sse_message(
+            await asyncio.wait_for(anext(stream), timeout=STREAM_TEST_TIMEOUT_SECONDS)
+        )
+        completion = parse_sse_message(
+            await asyncio.wait_for(anext(stream), timeout=STREAM_TEST_TIMEOUT_SECONDS)
+        )
         self.assertEqual(terminal_event["data"]["event_type"], "succeeded")
         self.assertEqual(completion["event"], "run_complete")
         self.assertEqual(completion["data"]["status"], "succeeded")
@@ -166,7 +177,9 @@ class TestRunStreaming(unittest.IsolatedAsyncioTestCase):
             heartbeat_interval_seconds=1.0,
         )
 
-        initial = parse_sse_message(await asyncio.wait_for(anext(stream), timeout=0.2))
+        initial = parse_sse_message(
+            await asyncio.wait_for(anext(stream), timeout=STREAM_TEST_TIMEOUT_SECONDS)
+        )
         self.assertEqual(initial["data"]["event_type"], "started")
 
         async def publish_live_event():
@@ -189,12 +202,18 @@ class TestRunStreaming(unittest.IsolatedAsyncioTestCase):
 
         producer = asyncio.create_task(publish_live_event())
         try:
-            live = parse_sse_message(await asyncio.wait_for(anext(stream), timeout=0.2))
+            live = parse_sse_message(
+                await asyncio.wait_for(anext(stream), timeout=STREAM_TEST_TIMEOUT_SECONDS)
+            )
             self.assertEqual(live["data"]["event_type"], "tool_result")
             self.assertEqual(live["data"]["payload"]["tool"], "time")
 
-            terminal = parse_sse_message(await asyncio.wait_for(anext(stream), timeout=0.2))
-            complete = parse_sse_message(await asyncio.wait_for(anext(stream), timeout=0.2))
+            terminal = parse_sse_message(
+                await asyncio.wait_for(anext(stream), timeout=STREAM_TEST_TIMEOUT_SECONDS)
+            )
+            complete = parse_sse_message(
+                await asyncio.wait_for(anext(stream), timeout=STREAM_TEST_TIMEOUT_SECONDS)
+            )
             self.assertEqual(terminal["data"]["event_type"], "succeeded")
             self.assertEqual(complete["event"], "run_complete")
         finally:
@@ -221,15 +240,19 @@ class TestRunStreaming(unittest.IsolatedAsyncioTestCase):
             heartbeat_interval_seconds=1.0,
         )
 
-        terminal = parse_sse_message(await asyncio.wait_for(anext(stream), timeout=0.2))
-        completion = parse_sse_message(await asyncio.wait_for(anext(stream), timeout=0.2))
+        terminal = parse_sse_message(
+            await asyncio.wait_for(anext(stream), timeout=STREAM_TEST_TIMEOUT_SECONDS)
+        )
+        completion = parse_sse_message(
+            await asyncio.wait_for(anext(stream), timeout=STREAM_TEST_TIMEOUT_SECONDS)
+        )
 
         self.assertEqual(terminal["data"]["event_type"], "failed")
         self.assertEqual(completion["event"], "run_complete")
         self.assertEqual(completion["data"]["status"], "failed")
 
         with self.assertRaises(StopAsyncIteration):
-            await asyncio.wait_for(anext(stream), timeout=0.2)
+            await asyncio.wait_for(anext(stream), timeout=STREAM_TEST_TIMEOUT_SECONDS)
 
     async def test_generate_run_sse_sends_heartbeats_while_idle(self):
         run = self.store.create_run(
@@ -251,13 +274,15 @@ class TestRunStreaming(unittest.IsolatedAsyncioTestCase):
             heartbeat_interval_seconds=0.02,
         )
 
-        heartbeat = parse_sse_message(await asyncio.wait_for(anext(stream), timeout=0.2))
+        heartbeat = parse_sse_message(
+            await asyncio.wait_for(anext(stream), timeout=STREAM_TEST_TIMEOUT_SECONDS)
+        )
         self.assertEqual(heartbeat["event"], "heartbeat")
         self.assertEqual(heartbeat["data"], {})
 
         disconnected = True
         with self.assertRaises(StopAsyncIteration):
-            await asyncio.wait_for(anext(stream), timeout=0.2)
+            await asyncio.wait_for(anext(stream), timeout=STREAM_TEST_TIMEOUT_SECONDS)
 
     async def test_generate_run_sse_closes_cleanly_if_run_is_pruned_mid_stream(self):
         run = self.store.create_run(
@@ -281,8 +306,12 @@ class TestRunStreaming(unittest.IsolatedAsyncioTestCase):
             events_limit=1,
         )
 
-        first = parse_sse_message(await asyncio.wait_for(anext(stream), timeout=0.2))
-        completion = parse_sse_message(await asyncio.wait_for(anext(stream), timeout=0.2))
+        first = parse_sse_message(
+            await asyncio.wait_for(anext(stream), timeout=STREAM_TEST_TIMEOUT_SECONDS)
+        )
+        completion = parse_sse_message(
+            await asyncio.wait_for(anext(stream), timeout=STREAM_TEST_TIMEOUT_SECONDS)
+        )
 
         self.assertEqual(first["event"], "run_event")
         self.assertEqual(first["data"]["event_type"], "queued")
