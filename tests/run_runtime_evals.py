@@ -120,10 +120,14 @@ class MockDbOps:
 class MockOrchestrator:
     """Configurable orchestrator: each call pops the next response spec."""
 
-    def __init__(self, responses: List[Tuple[str, Any]]) -> None:
+    def __init__(
+        self,
+        responses: List[Tuple[str, Any]],
+        shared_index: Optional[List[int]] = None,
+    ) -> None:
         # responses: list of ("success", result_str) | ("error", msg) | ("raise", exc)
         self._responses = list(responses)
-        self._index = 0
+        self._shared_index = shared_index or [0]
         self._call_count = 0
 
     def create_conversation(self) -> str:
@@ -131,12 +135,13 @@ class MockOrchestrator:
 
     async def process_request(self, **kwargs: Any) -> Dict[str, Any]:
         self._call_count += 1
-        if self._index >= len(self._responses):
+        index = self._shared_index[0]
+        if index >= len(self._responses):
             raise RuntimeError(
                 "MockOrchestrator exhausted: no more responses configured"
             )
-        kind, payload = self._responses[self._index]
-        self._index += 1
+        kind, payload = self._responses[index]
+        self._shared_index[0] += 1
         if kind == "raise":
             raise payload
         if kind == "error":
@@ -162,6 +167,10 @@ class RuntimeRequest:
         self.message = message
         self.conversation_id = conversation_id
         self.selected_documents = selected_documents or []
+
+
+def build_factory(orchestrator_cls, *args, **kwargs):
+    return lambda: orchestrator_cls(*args, **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -219,9 +228,15 @@ async def _case_lifecycle_queued_to_succeeded() -> Tuple[bool, List[str]]:
     """State transitions: queued→running→succeeded; events in order; result populated."""
     failures: List[str] = []
     mock_db_ops = MockDbOps()
-    orchestrator = MockOrchestrator([("success", "hello response")])
+    responses = [("success", "hello response")]
+    shared_index = [0]
+    orchestrator = MockOrchestrator(responses, shared_index)
     store = InMemoryRunStore()
-    service = RuntimeService(orchestrator=orchestrator, run_store=store)
+    service = RuntimeService(
+        orchestrator=orchestrator,
+        orchestrator_factory=build_factory(MockOrchestrator, responses, shared_index),
+        run_store=store,
+    )
 
     with patch("backend.database.operations.db_ops", mock_db_ops):
         sub = await service.submit_run(RuntimeRequest("hello", "conv-lc-ok"))
@@ -256,9 +271,15 @@ async def _case_lifecycle_queued_to_failed() -> Tuple[bool, List[str]]:
     """Error path: running→failed; error field set; no result."""
     failures: List[str] = []
     mock_db_ops = MockDbOps()
-    orchestrator = MockOrchestrator([("error", "something went wrong")])
+    responses = [("error", "something went wrong")]
+    shared_index = [0]
+    orchestrator = MockOrchestrator(responses, shared_index)
     store = InMemoryRunStore()
-    service = RuntimeService(orchestrator=orchestrator, run_store=store)
+    service = RuntimeService(
+        orchestrator=orchestrator,
+        orchestrator_factory=build_factory(MockOrchestrator, responses, shared_index),
+        run_store=store,
+    )
 
     with patch("backend.database.operations.db_ops", mock_db_ops):
         sub = await service.submit_run(RuntimeRequest("hello", "conv-lc-fail"))
@@ -290,15 +311,19 @@ async def _case_retry_transient_then_success() -> Tuple[bool, List[str]]:
     """Orchestrator raises twice, succeeds on 3rd; retrying events emitted; final status succeeded."""
     failures: List[str] = []
     mock_db_ops = MockDbOps()
-    orchestrator = MockOrchestrator(
-        [
-            ("raise", RuntimeError("transient error 1")),
-            ("raise", RuntimeError("transient error 2")),
-            ("success", "recovered ok"),
-        ]
-    )
+    responses = [
+        ("raise", RuntimeError("transient error 1")),
+        ("raise", RuntimeError("transient error 2")),
+        ("success", "recovered ok"),
+    ]
+    shared_index = [0]
+    orchestrator = MockOrchestrator(responses, shared_index)
     store = InMemoryRunStore()
-    service = RuntimeService(orchestrator=orchestrator, run_store=store)
+    service = RuntimeService(
+        orchestrator=orchestrator,
+        orchestrator_factory=build_factory(MockOrchestrator, responses, shared_index),
+        run_store=store,
+    )
 
     with patch("backend.database.operations.db_ops", mock_db_ops):
         sub = await service.submit_run(RuntimeRequest("hello", "conv-retry-ok"))
@@ -335,15 +360,19 @@ async def _case_retry_exhaustion() -> Tuple[bool, List[str]]:
     """All 3 attempts raise; final status failed; exactly 2 retrying events before failed."""
     failures: List[str] = []
     mock_db_ops = MockDbOps()
-    orchestrator = MockOrchestrator(
-        [
-            ("raise", RuntimeError("fail 1")),
-            ("raise", RuntimeError("fail 2")),
-            ("raise", RuntimeError("fail 3")),
-        ]
-    )
+    responses = [
+        ("raise", RuntimeError("fail 1")),
+        ("raise", RuntimeError("fail 2")),
+        ("raise", RuntimeError("fail 3")),
+    ]
+    shared_index = [0]
+    orchestrator = MockOrchestrator(responses, shared_index)
     store = InMemoryRunStore()
-    service = RuntimeService(orchestrator=orchestrator, run_store=store)
+    service = RuntimeService(
+        orchestrator=orchestrator,
+        orchestrator_factory=build_factory(MockOrchestrator, responses, shared_index),
+        run_store=store,
+    )
 
     with patch("backend.database.operations.db_ops", mock_db_ops):
         sub = await service.submit_run(RuntimeRequest("hello", "conv-exhaust"))
@@ -376,14 +405,18 @@ async def _case_session_isolation_different_sessions() -> Tuple[bool, List[str]]
     """Two concurrent runs in different sessions both reach succeeded."""
     failures: List[str] = []
     mock_db_ops = MockDbOps()
-    orchestrator = MockOrchestrator(
-        [
-            ("success", "result-A"),
-            ("success", "result-B"),
-        ]
-    )
+    responses = [
+        ("success", "result-A"),
+        ("success", "result-B"),
+    ]
+    shared_index = [0]
+    orchestrator = MockOrchestrator(responses, shared_index)
     store = InMemoryRunStore()
-    service = RuntimeService(orchestrator=orchestrator, run_store=store)
+    service = RuntimeService(
+        orchestrator=orchestrator,
+        orchestrator_factory=build_factory(MockOrchestrator, responses, shared_index),
+        run_store=store,
+    )
 
     with patch("backend.database.operations.db_ops", mock_db_ops):
         sub_a = await service.submit_run(RuntimeRequest("hello", "conv-diff-A"))
@@ -416,7 +449,8 @@ async def _case_session_isolation_same_session_blocked() -> Tuple[bool, List[str
             return str(uuid4())
 
         async def process_request(self, **kwargs: Any) -> Dict[str, Any]:
-            proceed_event.wait()
+            if not proceed_event.wait(timeout=10.0):
+                raise TimeoutError("timed out waiting to release blocking orchestrator")
             return {"error": False, "response": "run1 ok", "orchestration_actions": []}
 
         async def generate_conversation_title(self, conversation_id: str) -> Optional[str]:
@@ -428,7 +462,11 @@ async def _case_session_isolation_same_session_blocked() -> Tuple[bool, List[str
             return False
 
     store = InMemoryRunStore()
-    service = RuntimeService(orchestrator=BlockingOrchestrator(), run_store=store)
+    service = RuntimeService(
+        orchestrator=BlockingOrchestrator(),
+        orchestrator_factory=build_factory(BlockingOrchestrator),
+        run_store=store,
+    )
 
     with patch("backend.database.operations.db_ops", mock_db_ops):
         sub1 = await service.submit_run(RuntimeRequest("hello 1", "conv-shared"))

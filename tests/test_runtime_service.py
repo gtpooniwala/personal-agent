@@ -62,6 +62,10 @@ class BaseTestOrchestrator:
         return False
 
 
+def build_factory(orchestrator_cls):
+    return lambda: orchestrator_cls()
+
+
 class SuccessfulOrchestrator(BaseTestOrchestrator):
     async def process_request(self, user_request, conversation_id, selected_documents=None):
         await asyncio.sleep(0)
@@ -106,7 +110,11 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         self._tracking_db_ops_patcher.stop()
 
     async def test_submit_run_transitions_to_succeeded(self):
-        service = RuntimeService(orchestrator=SuccessfulOrchestrator(), run_store=InMemoryRunStore())
+        service = RuntimeService(
+            orchestrator=SuccessfulOrchestrator(),
+            orchestrator_factory=build_factory(SuccessfulOrchestrator),
+            run_store=InMemoryRunStore(),
+        )
         submitted = await service.submit_run(RuntimeRequest(message="hello", conversation_id="conv-1", selected_documents=[]))
 
         self.assertEqual(submitted["status"], "queued")
@@ -123,7 +131,11 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         self.assertIn("succeeded", event_types)
 
     async def test_submit_run_transitions_to_failed(self):
-        service = RuntimeService(orchestrator=FailingOrchestrator(), run_store=InMemoryRunStore())
+        service = RuntimeService(
+            orchestrator=FailingOrchestrator(),
+            orchestrator_factory=build_factory(FailingOrchestrator),
+            run_store=InMemoryRunStore(),
+        )
         submitted = await service.submit_run(RuntimeRequest(message="hello", conversation_id="conv-1", selected_documents=[]))
 
         status = await self._wait_for_terminal(service, submitted["run_id"])
@@ -136,7 +148,8 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
 
         class BlockingOrchestrator(BaseTestOrchestrator):
             async def process_request(self, user_request, conversation_id, selected_documents=None):
-                proceed_event.wait()
+                if not proceed_event.wait(timeout=5.0):
+                    raise TimeoutError("test orchestrator did not receive proceed signal")
                 return {
                     "response": "ok",
                     "conversation_id": conversation_id,
@@ -144,7 +157,11 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
                     "token_usage": 4,
                 }
 
-        service = RuntimeService(orchestrator=BlockingOrchestrator(), run_store=InMemoryRunStore())
+        service = RuntimeService(
+            orchestrator=BlockingOrchestrator(),
+            orchestrator_factory=build_factory(BlockingOrchestrator),
+            run_store=InMemoryRunStore(),
+        )
 
         # Submit first run (will block waiting for event)
         submitted1 = await service.submit_run(RuntimeRequest(message="hello", conversation_id="shared-conv", selected_documents=[]))
@@ -186,7 +203,11 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
                     "token_usage": 4,
                 }
 
-        service = RuntimeService(orchestrator=RetryableOrchestrator(), run_store=InMemoryRunStore())
+        service = RuntimeService(
+            orchestrator=RetryableOrchestrator(),
+            orchestrator_factory=build_factory(RetryableOrchestrator),
+            run_store=InMemoryRunStore(),
+        )
         submitted = await service.submit_run(RuntimeRequest(message="hello", conversation_id="conv-retry", selected_documents=[]))
 
         status = await self._wait_for_terminal(service, submitted["run_id"])
@@ -216,6 +237,7 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
 
         service = RuntimeService(
             orchestrator=BlockingOrchestrator(),
+            orchestrator_factory=build_factory(BlockingOrchestrator),
             run_store=InMemoryRunStore(),
             orchestration_max_workers=1,
         )
@@ -229,6 +251,7 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         run_id = submitted["run_id"]
 
         await self._wait_until_running(service, run_id)
+        await asyncio.to_thread(started_event.wait, 1.0)
         self.assertTrue(started_event.is_set())
 
         latencies = []
@@ -262,6 +285,7 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
 
         service = RuntimeService(
             orchestrator=BlockingOrchestrator(),
+            orchestrator_factory=build_factory(BlockingOrchestrator),
             run_store=InMemoryRunStore(),
             orchestration_max_workers=1,
         )
@@ -275,6 +299,7 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         run_id = submitted["run_id"]
 
         await self._wait_until_running(service, run_id)
+        await asyncio.to_thread(started_event.wait, 1.0)
         self.assertTrue(started_event.is_set())
 
         latencies = []
@@ -297,6 +322,16 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         events = await service.get_run_events(run_id=run_id, after=None, limit=100)
         event_types = [event["type"] for event in events["events"]]
         self.assertIn("succeeded", event_types)
+
+    async def test_requires_factory_for_multi_worker_execution(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "orchestrator_factory is required when orchestration_max_workers > 1",
+        ):
+            RuntimeService(
+                orchestrator=SuccessfulOrchestrator(),
+                run_store=InMemoryRunStore(),
+            )
 
     async def _wait_until_running(self, service, run_id):
         for _ in range(80):

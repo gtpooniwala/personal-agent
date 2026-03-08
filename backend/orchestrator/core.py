@@ -301,7 +301,19 @@ class CoreOrchestrator:
                 # Worker-thread execution disables background task spawning so the
                 # runtime can schedule follow-up work from the main event loop.
                 if spawn_background_tasks:
-                    asyncio.create_task(self.maybe_summarise_conversation(conversation_id))
+                    async def _summarise_background() -> None:
+                        try:
+                            await self.maybe_summarise_conversation(conversation_id)
+                        except Exception:
+                            logger.exception(
+                                "Background summarisation failed",
+                                extra={
+                                    "event": "orchestrator.summarisation_failed",
+                                    "conversation_id": conversation_id,
+                                },
+                            )
+
+                    asyncio.create_task(_summarise_background())
 
                 # Return response immediately
                 return {

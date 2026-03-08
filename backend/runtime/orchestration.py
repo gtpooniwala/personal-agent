@@ -14,7 +14,7 @@ import contextvars
 import inspect
 from concurrent.futures import Executor, ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Dict, Optional, Sequence
+from typing import Any, Callable, Dict, Optional, Sequence
 
 
 @dataclass(frozen=True)
@@ -38,6 +38,10 @@ class OrchestrationExecutionPlane:
         orchestration_executor: Optional[Executor] = None,
         orchestration_max_workers: int = 4,
     ):
+        if orchestrator_factory is None and orchestration_max_workers > 1:
+            raise ValueError(
+                "orchestrator_factory is required when orchestration_max_workers > 1"
+            )
         self._fallback_orchestrator = orchestrator
         self._orchestrator_factory = orchestrator_factory
         self._owns_executor = orchestration_executor is None
@@ -90,12 +94,18 @@ class OrchestrationExecutionPlane:
 
     async def _run_coroutine_in_executor(
         self,
-        coroutine_factory: Callable[[], Awaitable[Any]],
+        coroutine_factory: Callable[[], Any],
     ) -> Any:
         loop = asyncio.get_running_loop()
         context = contextvars.copy_context()
 
         def run_coroutine() -> Any:
-            return context.run(lambda: asyncio.run(coroutine_factory()))
+            def runner() -> Any:
+                result = coroutine_factory()
+                if inspect.isawaitable(result):
+                    return asyncio.run(result)
+                return result
+
+            return context.run(runner)
 
         return await loop.run_in_executor(self._executor, run_coroutine)
