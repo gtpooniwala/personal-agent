@@ -1,0 +1,23 @@
+.github/workflows/claude-code-review.yml
+  bf237318f9e5cd60 13-16,28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "282728f54101160d6cb463869e143a6ce411e198",
+  "prompts": {
+    "bf237318f9e5cd60": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "57a8df4a-0a7a-4073-945e-bbaff4921d13",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 1,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}
