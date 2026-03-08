@@ -71,6 +71,13 @@ class Settings(BaseSettings):
     # Performance settings
     max_conversation_history: int = 50
     conversation_summary_threshold: int = 20
+    runtime_orchestration_max_workers: int = Field(
+        default=4,
+        ge=1,
+        validation_alias=AliasChoices(
+            "RUNTIME_ORCHESTRATION_MAX_WORKERS",
+        ),
+    )
 
     # API keys for web search providers (optional)
     bing_api_key: Optional[str] = None

@@ -1,22 +1,25 @@
 # Roadmap
 
-Last updated: March 7, 2026
+Last updated: March 8, 2026
 
 ## Objective
 Move from strong prototype to production-ready personal AI agent with reliable behavior, safer defaults, and measurable quality.
 
-Current high-priority execution objective: validate and harden the async run model (`#15`-`#17`, now complete) and address frontend correctness follow-ups (`#31`, `#30`).
+Current high-priority execution objective: finish landing runtime responsiveness work for [#51](https://github.com/gtpooniwala/personal-agent/issues/51) via [PR #107](https://github.com/gtpooniwala/personal-agent/pull/107), then tackle the scoped runtime follow-ups opened from that work (`#102`, `#103`, `#104`, `#105`, `#106`, `#109`).
 
 ## Now (Stabilize Core + Raise Quality Bar)
 - Async run lifecycle schema + submission/status/event contracts complete (`#15`, `#16`, `#17`).
+- Runtime state isolation refactor complete (`#50`).
 
 ### Frontend Correctness (sequential)
-- Land Gmail reliability follow-up (`#40`).
-- Address active frontend send correctness risk (`#31`) and IME Enter handling (`#30`).
+- Completed: Gmail reliability follow-up (`#40`).
+- Completed: frontend send correctness risk (`#31`) and IME Enter handling (`#30`).
+- Completed: summarisation/tooling cleanup follow-ups (`#28`, `#29`).
 
 ### Runtime Quality (parallel with frontend)
-- Add runtime eval coverage for lifecycle transitions, retries, and session isolation (`#19`).
-- Add scheduler/heartbeat primitives for autonomous workflows (`#18`).
+- Completed: runtime eval coverage for lifecycle transitions, retries, and session isolation (`#19`).
+- Completed: scheduler/heartbeat primitives for autonomous workflows (`#18`).
+- In progress: move blocking orchestration work off the event loop (`#51`, PR `#107`).
 
 Success criteria:
 - Core tests runnable in one documented command.
@@ -27,10 +30,19 @@ Success criteria:
 - Scheduler primitives enable autonomous long-running workflow orchestration.
 
 ## Next (Async Cleanup + Hardening)
+- Land and verify runtime responsiveness work from `#51`.
+- Define executor lifecycle and graceful shutdown semantics (`#102`).
+- Investigate true async runtime/orchestrator execution paths (`#103`).
+- Add streaming run updates via SSE while keeping polling as fallback (`#104`).
+- Move follow-up background work onto persisted queued task types (`#105`).
+- Refactor `CoreOrchestrator` toward stateless per-request execution (`#106`).
+- Separate follow-up execution budget from foreground run attempts (`#109`).
 
 Success criteria:
 - Machine-readable runtime eval report with CI-friendly pass/fail signals.
+- Event loop remains responsive during blocking orchestration attempts.
 - Stable worker behavior under retry and per-session serialization.
+- Clear ownership and shutdown behavior for runtime execution resources.
 - Clear capability gating in `/tools` and orchestrator behavior.
 
 ## Later (Scale And Productize)
@@ -74,8 +86,10 @@ Success criteria:
 - Future backlog milestone: [Backlog / Future](https://github.com/gtpooniwala/personal-agent/milestone/4)
 - Completed migration prerequisites: [#14](https://github.com/gtpooniwala/personal-agent/issues/14) (design + PR decomposition), [#22](https://github.com/gtpooniwala/personal-agent/issues/22), [#23](https://github.com/gtpooniwala/personal-agent/issues/23)
 - Completed core migration implementation: [#15](https://github.com/gtpooniwala/personal-agent/issues/15) (run lifecycle schema), [#16](https://github.com/gtpooniwala/personal-agent/issues/16) (worker queue + per-session serialization), [#17](https://github.com/gtpooniwala/personal-agent/issues/17) (async contracts)
-- Remaining migration items: [#19](https://github.com/gtpooniwala/personal-agent/issues/19) (runtime evals), [#18](https://github.com/gtpooniwala/personal-agent/issues/18) (scheduler/heartbeat)
-- Active migration/frontend follow-ups: [#28](https://github.com/gtpooniwala/personal-agent/issues/28), [#29](https://github.com/gtpooniwala/personal-agent/issues/29), [#31](https://github.com/gtpooniwala/personal-agent/issues/31), [#30](https://github.com/gtpooniwala/personal-agent/issues/30), [#40](https://github.com/gtpooniwala/personal-agent/issues/40)
+- Completed workflow automation items: [#18](https://github.com/gtpooniwala/personal-agent/issues/18) (scheduler/heartbeat), [#19](https://github.com/gtpooniwala/personal-agent/issues/19) (runtime evals)
+- Completed hardening follow-ups: [#28](https://github.com/gtpooniwala/personal-agent/issues/28), [#29](https://github.com/gtpooniwala/personal-agent/issues/29), [#30](https://github.com/gtpooniwala/personal-agent/issues/30), [#31](https://github.com/gtpooniwala/personal-agent/issues/31), [#40](https://github.com/gtpooniwala/personal-agent/issues/40), [#50](https://github.com/gtpooniwala/personal-agent/issues/50)
+- Active runtime responsiveness work: [#51](https://github.com/gtpooniwala/personal-agent/issues/51) via [PR #107](https://github.com/gtpooniwala/personal-agent/pull/107)
+- Runtime follow-up issues opened from `#51`: [#102](https://github.com/gtpooniwala/personal-agent/issues/102), [#103](https://github.com/gtpooniwala/personal-agent/issues/103), [#104](https://github.com/gtpooniwala/personal-agent/issues/104), [#105](https://github.com/gtpooniwala/personal-agent/issues/105), [#106](https://github.com/gtpooniwala/personal-agent/issues/106), [#109](https://github.com/gtpooniwala/personal-agent/issues/109)
 - GCP deployment planning tracking: [#78](https://github.com/gtpooniwala/personal-agent/issues/78)
 - GCP deployment sub-issues: [#79](https://github.com/gtpooniwala/personal-agent/issues/79), [#80](https://github.com/gtpooniwala/personal-agent/issues/80), [#81](https://github.com/gtpooniwala/personal-agent/issues/81), [#82](https://github.com/gtpooniwala/personal-agent/issues/82), [#83](https://github.com/gtpooniwala/personal-agent/issues/83), [#85](https://github.com/gtpooniwala/personal-agent/issues/85), [#86](https://github.com/gtpooniwala/personal-agent/issues/86), [#87](https://github.com/gtpooniwala/personal-agent/issues/87)
 - Event-driven triggers sub-issues: [#88](https://github.com/gtpooniwala/personal-agent/issues/88), [#89](https://github.com/gtpooniwala/personal-agent/issues/89), [#90](https://github.com/gtpooniwala/personal-agent/issues/90), [#91](https://github.com/gtpooniwala/personal-agent/issues/91), [#92](https://github.com/gtpooniwala/personal-agent/issues/92)

@@ -1,7 +1,11 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import os
 import sys
+import threading
+import time
 import unittest
+from unittest.mock import patch
 
 # Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -25,10 +29,45 @@ class RuntimeRequest:
         self.selected_documents = selected_documents or []
 
 
-class SuccessfulOrchestrator:
+class MockDbOps:
+    def __init__(self):
+        self._leases = {}
+
+    def acquire_lease(self, key, owner_id, ttl_seconds):
+        if key in self._leases:
+            return None
+        self._leases[key] = owner_id
+        return {"key": key, "owner_id": owner_id}
+
+    def release_lease(self, key, owner_id):
+        if self._leases.get(key) == owner_id:
+            del self._leases[key]
+
+    def renew_lease(self, key, owner_id, ttl_seconds):
+        if self._leases.get(key) == owner_id:
+            return {"key": key, "owner_id": owner_id}
+        return None
+
+    def increment_runtime_counter(self, key, amount=1):
+        return 0
+
+
+class BaseTestOrchestrator:
     def create_conversation(self):
         return "conv-generated"
 
+    async def generate_conversation_title(self, conversation_id):
+        return None
+
+    async def maybe_summarise_conversation(self, conversation_id, **kwargs):
+        return False
+
+
+def build_factory(orchestrator_cls):
+    return lambda: orchestrator_cls()
+
+
+class SuccessfulOrchestrator(BaseTestOrchestrator):
     async def process_request(self, user_request, conversation_id, selected_documents=None):
         await asyncio.sleep(0)
         return {
@@ -41,10 +80,7 @@ class SuccessfulOrchestrator:
         }
 
 
-class FailingOrchestrator:
-    def create_conversation(self):
-        return "conv-generated"
-
+class FailingOrchestrator(BaseTestOrchestrator):
     async def process_request(self, user_request, conversation_id, selected_documents=None):
         await asyncio.sleep(0)
         return {
@@ -59,8 +95,36 @@ class FailingOrchestrator:
     f"Runtime service test dependencies unavailable: {RUNTIME_SERVICE_IMPORT_ERROR}",
 )
 class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self._mock_db_ops = MockDbOps()
+        self._services = []
+        self._db_ops_patcher = patch(
+            "backend.database.operations.db_ops", self._mock_db_ops
+        )
+        self._tracking_db_ops_patcher = patch(
+            "backend.observability.tracking.db_ops", self._mock_db_ops
+        )
+        self._db_ops_patcher.start()
+        self._tracking_db_ops_patcher.start()
+
+    async def asyncTearDown(self):
+        while self._services:
+            service = self._services.pop()
+            await service.shutdown()
+        self._db_ops_patcher.stop()
+        self._tracking_db_ops_patcher.stop()
+
+    def _make_service(self, **kwargs):
+        service = RuntimeService(**kwargs)
+        self._services.append(service)
+        return service
+
     async def test_submit_run_transitions_to_succeeded(self):
-        service = RuntimeService(orchestrator=SuccessfulOrchestrator(), run_store=InMemoryRunStore())
+        service = self._make_service(
+            orchestrator=SuccessfulOrchestrator(),
+            orchestrator_factory=build_factory(SuccessfulOrchestrator),
+            run_store=InMemoryRunStore(),
+        )
         submitted = await service.submit_run(RuntimeRequest(message="hello", conversation_id="conv-1", selected_documents=[]))
 
         self.assertEqual(submitted["status"], "queued")
@@ -77,7 +141,11 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         self.assertIn("succeeded", event_types)
 
     async def test_submit_run_transitions_to_failed(self):
-        service = RuntimeService(orchestrator=FailingOrchestrator(), run_store=InMemoryRunStore())
+        service = self._make_service(
+            orchestrator=FailingOrchestrator(),
+            orchestrator_factory=build_factory(FailingOrchestrator),
+            run_store=InMemoryRunStore(),
+        )
         submitted = await service.submit_run(RuntimeRequest(message="hello", conversation_id="conv-1", selected_documents=[]))
 
         status = await self._wait_for_terminal(service, submitted["run_id"])
@@ -85,23 +153,13 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(status["error"], "something failed")
 
     async def test_concurrent_runs_to_same_conversation_are_rejected(self):
-        """Two concurrent runs to same conversation should result in one failing with session_busy.
+        """Two concurrent runs to same conversation should result in one failing with session_busy."""
+        proceed_event = threading.Event()
 
-        NOTE: This test uses InMemoryRunStore which doesn't implement lease-based serialization.
-        The test validates basic failure semantics, but actual serialization is verified in
-        integration tests with DbRunStore (requires database setup). This test ensures the
-        service handles concurrent submissions gracefully.
-        """
-        # Orchestrator that blocks to ensure concurrent execution
-        blocking_event = asyncio.Event()
-
-        class BlockingOrchestrator:
-            def create_conversation(self):
-                return "conv-generated"
-
+        class BlockingOrchestrator(BaseTestOrchestrator):
             async def process_request(self, user_request, conversation_id, selected_documents=None):
-                # First request blocks, second can proceed
-                await blocking_event.wait()
+                if not proceed_event.wait(timeout=5.0):
+                    raise TimeoutError("test orchestrator did not receive proceed signal")
                 return {
                     "response": "ok",
                     "conversation_id": conversation_id,
@@ -109,40 +167,40 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
                     "token_usage": 4,
                 }
 
-        service = RuntimeService(orchestrator=BlockingOrchestrator(), run_store=InMemoryRunStore())
+        service = self._make_service(
+            orchestrator=BlockingOrchestrator(),
+            orchestrator_factory=build_factory(BlockingOrchestrator),
+            run_store=InMemoryRunStore(),
+        )
 
         # Submit first run (will block waiting for event)
         submitted1 = await service.submit_run(RuntimeRequest(message="hello", conversation_id="shared-conv", selected_documents=[]))
         run_id1 = submitted1["run_id"]
 
         # Give first task time to reach orchestrator
-        await asyncio.sleep(0.01)
+        await self._wait_until_running(service, run_id1)
 
         # Submit second run to same conversation while first is blocked
         submitted2 = await service.submit_run(RuntimeRequest(message="hello again", conversation_id="shared-conv", selected_documents=[]))
         run_id2 = submitted2["run_id"]
 
-        # Unblock the orchestrator
-        blocking_event.set()
+        status2 = await self._wait_for_terminal(service, run_id2, timeout=5.0)
+        proceed_event.set()
+        status1 = await self._wait_for_terminal(service, run_id1, timeout=5.0)
 
-        # Wait for both to complete
-        status1 = await self._wait_for_terminal(service, run_id1)
-        status2 = await self._wait_for_terminal(service, run_id2)
-
-        # Both should complete (InMemoryRunStore doesn't enforce serialization)
-        # This test primarily validates the service completes both runs without crashing
-        self.assertIn(status1["status"], {"succeeded", "failed"})
-        self.assertIn(status2["status"], {"succeeded", "failed"})
+        self.assertEqual(status1["status"], "succeeded")
+        self.assertEqual(status2["status"], "failed")
+        self.assertEqual(
+            status2["error"],
+            "Another operation is already running in this conversation.",
+        )
 
     async def test_orchestrator_exception_is_retried(self):
         """Orchestrator exceptions should trigger retries up to MAX_RETRY_ATTEMPTS."""
         # Create an orchestrator that fails once then succeeds
         attempt_count = [0]
 
-        class RetryableOrchestrator:
-            def create_conversation(self):
-                return "conv-generated"
-
+        class RetryableOrchestrator(BaseTestOrchestrator):
             async def process_request(self, user_request, conversation_id, selected_documents=None):
                 await asyncio.sleep(0)
                 attempt_count[0] += 1
@@ -155,7 +213,11 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
                     "token_usage": 4,
                 }
 
-        service = RuntimeService(orchestrator=RetryableOrchestrator(), run_store=InMemoryRunStore())
+        service = self._make_service(
+            orchestrator=RetryableOrchestrator(),
+            orchestrator_factory=build_factory(RetryableOrchestrator),
+            run_store=InMemoryRunStore(),
+        )
         submitted = await service.submit_run(RuntimeRequest(message="hello", conversation_id="conv-retry", selected_documents=[]))
 
         status = await self._wait_for_terminal(service, submitted["run_id"])
@@ -167,9 +229,239 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         event_types = [event["type"] for event in events["events"]]
         self.assertIn("retrying", event_types)
 
-    async def _wait_for_terminal(self, service, run_id):
-        terminal = {"succeeded", "failed", "cancelled"}
+    async def test_status_polling_remains_prompt_during_blocking_attempt(self):
+        started_event = threading.Event()
+
+        class BlockingOrchestrator(BaseTestOrchestrator):
+            async def process_request(
+                self, user_request, conversation_id, selected_documents=None
+            ):
+                started_event.set()
+                time.sleep(0.35)
+                return {
+                    "response": "ok",
+                    "conversation_id": conversation_id,
+                    "orchestration_actions": [],
+                    "token_usage": 4,
+                }
+
+        service = self._make_service(
+            orchestrator=BlockingOrchestrator(),
+            orchestrator_factory=build_factory(BlockingOrchestrator),
+            run_store=InMemoryRunStore(),
+            orchestration_max_workers=1,
+        )
+        submitted = await service.submit_run(
+            RuntimeRequest(
+                message="hello",
+                conversation_id="conv-responsive-status",
+                selected_documents=[],
+            )
+        )
+        run_id = submitted["run_id"]
+
+        await self._wait_until_running(service, run_id)
+        await asyncio.to_thread(started_event.wait, 1.0)
+        self.assertTrue(started_event.is_set())
+
+        latencies = []
+        for _ in range(5):
+            started = time.perf_counter()
+            status = await asyncio.wait_for(service.get_run_status(run_id), timeout=0.1)
+            latencies.append(time.perf_counter() - started)
+            self.assertIn(status["status"], {"running", "succeeded"})
+            await asyncio.sleep(0.01)
+
+        self.assertTrue(all(latency < 0.1 for latency in latencies), latencies)
+
+        status = await self._wait_for_terminal(service, run_id)
+        self.assertEqual(status["status"], "succeeded")
+
+    async def test_events_polling_remains_prompt_during_blocking_attempt(self):
+        started_event = threading.Event()
+
+        class BlockingOrchestrator(BaseTestOrchestrator):
+            async def process_request(
+                self, user_request, conversation_id, selected_documents=None
+            ):
+                started_event.set()
+                time.sleep(0.35)
+                return {
+                    "response": "ok",
+                    "conversation_id": conversation_id,
+                    "orchestration_actions": [],
+                    "token_usage": 4,
+                }
+
+        service = self._make_service(
+            orchestrator=BlockingOrchestrator(),
+            orchestrator_factory=build_factory(BlockingOrchestrator),
+            run_store=InMemoryRunStore(),
+            orchestration_max_workers=1,
+        )
+        submitted = await service.submit_run(
+            RuntimeRequest(
+                message="hello",
+                conversation_id="conv-responsive-events",
+                selected_documents=[],
+            )
+        )
+        run_id = submitted["run_id"]
+
+        await self._wait_until_running(service, run_id)
+        await asyncio.to_thread(started_event.wait, 1.0)
+        self.assertTrue(started_event.is_set())
+
+        latencies = []
+        for _ in range(5):
+            started = time.perf_counter()
+            events = await asyncio.wait_for(
+                service.get_run_events(run_id=run_id, after=None, limit=100),
+                timeout=0.1,
+            )
+            latencies.append(time.perf_counter() - started)
+            event_types = [event["type"] for event in events["events"]]
+            self.assertIn("started", event_types)
+            await asyncio.sleep(0.01)
+
+        self.assertTrue(all(latency < 0.1 for latency in latencies), latencies)
+
+        status = await self._wait_for_terminal(service, run_id)
+        self.assertEqual(status["status"], "succeeded")
+
+        events = await service.get_run_events(run_id=run_id, after=None, limit=100)
+        event_types = [event["type"] for event in events["events"]]
+        self.assertIn("succeeded", event_types)
+
+    async def test_submit_run_offloads_blocking_conversation_creation(self):
+        started_event = threading.Event()
+
+        class BlockingConversationOrchestrator(BaseTestOrchestrator):
+            def create_conversation(self):
+                started_event.set()
+                time.sleep(0.35)
+                return "conv-created-in-worker"
+
+            async def process_request(
+                self, user_request, conversation_id, selected_documents=None
+            ):
+                await asyncio.sleep(0)
+                return {
+                    "response": "ok",
+                    "conversation_id": conversation_id,
+                    "orchestration_actions": [],
+                    "token_usage": 4,
+                }
+
+        service = self._make_service(
+            orchestrator=BlockingConversationOrchestrator(),
+            orchestrator_factory=build_factory(BlockingConversationOrchestrator),
+            run_store=InMemoryRunStore(),
+            orchestration_max_workers=1,
+        )
+
+        submit_task = asyncio.create_task(
+            service.submit_run(
+                RuntimeRequest(
+                    message="hello",
+                    conversation_id=None,
+                    selected_documents=[],
+                )
+            )
+        )
+
+        await asyncio.to_thread(started_event.wait, 1.0)
+        self.assertTrue(started_event.is_set())
+
+        latencies = []
+        for _ in range(5):
+            started = time.perf_counter()
+            await asyncio.wait_for(asyncio.sleep(0.01), timeout=0.1)
+            latencies.append(time.perf_counter() - started)
+
+        self.assertTrue(all(latency < 0.1 for latency in latencies), latencies)
+
+        submitted = await asyncio.wait_for(submit_task, timeout=1.0)
+        self.assertEqual(submitted["conversation_id"], "conv-created-in-worker")
+
+        status = await self._wait_for_terminal(service, submitted["run_id"])
+        self.assertEqual(status["status"], "succeeded")
+
+    async def test_requires_factory_for_multi_worker_execution(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "orchestrator_factory is required when orchestration_max_workers > 1",
+        ):
+            RuntimeService(
+                orchestrator=SuccessfulOrchestrator(),
+                run_store=InMemoryRunStore(),
+            )
+
+    async def test_custom_executor_allows_shared_orchestrator_configuration(self):
+        executor = ThreadPoolExecutor(max_workers=2)
+        service = None
+        try:
+            service = self._make_service(
+                orchestrator=SuccessfulOrchestrator(),
+                orchestration_executor=executor,
+                run_store=InMemoryRunStore(),
+            )
+            submitted = await service.submit_run(
+                RuntimeRequest(
+                    message="hello",
+                    conversation_id="conv-custom-executor",
+                    selected_documents=[],
+                )
+            )
+            status = await self._wait_for_terminal(service, submitted["run_id"])
+            self.assertEqual(status["status"], "succeeded")
+        finally:
+            executor.shutdown(wait=False, cancel_futures=False)
+
+    async def test_shutdown_allows_owned_executor_to_restart_on_next_submission(self):
+        service = self._make_service(
+            orchestrator=SuccessfulOrchestrator(),
+            orchestrator_factory=build_factory(SuccessfulOrchestrator),
+            run_store=InMemoryRunStore(),
+            orchestration_max_workers=1,
+        )
+
+        first_submission = await service.submit_run(
+            RuntimeRequest(
+                message="first",
+                conversation_id="conv-restartable-service",
+                selected_documents=[],
+            )
+        )
+        first_status = await self._wait_for_terminal(service, first_submission["run_id"])
+        self.assertEqual(first_status["status"], "succeeded")
+
+        await service.shutdown()
+
+        second_submission = await service.submit_run(
+            RuntimeRequest(
+                message="second",
+                conversation_id="conv-restartable-service",
+                selected_documents=[],
+            )
+        )
+        second_status = await self._wait_for_terminal(
+            service, second_submission["run_id"]
+        )
+        self.assertEqual(second_status["status"], "succeeded")
+
+    async def _wait_until_running(self, service, run_id):
         for _ in range(80):
+            status = await service.get_run_status(run_id)
+            if status["status"] == "running":
+                return status
+            await asyncio.sleep(0.01)
+        self.fail(f"run {run_id} did not reach running state")
+
+    async def _wait_for_terminal(self, service, run_id, timeout=0.8):
+        terminal = {"succeeded", "failed", "cancelled"}
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
             status = await service.get_run_status(run_id)
             if status["status"] in terminal:
                 return status

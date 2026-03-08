@@ -156,7 +156,8 @@ class CoreOrchestrator:
         self, 
         user_request: str, 
         conversation_id: str,
-        selected_documents: Optional[List[str]] = None
+        selected_documents: Optional[List[str]] = None,
+        spawn_background_tasks: bool = True,
     ) -> Dict[str, Any]:
         """
         Main orchestrator method that processes user requests.
@@ -297,8 +298,22 @@ class CoreOrchestrator:
                     token_usage=token_usage
                 )
 
-                # Trigger summarisation in the background (do not await)
-                asyncio.create_task(self.maybe_summarise_conversation(conversation_id))
+                # Worker-thread execution disables background task spawning so the
+                # runtime can schedule follow-up work from the main event loop.
+                if spawn_background_tasks:
+                    async def _summarise_background() -> None:
+                        try:
+                            await self.maybe_summarise_conversation(conversation_id)
+                        except Exception:
+                            logger.exception(
+                                "Background summarisation failed",
+                                extra={
+                                    "event": "orchestrator.summarisation_failed",
+                                    "conversation_id": conversation_id,
+                                },
+                            )
+
+                    asyncio.create_task(_summarise_background())
 
                 # Return response immediately
                 return {

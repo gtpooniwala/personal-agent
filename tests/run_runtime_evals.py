@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+import threading
 import time
 import types
 from collections import defaultdict
@@ -119,10 +120,16 @@ class MockDbOps:
 class MockOrchestrator:
     """Configurable orchestrator: each call pops the next response spec."""
 
-    def __init__(self, responses: List[Tuple[str, Any]]) -> None:
+    def __init__(
+        self,
+        responses: List[Tuple[str, Any]],
+        shared_index: Optional[List[int]] = None,
+        shared_lock: Optional[threading.Lock] = None,
+    ) -> None:
         # responses: list of ("success", result_str) | ("error", msg) | ("raise", exc)
         self._responses = list(responses)
-        self._index = 0
+        self._shared_index = shared_index or [0]
+        self._shared_lock = shared_lock or threading.Lock()
         self._call_count = 0
 
     def create_conversation(self) -> str:
@@ -130,17 +137,27 @@ class MockOrchestrator:
 
     async def process_request(self, **kwargs: Any) -> Dict[str, Any]:
         self._call_count += 1
-        if self._index >= len(self._responses):
-            raise RuntimeError(
-                "MockOrchestrator exhausted: no more responses configured"
-            )
-        kind, payload = self._responses[self._index]
-        self._index += 1
+        with self._shared_lock:
+            index = self._shared_index[0]
+            if index >= len(self._responses):
+                raise RuntimeError(
+                    "MockOrchestrator exhausted: no more responses configured"
+                )
+            kind, payload = self._responses[index]
+            self._shared_index[0] += 1
         if kind == "raise":
             raise payload
         if kind == "error":
             return {"error": True, "response": payload}
         return {"error": False, "response": payload, "orchestration_actions": []}
+
+    async def generate_conversation_title(self, conversation_id: str) -> Optional[str]:
+        return None
+
+    async def maybe_summarise_conversation(
+        self, conversation_id: str, **kwargs: Any
+    ) -> bool:
+        return False
 
 
 class RuntimeRequest:
@@ -153,6 +170,10 @@ class RuntimeRequest:
         self.message = message
         self.conversation_id = conversation_id
         self.selected_documents = selected_documents or []
+
+
+def build_factory(orchestrator_cls, *args, **kwargs):
+    return lambda: orchestrator_cls(*args, **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -210,188 +231,242 @@ async def _case_lifecycle_queued_to_succeeded() -> Tuple[bool, List[str]]:
     """State transitions: queued→running→succeeded; events in order; result populated."""
     failures: List[str] = []
     mock_db_ops = MockDbOps()
-    orchestrator = MockOrchestrator([("success", "hello response")])
+    responses = [("success", "hello response")]
+    shared_index = [0]
+    shared_lock = threading.Lock()
+    orchestrator = MockOrchestrator(responses, shared_index, shared_lock)
     store = InMemoryRunStore()
-    service = RuntimeService(orchestrator=orchestrator, run_store=store)
+    service = RuntimeService(
+        orchestrator=orchestrator,
+        orchestrator_factory=build_factory(
+            MockOrchestrator, responses, shared_index, shared_lock
+        ),
+        run_store=store,
+    )
 
-    with patch("backend.database.operations.db_ops", mock_db_ops):
-        sub = await service.submit_run(RuntimeRequest("hello", "conv-lc-ok"))
-        if sub["status"] != "queued":
-            failures.append(f"expected initial status 'queued', got '{sub['status']}'")
+    try:
+        with patch("backend.database.operations.db_ops", mock_db_ops):
+            sub = await service.submit_run(RuntimeRequest("hello", "conv-lc-ok"))
+            if sub["status"] != "queued":
+                failures.append(f"expected initial status 'queued', got '{sub['status']}'")
 
-        run_id = sub["run_id"]
-        status = await _wait_terminal(service, run_id)
+            run_id = sub["run_id"]
+            status = await _wait_terminal(service, run_id)
 
-        if status["status"] != RUN_STATUS_SUCCEEDED:
-            failures.append(
-                f"expected terminal status '{RUN_STATUS_SUCCEEDED}', got '{status['status']}'"
+            if status["status"] != RUN_STATUS_SUCCEEDED:
+                failures.append(
+                    f"expected terminal status '{RUN_STATUS_SUCCEEDED}', got '{status['status']}'"
+                )
+            if status.get("result") != "hello response":
+                failures.append(
+                    f"expected result 'hello response', got '{status.get('result')}'"
+                )
+            if status.get("error") is not None:
+                failures.append(f"expected no error, got '{status.get('error')}'")
+
+            event_types = await _get_event_types(service, run_id)
+            _check_event_order(
+                event_types,
+                [RUN_EVENT_QUEUED, RUN_EVENT_STARTED, RUN_EVENT_SUCCEEDED],
+                failures,
             )
-        if status.get("result") != "hello response":
-            failures.append(
-                f"expected result 'hello response', got '{status.get('result')}'"
-            )
-        if status.get("error") is not None:
-            failures.append(f"expected no error, got '{status.get('error')}'")
 
-        event_types = await _get_event_types(service, run_id)
-        _check_event_order(
-            event_types,
-            [RUN_EVENT_QUEUED, RUN_EVENT_STARTED, RUN_EVENT_SUCCEEDED],
-            failures,
-        )
-
-    return len(failures) == 0, failures
+        return len(failures) == 0, failures
+    finally:
+        await service.shutdown()
 
 
 async def _case_lifecycle_queued_to_failed() -> Tuple[bool, List[str]]:
     """Error path: running→failed; error field set; no result."""
     failures: List[str] = []
     mock_db_ops = MockDbOps()
-    orchestrator = MockOrchestrator([("error", "something went wrong")])
+    responses = [("error", "something went wrong")]
+    shared_index = [0]
+    shared_lock = threading.Lock()
+    orchestrator = MockOrchestrator(responses, shared_index, shared_lock)
     store = InMemoryRunStore()
-    service = RuntimeService(orchestrator=orchestrator, run_store=store)
+    service = RuntimeService(
+        orchestrator=orchestrator,
+        orchestrator_factory=build_factory(
+            MockOrchestrator, responses, shared_index, shared_lock
+        ),
+        run_store=store,
+    )
 
-    with patch("backend.database.operations.db_ops", mock_db_ops):
-        sub = await service.submit_run(RuntimeRequest("hello", "conv-lc-fail"))
-        run_id = sub["run_id"]
-        status = await _wait_terminal(service, run_id)
+    try:
+        with patch("backend.database.operations.db_ops", mock_db_ops):
+            sub = await service.submit_run(RuntimeRequest("hello", "conv-lc-fail"))
+            run_id = sub["run_id"]
+            status = await _wait_terminal(service, run_id)
 
-        if status["status"] != RUN_STATUS_FAILED:
-            failures.append(
-                f"expected terminal status '{RUN_STATUS_FAILED}', got '{status['status']}'"
+            if status["status"] != RUN_STATUS_FAILED:
+                failures.append(
+                    f"expected terminal status '{RUN_STATUS_FAILED}', got '{status['status']}'"
+                )
+            if status.get("error") != "something went wrong":
+                failures.append(
+                    f"expected error 'something went wrong', got '{status.get('error')}'"
+                )
+            if status.get("result") is not None:
+                failures.append(f"expected no result, got '{status.get('result')}'")
+
+            event_types = await _get_event_types(service, run_id)
+            _check_event_order(
+                event_types,
+                [RUN_EVENT_QUEUED, RUN_EVENT_STARTED, RUN_EVENT_FAILED],
+                failures,
             )
-        if status.get("error") != "something went wrong":
-            failures.append(
-                f"expected error 'something went wrong', got '{status.get('error')}'"
-            )
-        if status.get("result") is not None:
-            failures.append(f"expected no result, got '{status.get('result')}'")
 
-        event_types = await _get_event_types(service, run_id)
-        _check_event_order(
-            event_types,
-            [RUN_EVENT_QUEUED, RUN_EVENT_STARTED, RUN_EVENT_FAILED],
-            failures,
-        )
-
-    return len(failures) == 0, failures
+        return len(failures) == 0, failures
+    finally:
+        await service.shutdown()
 
 
 async def _case_retry_transient_then_success() -> Tuple[bool, List[str]]:
     """Orchestrator raises twice, succeeds on 3rd; retrying events emitted; final status succeeded."""
     failures: List[str] = []
     mock_db_ops = MockDbOps()
-    orchestrator = MockOrchestrator(
-        [
-            ("raise", RuntimeError("transient error 1")),
-            ("raise", RuntimeError("transient error 2")),
-            ("success", "recovered ok"),
-        ]
-    )
+    responses = [
+        ("raise", RuntimeError("transient error 1")),
+        ("raise", RuntimeError("transient error 2")),
+        ("success", "recovered ok"),
+    ]
+    shared_index = [0]
+    shared_lock = threading.Lock()
+    orchestrator = MockOrchestrator(responses, shared_index, shared_lock)
     store = InMemoryRunStore()
-    service = RuntimeService(orchestrator=orchestrator, run_store=store)
+    service = RuntimeService(
+        orchestrator=orchestrator,
+        orchestrator_factory=build_factory(
+            MockOrchestrator, responses, shared_index, shared_lock
+        ),
+        run_store=store,
+    )
 
-    with patch("backend.database.operations.db_ops", mock_db_ops):
-        sub = await service.submit_run(RuntimeRequest("hello", "conv-retry-ok"))
-        run_id = sub["run_id"]
-        status = await _wait_terminal(service, run_id)
+    try:
+        with patch("backend.database.operations.db_ops", mock_db_ops):
+            sub = await service.submit_run(RuntimeRequest("hello", "conv-retry-ok"))
+            run_id = sub["run_id"]
+            status = await _wait_terminal(service, run_id)
 
-        if status["status"] != RUN_STATUS_SUCCEEDED:
-            failures.append(
-                f"expected terminal status '{RUN_STATUS_SUCCEEDED}', got '{status['status']}'"
-            )
-        if status.get("result") != "recovered ok":
-            failures.append(
-                f"expected result 'recovered ok', got '{status.get('result')}'"
-            )
+            if status["status"] != RUN_STATUS_SUCCEEDED:
+                failures.append(
+                    f"expected terminal status '{RUN_STATUS_SUCCEEDED}', got '{status['status']}'"
+                )
+            if status.get("result") != "recovered ok":
+                failures.append(
+                    f"expected result 'recovered ok', got '{status.get('result')}'"
+                )
 
-        event_types = await _get_event_types(service, run_id)
+            event_types = await _get_event_types(service, run_id)
 
-        retrying_count = event_types.count(RUN_EVENT_RETRYING)
-        if retrying_count != 2:
-            failures.append(
-                f"expected at least 2 '{RUN_EVENT_RETRYING}' events, got {retrying_count} "
-                f"(events={event_types})"
-            )
+            retrying_count = event_types.count(RUN_EVENT_RETRYING)
+            if retrying_count != 2:
+                failures.append(
+                    f"expected at least 2 '{RUN_EVENT_RETRYING}' events, got {retrying_count} "
+                    f"(events={event_types})"
+                )
 
-        if not event_types or event_types[-1] != RUN_EVENT_SUCCEEDED:
-            failures.append(
-                f"expected last event to be '{RUN_EVENT_SUCCEEDED}', got events={event_types}"
-            )
+            if not event_types or event_types[-1] != RUN_EVENT_SUCCEEDED:
+                failures.append(
+                    f"expected last event to be '{RUN_EVENT_SUCCEEDED}', got events={event_types}"
+                )
 
-    return len(failures) == 0, failures
+        return len(failures) == 0, failures
+    finally:
+        await service.shutdown()
 
 
 async def _case_retry_exhaustion() -> Tuple[bool, List[str]]:
     """All 3 attempts raise; final status failed; exactly 2 retrying events before failed."""
     failures: List[str] = []
     mock_db_ops = MockDbOps()
-    orchestrator = MockOrchestrator(
-        [
-            ("raise", RuntimeError("fail 1")),
-            ("raise", RuntimeError("fail 2")),
-            ("raise", RuntimeError("fail 3")),
-        ]
-    )
+    responses = [
+        ("raise", RuntimeError("fail 1")),
+        ("raise", RuntimeError("fail 2")),
+        ("raise", RuntimeError("fail 3")),
+    ]
+    shared_index = [0]
+    shared_lock = threading.Lock()
+    orchestrator = MockOrchestrator(responses, shared_index, shared_lock)
     store = InMemoryRunStore()
-    service = RuntimeService(orchestrator=orchestrator, run_store=store)
+    service = RuntimeService(
+        orchestrator=orchestrator,
+        orchestrator_factory=build_factory(
+            MockOrchestrator, responses, shared_index, shared_lock
+        ),
+        run_store=store,
+    )
 
-    with patch("backend.database.operations.db_ops", mock_db_ops):
-        sub = await service.submit_run(RuntimeRequest("hello", "conv-exhaust"))
-        run_id = sub["run_id"]
-        status = await _wait_terminal(service, run_id)
+    try:
+        with patch("backend.database.operations.db_ops", mock_db_ops):
+            sub = await service.submit_run(RuntimeRequest("hello", "conv-exhaust"))
+            run_id = sub["run_id"]
+            status = await _wait_terminal(service, run_id)
 
-        if status["status"] != RUN_STATUS_FAILED:
-            failures.append(
-                f"expected terminal status '{RUN_STATUS_FAILED}', got '{status['status']}'"
-            )
+            if status["status"] != RUN_STATUS_FAILED:
+                failures.append(
+                    f"expected terminal status '{RUN_STATUS_FAILED}', got '{status['status']}'"
+                )
 
-        event_types = await _get_event_types(service, run_id)
+            event_types = await _get_event_types(service, run_id)
 
-        retrying_count = event_types.count(RUN_EVENT_RETRYING)
-        if retrying_count != 2:
-            failures.append(
-                f"expected exactly 2 '{RUN_EVENT_RETRYING}' events, got {retrying_count} "
-                f"(events={event_types})"
-            )
+            retrying_count = event_types.count(RUN_EVENT_RETRYING)
+            if retrying_count != 2:
+                failures.append(
+                    f"expected exactly 2 '{RUN_EVENT_RETRYING}' events, got {retrying_count} "
+                    f"(events={event_types})"
+                )
 
-        if not event_types or event_types[-1] != RUN_EVENT_FAILED:
-            failures.append(
-                f"expected last event to be '{RUN_EVENT_FAILED}', got events={event_types}"
-            )
+            if not event_types or event_types[-1] != RUN_EVENT_FAILED:
+                failures.append(
+                    f"expected last event to be '{RUN_EVENT_FAILED}', got events={event_types}"
+                )
 
-    return len(failures) == 0, failures
+        return len(failures) == 0, failures
+    finally:
+        await service.shutdown()
 
 
 async def _case_session_isolation_different_sessions() -> Tuple[bool, List[str]]:
     """Two concurrent runs in different sessions both reach succeeded."""
     failures: List[str] = []
     mock_db_ops = MockDbOps()
-    orchestrator = MockOrchestrator(
-        [
-            ("success", "result-A"),
-            ("success", "result-B"),
-        ]
-    )
+    responses = [
+        ("success", "result-A"),
+        ("success", "result-B"),
+    ]
+    shared_index = [0]
+    shared_lock = threading.Lock()
+    orchestrator = MockOrchestrator(responses, shared_index, shared_lock)
     store = InMemoryRunStore()
-    service = RuntimeService(orchestrator=orchestrator, run_store=store)
+    service = RuntimeService(
+        orchestrator=orchestrator,
+        orchestrator_factory=build_factory(
+            MockOrchestrator, responses, shared_index, shared_lock
+        ),
+        run_store=store,
+    )
 
-    with patch("backend.database.operations.db_ops", mock_db_ops):
-        sub_a = await service.submit_run(RuntimeRequest("hello", "conv-diff-A"))
-        sub_b = await service.submit_run(RuntimeRequest("hello", "conv-diff-B"))
+    try:
+        with patch("backend.database.operations.db_ops", mock_db_ops):
+            sub_a = await service.submit_run(RuntimeRequest("hello", "conv-diff-A"))
+            sub_b = await service.submit_run(RuntimeRequest("hello", "conv-diff-B"))
 
-        status_a, status_b = await asyncio.gather(
-            _wait_terminal(service, sub_a["run_id"]),
-            _wait_terminal(service, sub_b["run_id"]),
-        )
+            status_a, status_b = await asyncio.gather(
+                _wait_terminal(service, sub_a["run_id"]),
+                _wait_terminal(service, sub_b["run_id"]),
+            )
 
-        for label, status in [("conv-diff-A", status_a), ("conv-diff-B", status_b)]:
-            if status["status"] != RUN_STATUS_SUCCEEDED:
-                failures.append(
-                    f"{label}: expected '{RUN_STATUS_SUCCEEDED}', got '{status['status']}'"
-                )
+            for label, status in [("conv-diff-A", status_a), ("conv-diff-B", status_b)]:
+                if status["status"] != RUN_STATUS_SUCCEEDED:
+                    failures.append(
+                        f"{label}: expected '{RUN_STATUS_SUCCEEDED}', got '{status['status']}'"
+                    )
 
-    return len(failures) == 0, failures
+        return len(failures) == 0, failures
+    finally:
+        await service.shutdown()
 
 
 async def _case_session_isolation_same_session_blocked() -> Tuple[bool, List[str]]:
@@ -400,59 +475,146 @@ async def _case_session_isolation_same_session_blocked() -> Tuple[bool, List[str
     mock_db_ops = MockDbOps()
 
     # Run 1 blocks until we release it; run 2 must exhaust all lease retries and fail
-    proceed_event = asyncio.Event()
+    proceed_event = threading.Event()
 
     class BlockingOrchestrator:
         def create_conversation(self) -> str:
             return str(uuid4())
 
         async def process_request(self, **kwargs: Any) -> Dict[str, Any]:
-            await proceed_event.wait()
+            if not proceed_event.wait(timeout=10.0):
+                raise TimeoutError("timed out waiting to release blocking orchestrator")
             return {"error": False, "response": "run1 ok", "orchestration_actions": []}
 
+        async def generate_conversation_title(self, conversation_id: str) -> Optional[str]:
+            return None
+
+        async def maybe_summarise_conversation(
+            self, conversation_id: str, **kwargs: Any
+        ) -> bool:
+            return False
+
     store = InMemoryRunStore()
-    service = RuntimeService(orchestrator=BlockingOrchestrator(), run_store=store)
+    service = RuntimeService(
+        orchestrator=BlockingOrchestrator(),
+        orchestrator_factory=build_factory(BlockingOrchestrator),
+        run_store=store,
+    )
 
-    with patch("backend.database.operations.db_ops", mock_db_ops):
-        sub1 = await service.submit_run(RuntimeRequest("hello 1", "conv-shared"))
-        run1_id = sub1["run_id"]
+    try:
+        with patch("backend.database.operations.db_ops", mock_db_ops):
+            sub1 = await service.submit_run(RuntimeRequest("hello 1", "conv-shared"))
+            run1_id = sub1["run_id"]
 
-        # Wait until run1 has acquired the lease (status transitions to running)
-        # before submitting run2. Without this, asyncio may schedule run2's background
-        # task before run1's, letting run2 win the lease and inverting the assertions.
-        deadline = time.monotonic() + 5.0
-        while time.monotonic() < deadline:
-            s = await service.get_run_status(run1_id)
-            if s["status"] not in {"queued"}:
-                break
-            await asyncio.sleep(0.01)
+            # Wait until run1 has acquired the lease (status transitions to running)
+            # before submitting run2. Without this, asyncio may schedule run2's background
+            # task before run1's, letting run2 win the lease and inverting the assertions.
+            deadline = time.monotonic() + 5.0
+            while time.monotonic() < deadline:
+                s = await service.get_run_status(run1_id)
+                if s["status"] not in {"queued"}:
+                    break
+                await asyncio.sleep(0.01)
 
-        sub2 = await service.submit_run(RuntimeRequest("hello 2", "conv-shared"))
-        run2_id = sub2["run_id"]
+            sub2 = await service.submit_run(RuntimeRequest("hello 2", "conv-shared"))
+            run2_id = sub2["run_id"]
 
-        # Wait for run 2 to exhaust its lease acquisition retries and fail
-        # (backoff policy in _acquire_lease_with_retry determines how long this takes)
-        status2 = await _wait_terminal(service, run2_id, timeout=10.0)
+            # Wait for run 2 to exhaust its lease acquisition retries and fail
+            # (backoff policy in _acquire_lease_with_retry determines how long this takes)
+            status2 = await _wait_terminal(service, run2_id, timeout=10.0)
 
-        # Now let run 1 proceed and complete
-        proceed_event.set()
-        status1 = await _wait_terminal(service, run1_id, timeout=5.0)
+            # Now let run 1 proceed and complete
+            proceed_event.set()
+            status1 = await _wait_terminal(service, run1_id, timeout=5.0)
 
-        if status1["status"] != RUN_STATUS_SUCCEEDED:
-            failures.append(
-                f"run1: expected '{RUN_STATUS_SUCCEEDED}', got '{status1['status']}'"
-            )
+            if status1["status"] != RUN_STATUS_SUCCEEDED:
+                failures.append(
+                    f"run1: expected '{RUN_STATUS_SUCCEEDED}', got '{status1['status']}'"
+                )
 
-        if status2["status"] != RUN_STATUS_FAILED:
-            failures.append(
-                f"run2: expected '{RUN_STATUS_FAILED}', got '{status2['status']}'"
-            )
-        if status2.get("error") != SESSION_BUSY_MESSAGE:
-            failures.append(
-                f"run2: expected error '{SESSION_BUSY_MESSAGE}', got '{status2.get('error')}'"
-            )
+            if status2["status"] != RUN_STATUS_FAILED:
+                failures.append(
+                    f"run2: expected '{RUN_STATUS_FAILED}', got '{status2['status']}'"
+                )
+            if status2.get("error") != SESSION_BUSY_MESSAGE:
+                failures.append(
+                    f"run2: expected error '{SESSION_BUSY_MESSAGE}', got '{status2.get('error')}'"
+                )
 
-    return len(failures) == 0, failures
+        return len(failures) == 0, failures
+    finally:
+        await service.shutdown()
+
+
+async def _case_event_loop_responsive_during_blocking_orchestration() -> Tuple[bool, List[str]]:
+    """Status polling stays responsive while a blocking attempt runs in the executor."""
+    failures: List[str] = []
+    mock_db_ops = MockDbOps()
+    started_event = threading.Event()
+
+    class BlockingOrchestrator:
+        def create_conversation(self) -> str:
+            return str(uuid4())
+
+        async def process_request(self, **kwargs: Any) -> Dict[str, Any]:
+            started_event.set()
+            time.sleep(0.35)
+            return {"error": False, "response": "run ok", "orchestration_actions": []}
+
+        async def generate_conversation_title(self, conversation_id: str) -> Optional[str]:
+            return None
+
+        async def maybe_summarise_conversation(self, conversation_id: str, **kwargs: Any) -> bool:
+            return False
+
+    store = InMemoryRunStore()
+    service = RuntimeService(
+        orchestrator=BlockingOrchestrator(),
+        orchestrator_factory=BlockingOrchestrator,
+        orchestration_max_workers=1,
+        run_store=store,
+    )
+
+    try:
+        with patch("backend.database.operations.db_ops", mock_db_ops):
+            sub = await service.submit_run(RuntimeRequest("hello", "conv-responsive"))
+            run_id = sub["run_id"]
+
+            deadline = time.monotonic() + 1.0
+            while time.monotonic() < deadline:
+                status = await service.get_run_status(run_id)
+                if status["status"] == "running" and started_event.is_set():
+                    break
+                await asyncio.sleep(0.01)
+            else:
+                failures.append("run did not reach running state before responsiveness polling")
+
+            max_latency = 0.0
+            for _ in range(5):
+                started = time.perf_counter()
+                status = await asyncio.wait_for(service.get_run_status(run_id), timeout=0.1)
+                latency = time.perf_counter() - started
+                max_latency = max(max_latency, latency)
+                if status["status"] not in {"running", RUN_STATUS_SUCCEEDED}:
+                    failures.append(
+                        f"expected status polling during run to return running/succeeded, got '{status['status']}'"
+                    )
+                await asyncio.sleep(0.01)
+
+            if max_latency >= 0.1:
+                failures.append(
+                    f"expected max status polling latency < 0.1s, got {max_latency:.3f}s"
+                )
+
+            status = await _wait_terminal(service, run_id)
+            if status["status"] != RUN_STATUS_SUCCEEDED:
+                failures.append(
+                    f"expected terminal status '{RUN_STATUS_SUCCEEDED}', got '{status['status']}'"
+                )
+
+        return len(failures) == 0, failures
+    finally:
+        await service.shutdown()
 
 
 # ---------------------------------------------------------------------------
@@ -475,6 +637,11 @@ EVAL_CASES: List[EvalCase] = [
         "runtime",
         "session_isolation_same_session_blocked",
         _case_session_isolation_same_session_blocked,
+    ),
+    (
+        "runtime",
+        "event_loop_responsive_during_blocking_orchestration",
+        _case_event_loop_responsive_during_blocking_orchestration,
     ),
 ]
 
