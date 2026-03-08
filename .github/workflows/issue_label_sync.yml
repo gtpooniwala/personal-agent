@@ -51,6 +51,21 @@ jobs:
             }
 
             const managedPrefixes = ["priority:", "size:", "type:", "track:"];
+            const managedLabels = new Set([
+              "priority:p0",
+              "priority:p1",
+              "priority:p2",
+              "priority:p3",
+              "size:S",
+              "size:M",
+              "size:L",
+              "type:architecture",
+              "type:security",
+              "type:cleanup",
+              "type:improvement",
+              "type:ops",
+              "track:migration",
+            ]);
             const currentLabels = issue.labels.map((label) => label.name);
 
             const desiredLabels = new Set();
@@ -74,38 +89,43 @@ jobs:
               return;
             }
 
-            for (const value of [priority, size, primaryType]) {
-              if (value) {
-                desiredLabels.add(value);
+            function addManagedLabel(value) {
+              if (!value) {
+                return;
               }
+
+              if (managedLabels.has(value)) {
+                desiredLabels.add(value);
+                return;
+              }
+
+              core.warning(`Ignoring unknown managed label value: ${value}`);
+            }
+
+            for (const value of [priority, size, primaryType]) {
+              addManagedLabel(value);
             }
 
             for (const value of [...additionalTypes, ...tracks]) {
-              if (value) {
-                desiredLabels.add(value);
-              }
+              addManagedLabel(value);
             }
 
-            const labelsToRemove = currentLabels.filter((label) =>
-              managedPrefixes.some((prefix) => label.startsWith(prefix)) && !desiredLabels.has(label)
+            const nonManagedLabels = currentLabels.filter(
+              (label) => !managedPrefixes.some((prefix) => label.startsWith(prefix))
             );
+            const finalLabels = [...nonManagedLabels, ...desiredLabels];
+            const currentLabelSet = new Set(currentLabels);
+            const finalLabelSet = new Set(finalLabels);
+            const labelsChanged =
+              currentLabelSet.size !== finalLabelSet.size ||
+              currentLabels.some((label) => !finalLabelSet.has(label)) ||
+              finalLabels.some((label) => !currentLabelSet.has(label));
 
-            const labelsToAdd = Array.from(desiredLabels).filter((label) => !currentLabels.includes(label));
-
-            if (labelsToRemove.length > 0) {
-              await github.rest.issues.removeLabels({
+            if (labelsChanged) {
+              await github.rest.issues.setLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issue.number,
-                labels: labelsToRemove,
-              });
-            }
-
-            if (labelsToAdd.length > 0) {
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issue.number,
-                labels: labelsToAdd,
+                labels: finalLabels,
               });
             }
