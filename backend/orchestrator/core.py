@@ -189,28 +189,6 @@ class CoreOrchestrator:
                 # Save user message to database
                 db_ops.save_message(conversation_id, "user", user_request)
 
-                no_document_response = self._maybe_short_circuit_unselected_document_request(
-                    user_request=user_request,
-                    selected_documents=selected_documents,
-                )
-                if no_document_response is not None:
-                    db_ops.save_message(conversation_id, "assistant", no_document_response)
-                    update_observation(
-                        operation_observation,
-                        output={
-                            "tool_actions_count": 0,
-                            "token_usage": None,
-                            "fallback_used": False,
-                            "short_circuit": "no_selected_documents",
-                        },
-                    )
-                    return {
-                        "response": no_document_response,
-                        "conversation_id": conversation_id,
-                        "orchestration_actions": [],
-                        "token_usage": None,
-                    }
-
                 # Use condensed conversation history for agent context
                 condensed_history = self.get_condensed_conversation_history(conversation_id)
                 messages = self._build_langgraph_messages(condensed_history)
@@ -227,8 +205,12 @@ class CoreOrchestrator:
                     ) as invoke_observation:
                         config = {"configurable": {"thread_id": conversation_id}}
                         result = run_agent.invoke({"messages": messages}, config=config)
-                        orchestration_actions = self._extract_langgraph_actions(result["messages"]) if result and "messages" in result else []
-                        tool_results = orchestration_actions if orchestration_actions else []
+                        orchestration_actions = (
+                            self._extract_langgraph_actions(result["messages"])
+                            if result and "messages" in result
+                            else []
+                        ) or []
+                        tool_results = orchestration_actions
                         response_agent_tool = run_registry.get_tool("response_agent")
                         if response_agent_tool:
                             # Use condensed history for response agent as well
@@ -254,24 +236,16 @@ class CoreOrchestrator:
                     logger.warning(f"LangGraph agent processing failed: {str(e)}")
                     increment_counter("orchestrator.fallback_total")
                     fallback_used = True
-                    orchestration_actions = self._run_rule_based_fallback(user_request, run_registry)
-                    if orchestration_actions:
-                        response_agent_tool = run_registry.get_tool("response_agent")
-                        if response_agent_tool:
-                            conversation_history = self.get_condensed_conversation_history(conversation_id)
-                            response = response_agent_tool._run(
-                                user_query=user_request,
-                                tool_results=orchestration_actions,
-                                conversation_history=conversation_history
-                            )
-                        else:
-                            response = orchestration_actions[-1].get("output", "")
-                    else:
-                        response = await self._generate_direct_response(
-                            user_request=user_request,
-                            conversation_history=condensed_history,
-                        )
-                        orchestration_actions = []
+                    # Normal tool selection belongs to the model from the currently
+                    # bound tool set. If orchestration fails catastrophically, fall
+                    # back to an honest direct response rather than switching to a
+                    # second handwritten routing policy. Retry behavior is tracked
+                    # separately from this ownership cleanup.
+                    response = await self._generate_direct_response(
+                        user_request=user_request,
+                        conversation_history=condensed_history,
+                    )
+                    orchestration_actions = []
 
                 for action in orchestration_actions or []:
                     tool_name = action.get("tool", "unknown")
@@ -279,6 +253,13 @@ class CoreOrchestrator:
                     increment_counter(f"orchestrator.tool_calls.{tool_name}.total")
                 if token_usage:
                     increment_counter("orchestrator.token_usage_total", amount=int(token_usage))
+
+                response = self._enforce_capability_boundaries(
+                    response=response,
+                    user_request=user_request,
+                    tool_registry=run_registry,
+                    orchestration_actions=orchestration_actions,
+                )
 
                 update_observation(
                     operation_observation,
@@ -428,130 +409,60 @@ class CoreOrchestrator:
         )
         return await predict_text(self.llm, prompt)
 
-    def _maybe_short_circuit_unselected_document_request(
-        self,
-        *,
-        user_request: str,
-        selected_documents: Optional[List[str]],
-    ) -> Optional[str]:
-        """Return explicit guidance when the user asks about docs but none are selected."""
-        if selected_documents is None or len(selected_documents) > 0:
-            return None
-
-        query = (user_request or "").strip().lower()
-        document_intent = self._has_document_intent(query)
-        if not document_intent:
-            return None
-
-        return self._build_no_selected_documents_response(user_request)
-
     def _has_document_intent(self, query: str) -> bool:
         return DOCUMENT_INTENT_PATTERN.search((query or "").lower()) is not None
 
     def _build_no_selected_documents_response(self, user_request: str) -> str:
-        """Keep fallback guidance explicit while acknowledging the requested document topic."""
-        query = (user_request or "").strip()
-        query_lower = query.lower()
-
+        query_lower = (user_request or "").strip().lower()
         if "contract" in query_lower:
             return f"I can't answer what your contract says because {NO_SELECTED_DOCUMENTS_MESSAGE}"
+        return (
+            "I can't answer questions about your uploaded documents because "
+            f"{NO_SELECTED_DOCUMENTS_MESSAGE}"
+        )
 
-        return f"I can't answer questions about your uploaded documents because {NO_SELECTED_DOCUMENTS_MESSAGE}"
+    def _document_capability_boundary_response(
+        self,
+        *,
+        user_request: str,
+        tool_registry: ToolRegistry,
+        orchestration_actions: Optional[List[Dict[str, Any]]],
+    ) -> Optional[str]:
+        if tool_registry.get_tool("search_documents") is not None:
+            return None
+        if not self._has_document_intent(user_request):
+            return None
+        if any(action.get("tool") == "search_documents" for action in orchestration_actions or []):
+            return None
+        return self._build_no_selected_documents_response(user_request)
 
-    def _run_rule_based_fallback(self, user_request: str, tool_registry: ToolRegistry) -> Optional[List[Dict[str, Any]]]:
-        """
-        Deterministic fallback routing when graph execution fails.
-        Keeps common intents functional even if model/tool runtime has transient issues.
-        """
-        actions: List[Dict[str, Any]] = []
-        query = (user_request or "").strip()
-        query_lower = query.lower()
+    def _enforce_capability_boundaries(
+        self,
+        *,
+        response: str,
+        user_request: str,
+        tool_registry: ToolRegistry,
+        orchestration_actions: Optional[List[Dict[str, Any]]],
+    ) -> str:
+        document_boundary = self._document_capability_boundary_response(
+            user_request=user_request,
+            tool_registry=tool_registry,
+            orchestration_actions=orchestration_actions,
+        )
+        if document_boundary is None:
+            return response
 
-        math_expression = self._extract_math_expression(query)
-        calculator_tool = tool_registry.get_tool("calculator")
-        if math_expression and calculator_tool:
-            with observe_operation(
-                name="orchestrator.fallback.calculator",
-                counter_prefix="orchestrator.fallback.calculator",
-                as_type="tool",
-                input_data={"expression": math_expression},
-                metadata={"component": "orchestrator", "fallback": True},
-            ):
-                output = calculator_tool._run(expression=math_expression)
-                actions.append({
-                    "tool": "calculator",
-                    "input": json.dumps({"expression": math_expression}, ensure_ascii=False),
-                    "output": output,
-                })
+        response_text = (response or "").strip()
+        if NO_SELECTED_DOCUMENTS_MESSAGE.lower() in response_text.lower():
+            return response
 
-        current_time_tool = tool_registry.get_tool("current_time")
-        if any(token in query_lower for token in ("time", "date", "day")) and current_time_tool:
-            with observe_operation(
-                name="orchestrator.fallback.current_time",
-                counter_prefix="orchestrator.fallback.current_time",
-                as_type="tool",
-                input_data={"query_chars": len(query)},
-                metadata={"component": "orchestrator", "fallback": True},
-            ):
-                output = current_time_tool._run(query=query)
-                actions.append({
-                    "tool": "current_time",
-                    "input": json.dumps({"query": query}, ensure_ascii=False),
-                    "output": output,
-                })
-
-        document_intent = self._has_document_intent(query_lower)
-        if document_intent:
-            search_tool = tool_registry._tools.get("search_documents")
-            with observe_operation(
-                name="orchestrator.fallback.search_documents",
-                counter_prefix="orchestrator.fallback.search_documents",
-                as_type="tool",
-                input_data={"query_chars": len(query), "max_results": 3},
-                metadata={"component": "orchestrator", "fallback": True},
-            ):
-                if search_tool:
-                    output = search_tool._run(query=query, max_results=3)
-                else:
-                    output = self._build_no_selected_documents_response(query)
-                actions.append({
-                    "tool": "search_documents",
-                    "input": json.dumps({"query": query, "max_results": 3}, ensure_ascii=False),
-                    "output": output,
-                })
-
-        internet_intent = any(token in query_lower for token in ("internet", "latest", "news", "headline", "headlines", "search the internet"))
-        internet_search_tool = tool_registry.get_tool("internet_search")
-        if internet_intent and internet_search_tool:
-            with observe_operation(
-                name="orchestrator.fallback.internet_search",
-                counter_prefix="orchestrator.fallback.internet_search",
-                as_type="tool",
-                input_data={"query_chars": len(query), "provider": "duckduckgo"},
-                metadata={"component": "orchestrator", "fallback": True},
-            ):
-                output = internet_search_tool._run(query=query, provider="duckduckgo")
-                actions.append({
-                    "tool": "internet_search",
-                    "input": json.dumps({"query": query, "provider": "duckduckgo"}, ensure_ascii=False),
-                    "output": output,
-                })
-
-        return actions if actions else None
-
-    def _extract_math_expression(self, query: str) -> Optional[str]:
-        """Extract likely arithmetic expression from free text user input."""
-        candidates = re.findall(r"[\d\.\s\+\-\*\/\(\)]{3,}", query)
-        for candidate in candidates:
-            expression = candidate.strip()
-            if not expression:
-                continue
-            if not re.search(r"\d", expression):
-                continue
-            if not re.search(r"[\+\-\*\/]", expression):
-                continue
-            return expression
-        return None
+        other_tool_actions = [
+            action for action in (orchestration_actions or [])
+            if action.get("tool") != "search_documents"
+        ]
+        if other_tool_actions and response_text:
+            return f"{response_text}\n\n{document_boundary}"
+        return document_boundary
 
     def _extract_langgraph_actions(self, messages: List) -> Optional[List[Dict[str, Any]]]:
         """

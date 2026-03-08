@@ -77,12 +77,12 @@ Use when:
 
 Deterministic harness:
 ```bash
-python tests/run_llm_evals.py --mode mock
+python3 tests/run_llm_evals.py --mode mock
 ```
 
 Live run:
 ```bash
-python tests/run_llm_evals.py --mode live
+python3 tests/run_llm_evals.py --mode live
 ```
 
 Artifacts:
@@ -92,13 +92,13 @@ Artifacts:
 ## Environment Notes
 - `TEST_DATABASE_URL` should point to a dedicated destructive test database.
 - `EVAL_DATABASE_URL` should point to a dedicated evaluation database.
-- Live LLM evals need provider credentials and will report `blocked` if the key is missing.
+- Live LLM evals need provider credentials and a reachable PostgreSQL test/eval database, and will report `blocked` if prerequisites are missing.
 
 ## Minimum Honest Validation By Change Type
 - Docs-only updates: `python tests/run_repo_checks.py`
 - General backend change: `scripts/run_local_checks.sh`
 - Runtime/orchestrator change: `scripts/run_local_checks.sh` plus `python tests/run_runtime_evals.py`
-- Prompt/tool-routing change: `scripts/run_local_checks.sh` plus `python tests/run_llm_evals.py --mode mock`
+- Prompt/tool-routing change: `scripts/run_local_checks.sh` plus `python3 tests/run_llm_evals.py --mode mock`
 
 ## Reporting In PRs
 Include:

@@ -95,7 +95,8 @@ class ToolRegistry:
         """
         Get list of tools that should be available to the orchestrator.
         """
-        # Always include all core tools
+        # This is capability gating only. The model owns normal tool selection
+        # from the tools exposed here.
         available_tools = ["calculator", "current_time", "scratchpad", "internet_search", "user_profile"]
         if "gmail_read" in self._tools:
             available_tools.append("gmail_read")

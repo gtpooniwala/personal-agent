@@ -34,8 +34,10 @@ scripts/sync_main.sh
 
 ### Prompt, orchestration, or tool-routing changes
 - run the relevant deterministic tests
-- run `python tests/run_llm_evals.py --mode mock`
+- run `python3 tests/run_llm_evals.py --mode mock`
 - run live evals when the behavior change is meaningful and credentials are available
+  - `python3 tests/run_llm_evals.py --mode live`
+  - if you are using Docker Compose Postgres, use `TEST_DATABASE_URL` / `EVAL_DATABASE_URL` on `127.0.0.1:5433`
 
 ### Runtime changes
 - run runtime-specific tests and `python tests/run_runtime_evals.py`

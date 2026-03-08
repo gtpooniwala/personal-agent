@@ -36,7 +36,8 @@ This file is a capability inventory, not a marketing snapshot. It lists what exi
 
 ## Current Maturity Notes
 - The runtime contract itself is real and usable.
-- Tool selection is still partly split between LLM behavior and deterministic fallback branches.
+- Normal tool selection is owned by the orchestrator LLM from the currently exposed tool set.
+- Deterministic code is limited to capability gating and honest failure boundaries.
 - Some background work is still in-process rather than durable.
 - Streaming updates are not implemented yet; the UI relies on polling.
 

@@ -19,7 +19,7 @@ echo "Installing backend dependencies..."
 "${VENV_PY}" -m pip install -r backend/requirements.txt
 
 echo "Running guarded unit tests..."
-TEST_DB_URL="${TEST_DATABASE_URL:-postgresql+psycopg://personal_agent:personal_agent@127.0.0.1:5432/personal_agent_test}"
+TEST_DB_URL="${TEST_DATABASE_URL:-postgresql+psycopg://personal_agent:personal_agent@127.0.0.1:5433/personal_agent_test}"
 export TEST_DATABASE_URL="${TEST_DB_URL}"
 export DATABASE_URL="${TEST_DB_URL}"
 "${VENV_PY}" - <<'PY'

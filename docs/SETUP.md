@@ -26,8 +26,8 @@ Useful database variables:
 ```env
 DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent
 DATABASE_URL_DOCKER=postgresql+psycopg://personal_agent:personal_agent@postgres:5432/personal_agent
-TEST_DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent_test
-EVAL_DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent_test
+TEST_DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5433/personal_agent_test
+EVAL_DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5433/personal_agent_test
 ```
 
 Optional observability:
@@ -94,13 +94,19 @@ python3 tests/run_runtime_evals.py
 If you changed prompt behavior or tool-calling behavior, also run:
 ```bash
 python3 tests/run_llm_evals.py --mode mock
+python3 tests/run_llm_evals.py --mode live
 ```
+
+Live eval notes:
+- `python3` is fine; the harness re-execs into the repo `.venv` automatically when needed
+- if you are using Docker Compose Postgres, keep `TEST_DATABASE_URL` and `EVAL_DATABASE_URL` on `localhost:5433`
+- the live harness can create the dedicated `*_test` / `*_eval` database once the Postgres server itself is reachable
 
 ## Common Problems
 
 ### Database connection failures
 ```bash
-pg_isready -h localhost -p 5432 -U personal_agent -d personal_agent
+pg_isready -h localhost -p 5433 -U personal_agent -d personal_agent
 ```
 
 ### Port already in use
