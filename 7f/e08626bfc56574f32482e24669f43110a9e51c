@@ -1,0 +1,27 @@
+docs/WORKBOARD.md
+  ff363d32692b1821 3,52,55-58,60-61,68
+docs/DEPLOYMENT.md
+  ff363d32692b1821 3,8,12-15,17-22,46-49,51,53,60,62,70,72,89,91,93,95,97,110,117,119,121-126,128,130,132-133,136,138,140-145,147,153,155,157,159-160,162,169-171,178-187,193-195,197-199,211-212,215-217
+docs/ROADMAP.md
+  ff363d32692b1821 3,49-50,76-80,83-92,120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "7fe08626bfc56574f32482e24669f43110a9e51c",
+  "prompts": {
+    "ff363d32692b1821": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1e4e96c6-88b6-4d33-b0c1-eb24965c6e3a",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 6,
+      "accepted_lines": 107,
+      "overriden_lines": 0
+    }
+  }
+}
