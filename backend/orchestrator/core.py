@@ -3,7 +3,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
@@ -41,8 +41,8 @@ class OrchestratorRunContext:
 
     user_request: str
     conversation_id: str
-    selected_documents: List[str]
-    condensed_history: List[Dict[str, Any]]
+    selected_documents: Tuple[str, ...]
+    condensed_history: Tuple[Dict[str, Any], ...]
     llm: Any
     run_registry: ToolRegistry
     run_agent: Any
@@ -98,7 +98,8 @@ class CoreOrchestrator:
         available_tools = tool_registry.get_available_tools()
         document_context = self._get_document_context(tool_registry)
         system_prompt = build_orchestrator_system_prompt(self._format_document_status(document_context))
-        llm = llm or self._ensure_llm()
+        if llm is None:
+            llm = self._ensure_llm()
         return create_react_agent(
             model=llm,
             tools=available_tools,
@@ -126,8 +127,8 @@ class CoreOrchestrator:
         return OrchestratorRunContext(
             user_request=user_request,
             conversation_id=conversation_id,
-            selected_documents=selected_documents,
-            condensed_history=condensed_history,
+            selected_documents=tuple(selected_documents),
+            condensed_history=tuple(condensed_history),
             llm=llm,
             run_registry=run_registry,
             run_agent=run_agent,
@@ -142,10 +143,13 @@ class CoreOrchestrator:
     ) -> str:
         response_agent_tool = context.run_registry.get_tool("response_agent")
         if response_agent_tool:
-            return response_agent_tool._run(
+            # Foreground orchestration runs in the worker-thread execution plane,
+            # so response synthesis stays on the same synchronous path as graph
+            # execution rather than mixing loop-bound async clients into shared tools.
+            return response_agent_tool.synthesize(
                 user_query=context.user_request,
                 tool_results=orchestration_actions,
-                conversation_history=context.condensed_history,
+                conversation_history=list(context.condensed_history),
             )
 
         if agent_result and "messages" in agent_result:
@@ -264,6 +268,7 @@ class CoreOrchestrator:
                 messages = self._build_langgraph_messages(context.condensed_history)
                 token_usage = None
                 fallback_used = False
+                executed_actions: List[Dict[str, Any]] = []
                 orchestration_actions: List[Dict[str, Any]] = []
                 try:
                     with observe_operation(
@@ -281,6 +286,7 @@ class CoreOrchestrator:
                             if result and "messages" in result
                             else []
                         ) or []
+                        executed_actions = list(orchestration_actions)
                         response = self._compose_response(
                             context=context,
                             agent_result=result,
@@ -306,8 +312,9 @@ class CoreOrchestrator:
                         user_request=user_request,
                         conversation_history=context.condensed_history,
                     )
+                    orchestration_actions = []
 
-                for action in orchestration_actions or []:
+                for action in executed_actions or []:
                     tool_name = action.get("tool", "unknown")
                     increment_counter("orchestrator.tool_calls_total")
                     increment_counter(f"orchestrator.tool_calls.{tool_name}.total")
@@ -324,7 +331,7 @@ class CoreOrchestrator:
                 update_observation(
                     operation_observation,
                     output={
-                        "tool_actions_count": len(orchestration_actions or []),
+                        "tool_actions_count": len(executed_actions or []),
                         "token_usage": token_usage,
                         "fallback_used": fallback_used,
                     },
@@ -464,7 +471,8 @@ class CoreOrchestrator:
         conversation_history: Optional[List[Dict[str, Any]]] = None,
     ) -> str:
         """Fallback direct response when the graph cannot complete and no tool route applies."""
-        llm = llm or self._ensure_llm()
+        if llm is None:
+            llm = self._ensure_llm()
         prompt = build_direct_response_prompt(
             user_request=user_request,
             conversation_history=conversation_history,
@@ -566,7 +574,6 @@ class CoreOrchestrator:
                     except Exception:
                         pass
                     if isinstance(tool_input, dict):
-                        import json
                         tool_input_pretty = json.dumps(tool_input, ensure_ascii=False, indent=2)
                     else:
                         tool_input_pretty = str(tool_input)
@@ -608,7 +615,7 @@ class CoreOrchestrator:
         Returns the generated title string, or None if generation was skipped or failed.
         """
         try:
-            self._ensure_llm()
+            llm = self._ensure_llm()
 
             # Skip if the conversation already has a real title (idempotency guard).
             already_titled = not await asyncio.to_thread(
@@ -629,7 +636,7 @@ class CoreOrchestrator:
             )
             title_prompt = build_title_prompt(conversation_context)
 
-            title = await predict_text(self.llm, title_prompt)
+            title = await predict_text(llm, title_prompt)
             title = title.strip().strip('"\'').strip()
 
             if len(title) > _TITLE_MAX_LENGTH:

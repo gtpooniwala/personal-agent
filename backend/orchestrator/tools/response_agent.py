@@ -60,3 +60,17 @@ class ResponseAgentTool(BaseTool):
         }
         response = self._chain.invoke(inputs)
         return response.content if hasattr(response, "content") else str(response)
+
+    def synthesize(
+        self,
+        *,
+        user_query: str,
+        tool_results: List[Dict[str, Any]],
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+    ) -> str:
+        """Public synchronous wrapper for worker-thread response synthesis."""
+        return self._run(
+            user_query=user_query,
+            tool_results=tool_results,
+            conversation_history=conversation_history,
+        )
