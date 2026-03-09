@@ -1,0 +1,23 @@
+docker-compose.yml
+  4cf49f9c967334f8 41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "7cc999f3351b6118a34c4f7b64a22cb6961f9e93",
+  "prompts": {
+    "4cf49f9c967334f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "68e4e8f8-29f8-4071-8bfc-f993df15de89",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
