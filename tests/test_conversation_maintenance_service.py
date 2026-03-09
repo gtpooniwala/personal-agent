@@ -21,6 +21,8 @@ class FakeDbOps:
         self.released = []
         self._leases = {}
         self._untitled = {}
+        self._history = {}
+        self._untitled_errors = set()
 
     def find_conversations_needing_title(self, *, delay_minutes, limit):
         return list(self.title_candidates)
@@ -42,7 +44,12 @@ class FakeDbOps:
         return False
 
     def is_conversation_untitled(self, conversation_id):
+        if conversation_id in self._untitled_errors:
+            raise RuntimeError("db down")
         return self._untitled.get(conversation_id, True)
+
+    def get_conversation_history(self, conversation_id):
+        return list(self._history.get(conversation_id, []))
 
     def delete_conversation(self, conversation_id):
         self.deleted.append(conversation_id)
@@ -112,6 +119,37 @@ class TestConversationMaintenanceService(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(
             any(
                 lease_key == "conversation-maintenance:delete:conv-empty"
+                for lease_key, _ in self.db.released
+            )
+        )
+
+    async def test_title_retry_stops_cleanly_when_state_check_fails(self):
+        self.db.title_candidates = [{"id": "conv-err"}]
+        self.db._untitled_errors.add("conv-err")
+
+        await self.service._sweep()
+        await self._drain_background_tasks()
+
+        self.orchestrator.generate_conversation_title.assert_awaited_once_with("conv-err")
+        self.assertEqual(self.db.deleted, [])
+        self.assertTrue(
+            any(
+                lease_key == "conversation-maintenance:title:conv-err"
+                for lease_key, _ in self.db.released
+            )
+        )
+
+    async def test_delete_skips_conversation_that_gained_messages(self):
+        self.db.empty_candidates = [{"id": "conv-now-active"}]
+        self.db._history["conv-now-active"] = [{"id": "msg-1", "content": "hi"}]
+
+        await self.service._sweep()
+        await self._drain_background_tasks()
+
+        self.assertEqual(self.db.deleted, [])
+        self.assertTrue(
+            any(
+                lease_key == "conversation-maintenance:delete:conv-now-active"
                 for lease_key, _ in self.db.released
             )
         )

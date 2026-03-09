@@ -186,9 +186,20 @@ class ConversationMaintenanceService:
                         if attempt == _NAMING_MAX_RETRIES:
                             return
 
-                    still_untitled = await asyncio.to_thread(
-                        db.is_conversation_untitled, conversation_id
-                    )
+                    try:
+                        still_untitled = await asyncio.to_thread(
+                            db.is_conversation_untitled, conversation_id
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Conversation title state check failed",
+                            extra={
+                                "event": "conversation_maintenance.generate_title_state_error",
+                                "conversation_id": conversation_id,
+                                "attempt": attempt,
+                            },
+                        )
+                        return
                     if not still_untitled or attempt == _NAMING_MAX_RETRIES:
                         return
 
@@ -221,6 +232,19 @@ class ConversationMaintenanceService:
                 conversation_id=conversation_id,
                 metadata={"component": "maintenance"},
             ):
+                messages = await asyncio.to_thread(
+                    db.get_conversation_history, conversation_id
+                )
+                if messages:
+                    logger.info(
+                        "Skipping deletion for conversation that is no longer empty",
+                        extra={
+                            "event": "conversation_maintenance.delete_skip_nonempty",
+                            "conversation_id": conversation_id,
+                            "message_count": len(messages),
+                        },
+                    )
+                    return
                 await asyncio.to_thread(db.delete_conversation, conversation_id)
         except Exception:
             logger.exception(
