@@ -1,0 +1,35 @@
+frontend/tests/runStream.test.js
+  9063423eb0b6240c 1-176
+frontend/jest.setup.js
+  9063423eb0b6240c 6-42
+docs/WORKBOARD.md
+  9063423eb0b6240c 3,24-25,30-31,84-85
+docs/ROADMAP.md
+  9063423eb0b6240c 3,26-29,41,43,68
+frontend/tests/sendMessage.test.jsx
+  9063423eb0b6240c 6-13,32,49-58,249,299-350
+frontend/components/WorkspaceApp.jsx
+  9063423eb0b6240c 10,151,426,496-499,503-504,506,508-513,517-526,535-536,539-540,546-547,550,553-597,599,612-613,870-873
+frontend/lib/runStream.js
+  9063423eb0b6240c 1-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "073f2dbf84d0cfea427a32220e24b9c39d8e402a",
+  "prompts": {
+    "9063423eb0b6240c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4fd65edf-1354-412d-a7be-b54532fe3c7e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 25,
+      "total_deletions": 12,
+      "accepted_lines": 459,
+      "overriden_lines": 0
+    }
+  }
+}
