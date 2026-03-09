@@ -17,6 +17,7 @@ fi
 echo "Installing backend dependencies..."
 "${VENV_PY}" -m pip install --upgrade pip
 "${VENV_PY}" -m pip install -r backend/requirements.txt
+"${VENV_PY}" -m pip install -r backend/requirements-dev.txt
 
 echo "Running guarded unit tests..."
 TEST_DB_URL="${TEST_DATABASE_URL:-postgresql+psycopg://personal_agent:personal_agent@127.0.0.1:5433/personal_agent_test}"

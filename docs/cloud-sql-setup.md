@@ -50,7 +50,7 @@ gcloud sql instances create "${INSTANCE_NAME}" \
   --storage-type=SSD \
   --storage-size=10GB \
   --storage-auto-increase \
-  --storage-auto-increase-limit=100 \
+  --storage-auto-increase-limit=100GB \
   --backup \
   --backup-start-time=03:00 \
   --retained-backups-count=7 \
@@ -158,12 +158,12 @@ WHERE table_name = 'documents'
 SELECT id, length(file_content) FROM documents;
 ```
 
-Expect non-null, non-zero values. The `data/uploads/` directory on the Cloud Run filesystem will remain empty.
+Expect non-null, non-zero values. The application stores file content directly in the database and no longer creates or uses a `data/uploads/` directory.
 
 ---
 
 ## Notes
 
 - `--no-assign-ip` means the instance has no public IP — access is only via Cloud SQL Auth Connector (socket) or Cloud SQL Proxy.
-- PDF binary size is capped at 50 MB in `backend/routes.py`; PostgreSQL BYTEA has no practical limit below that.
+- PDF binary size is capped at 50 MB in `backend/api/routes.py`; PostgreSQL BYTEA has no practical limit below that.
 - `db-g1-small` is sufficient for personal scale. Upgrade to `db-custom-1-3840` if query latency degrades under load.
