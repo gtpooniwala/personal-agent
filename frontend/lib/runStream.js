@@ -7,7 +7,13 @@ export function subscribeToRunStream(runId, { onStateUpdate, onComplete, onFallb
   }
 
   let closed = false;
-  const es = new EventSource(`${RUNTIME_API_BASE}/runs/${runId}/stream`);
+  let es;
+  try {
+    es = new EventSource(`${RUNTIME_API_BASE}/runs/${runId}/stream`);
+  } catch {
+    onFallback();
+    return () => {};
+  }
 
   es.addEventListener("run_event", (event) => {
     if (closed) return;
@@ -15,6 +21,7 @@ export function subscribeToRunStream(runId, { onStateUpdate, onComplete, onFallb
     try {
       data = JSON.parse(event.data);
     } catch {
+      closed = true;
       es.close();
       onFallback();
       return;
@@ -28,6 +35,7 @@ export function subscribeToRunStream(runId, { onStateUpdate, onComplete, onFallb
     try {
       data = JSON.parse(event.data);
     } catch {
+      closed = true;
       es.close();
       onFallback();
       return;
@@ -42,6 +50,7 @@ export function subscribeToRunStream(runId, { onStateUpdate, onComplete, onFallb
 
   es.onerror = () => {
     if (closed) return;
+    closed = true;
     es.close();
     onFallback();
   };

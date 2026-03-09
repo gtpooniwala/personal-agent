@@ -148,7 +148,7 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
   const [resizingSidebar, setResizingSidebar] = useState(null);
 
   const appRootRef = useRef(null);
-  const activeStreamCleanupRef = useRef(null);
+  const activeStreamCleanupsRef = useRef(new Set());
   const fileInputRef = useRef(null);
   const messageInputRef = useRef(null);
   const focusAnimationFrameRef = useRef(null);
@@ -423,6 +423,7 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
     setSendingConversations((prev) => new Set(prev).add(sendingConversationKey));
     setChatError("");
     let thinkingId = null;
+    let streamCleanup = null;
 
     try {
       if (!requestConversationId) {
@@ -553,7 +554,7 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
       let runFinalError = null;
 
       await new Promise((resolve, reject) => {
-        const cleanup = subscribeToRunStream(runId, {
+        streamCleanup = subscribeToRunStream(runId, {
           onStateUpdate: ({ type, event, status: completeStatus, error }) => {
             if (type === "run_event") {
               updateRunState(requestConversationId, (prev) => {
@@ -589,9 +590,9 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
               .catch(reject);
           },
         });
-        activeStreamCleanupRef.current = cleanup;
+        activeStreamCleanupsRef.current.add(streamCleanup);
       });
-      activeStreamCleanupRef.current = null;
+      activeStreamCleanupsRef.current.delete(streamCleanup);
 
       const status = { status: runFinalStatus, error: runFinalError };
 
@@ -608,7 +609,7 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
         }
       }
     } catch {
-      activeStreamCleanupRef.current = null;
+      if (streamCleanup) activeStreamCleanupsRef.current.delete(streamCleanup);
 
       if (!requestConversationId) {
         setChatError("Failed to start a conversation.");
@@ -867,8 +868,8 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
         clearTimeout(uploadResetTimerRef.current);
       }
 
-      if (activeStreamCleanupRef.current) {
-        activeStreamCleanupRef.current();
+      for (const cleanup of activeStreamCleanupsRef.current) {
+        cleanup();
       }
     };
   }, []);

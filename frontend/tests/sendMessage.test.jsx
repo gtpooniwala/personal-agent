@@ -6,7 +6,10 @@ import { apiCall, runtimeApiCall } from '@/lib/api';
 import { subscribeToRunStream } from '@/lib/runStream';
 
 jest.mock('@/lib/runStream', () => ({
-  subscribeToRunStream: jest.fn(),
+  subscribeToRunStream: jest.fn((_runId, { onFallback }) => {
+    onFallback();
+    return () => {};
+  }),
 }));
 
 jest.mock('@/lib/api', () => ({
