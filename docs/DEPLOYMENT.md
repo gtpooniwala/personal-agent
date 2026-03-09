@@ -13,10 +13,10 @@ Current status:
 
 | Topic | Decision |
 |-------|----------|
-| Compute (backend) | Cloud Run, `min-instances=0` |
+| Compute (backend) | Cloud Run |
 | Frontend hosting | Vercel (free hobby tier) |
 | Auth | Bearer token (long random key in Secret Manager) |
-| min-instances | Backend = 0; Vercel handles frontend |
+| Cloud Run min-instances | Backend service: `min-instances=0` (scale-to-zero) |
 | Document storage | Deferred — ephemeral OK for initial deploy; GCS is the target (#79) |
 | Custom domain | Not initially; `*.run.app` + Vercel-assigned domain |
 | Cost estimate | ~$7–25/month (Cloud SQL $7–20, Cloud Run ~$0–5, Vercel free) |
@@ -121,9 +121,11 @@ Secrets to migrate:
 **Implementation:**
 - Generate a long random token: `openssl rand -base64 48`
 - Store in Secret Manager as `AGENT_API_KEY`
+- Cloud Run service is deployed with **unauthenticated HTTP invocation enabled** (`--allow-unauthenticated`); access control is enforced entirely by the bearer-token middleware inside the service (no IAP or IAM-based invoker in the request path)
 - FastAPI middleware checks `Authorization: Bearer <token>` on all protected routes
 - Cloud Run injects `AGENT_API_KEY` from Secret Manager at startup
-- Vercel reads `AGENT_API_KEY` from env vars and includes it in API requests to the backend
+- Vercel reads `AGENT_API_KEY` as a private env var and injects it server-side via the Next.js API proxy route (#132)
+- Cloud Scheduler jobs that call the backend use HTTP targets pointing at the Cloud Run URL and include `Authorization: Bearer <AGENT_API_KEY>` in the request headers
 
 **Why not IAP:** IAP + Vercel requires service-to-service token complexity (identity tokens, refresh logic in the frontend). For personal single-user use, a long random bearer token is simpler and equally secure. No Google account dependency in the auth path.
 
@@ -141,8 +143,8 @@ Tracked in #83.
 - Purpose-built for Next.js; zero code changes required
 - Free for 3–10 DAU indefinitely on the hobby tier
 - Best Next.js developer experience; preview deploys included
-- `NEXT_PUBLIC_API_BASE_URL` points to the Cloud Run backend `*.run.app` URL (used by the Next.js API proxy)
-- `AGENT_API_KEY` stored as a **private** Vercel env var (no `NEXT_PUBLIC_` prefix); injected server-side via a Next.js API proxy route (#132) so the token is never exposed in the browser
+- `API_BASE_URL` stored as a **private** Vercel env var pointing to the Cloud Run `*.run.app` URL; used server-side by the Next.js API proxy route only — not exposed in the browser bundle
+- `AGENT_API_KEY` stored as a **private** Vercel env var; injected server-side via the Next.js API proxy route (#132) so the token is never exposed in the browser
 
 Tracked in #127. API proxy route tracked in #132.
 
