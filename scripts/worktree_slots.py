@@ -41,6 +41,14 @@ class RepoContext:
     state_dir: Path
 
 
+@dataclass(frozen=True)
+class PullRequestInfo:
+    number: int
+    state: str
+    url: str
+    merge_commit_oid: str | None
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -331,6 +339,79 @@ def clear_worktree_list_cache(ctx: RepoContext) -> None:
     _parse_worktree_list_cached.cache_clear()
 
 
+def _parse_pull_request_info(item: dict[str, Any]) -> PullRequestInfo | None:
+    number = item.get("number")
+    state = item.get("state")
+    url = item.get("url")
+    if not isinstance(number, int) or not isinstance(state, str) or not isinstance(url, str):
+        return None
+    merge_commit = item.get("mergeCommit")
+    merge_commit_oid = None
+    if isinstance(merge_commit, dict):
+        oid = merge_commit.get("oid")
+        if isinstance(oid, str):
+            merge_commit_oid = oid
+    return PullRequestInfo(number=number, state=state, url=url, merge_commit_oid=merge_commit_oid)
+
+
+@lru_cache(maxsize=128)
+def cached_branch_pr_info(shared_root: str, branch: str) -> PullRequestInfo | None:
+    if not command_exists("gh"):
+        return None
+
+    shared_root_path = Path(shared_root)
+    result = run(
+        "gh",
+        "pr",
+        "view",
+        branch,
+        "--json",
+        "number,state,url,mergeCommit",
+        cwd=shared_root_path,
+        check=False,
+        capture_stderr=True,
+    )
+    if result.returncode == 0 and result.stdout.strip():
+        try:
+            item = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            item = None
+        if isinstance(item, dict):
+            info = _parse_pull_request_info(item)
+            if info is not None:
+                return info
+
+    result = run(
+        "gh",
+        "pr",
+        "list",
+        "--head",
+        branch,
+        "--state",
+        "all",
+        "--json",
+        "number,state,url,mergeCommit",
+        cwd=shared_root_path,
+        check=False,
+        capture_stderr=True,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+    try:
+        items = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(items, list) or not items:
+        return None
+    if not isinstance(items[0], dict):
+        return None
+    return _parse_pull_request_info(items[0])
+
+
+def branch_pr_info(ctx: RepoContext, branch: str) -> PullRequestInfo | None:
+    return cached_branch_pr_info(str(ctx.shared_root), branch)
+
+
 def branch_worktree_map(ctx: RepoContext) -> dict[str, str]:
     mapping: dict[str, str] = {}
     for entry in parse_worktree_list(ctx):
@@ -358,15 +439,24 @@ def git_status_dirty(path: Path) -> bool:
 def branch_merged_into_main(ctx: RepoContext, branch: str) -> bool | None:
     if not local_branch_exists(ctx, branch):
         return None
-    return run(
-        "git",
-        "merge-base",
-        "--is-ancestor",
-        branch,
-        base_ref(ctx),
-        cwd=ctx.shared_root,
-        check=False,
-    ).returncode == 0
+    merged = (
+        run(
+            "git",
+            "merge-base",
+            "--is-ancestor",
+            branch,
+            base_ref(ctx),
+            cwd=ctx.shared_root,
+            check=False,
+        ).returncode
+        == 0
+    )
+    if merged:
+        return True
+    pr_info = branch_pr_info(ctx, branch)
+    if pr_info is not None and pr_info.state == "MERGED":
+        return True
+    return False
 
 
 def branch_last_commit(ctx: RepoContext, branch: str) -> str | None:
@@ -377,32 +467,10 @@ def branch_last_commit(ctx: RepoContext, branch: str) -> str | None:
 
 
 def branch_open_pr_hint(ctx: RepoContext, branch: str) -> str | None:
-    if not command_exists("gh"):
+    info = branch_pr_info(ctx, branch)
+    if info is None:
         return None
-    result = run(
-        "gh",
-        "pr",
-        "list",
-        "--head",
-        branch,
-        "--state",
-        "all",
-        "--json",
-        "number,state,url",
-        cwd=ctx.shared_root,
-        check=False,
-        capture_stderr=True,
-    )
-    if result.returncode != 0 or not result.stdout.strip():
-        return None
-    try:
-        items = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        return None
-    if not items:
-        return None
-    item = items[0]
-    return f"PR #{item['number']} {item['state'].lower()} ({item['url']})"
+    return f"PR #{info.number} {info.state.lower()} ({info.url})"
 
 
 def observe_slot(ctx: RepoContext, lease: dict[str, Any], stale_hours: int) -> dict[str, Any]:
