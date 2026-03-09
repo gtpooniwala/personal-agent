@@ -1,0 +1,29 @@
+frontend/components/WorkspaceApp.jsx
+  72e0d419b922a5e1 14-15,32-38,542,556,609,620,623-628
+frontend/tests/runStream.test.js
+  72e0d419b922a5e1 2-3,22-30,85-96,128-164,166-169,221-231,290-300
+frontend/lib/runStream.js
+  72e0d419b922a5e1 3-5,10-12,21-46,53,57,62,70,75,79,86-87,91,95-97,99
+frontend/tests/sendMessage.test.jsx
+  72e0d419b922a5e1 27-28,307-310,356-424
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "79649c1e6936e88ba46a1f5c7dc2ac32b226b111",
+  "prompts": {
+    "72e0d419b922a5e1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019cd2b8-9f6f-7323-b216-016e87319176",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 247,
+      "total_deletions": 17,
+      "accepted_lines": 238,
+      "overriden_lines": 0
+    }
+  }
+}
