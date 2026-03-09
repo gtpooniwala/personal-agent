@@ -1,0 +1,39 @@
+docs/ROADMAP.md
+  2c5600fcd342d7fc 19,22-24,28-30,37-44,47-58,61-63,65-68,71-72,78,81-88,113-114
+  adcd1827d0b486b2 112
+docs/WORKBOARD.md
+  2c5600fcd342d7fc 23,37-43,55-56,58,79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "7a02747999bf8b86c29b5702e2cbbeb937738829",
+  "prompts": {
+    "2c5600fcd342d7fc": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019cd047-10f4-7f02-a53d-60bc228ba2fb",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 71,
+      "overriden_lines": 0
+    },
+    "adcd1827d0b486b2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019cd07a-b37f-71e0-932b-baf3f7cbceec",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 28,
+      "overriden_lines": 0
+    }
+  }
+}
