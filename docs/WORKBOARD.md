@@ -13,6 +13,7 @@ Default loop:
 
 Important rule:
 - This board tracks merged `main` behavior, not unmerged branches or stale issue state.
+- When updating it in a PR, write the content to match the state that will be true once that PR is merged to `main`.
 
 ## Current Status
 - Core async runtime is in place: durable `runs`, `run_events`, and `leases`; async `POST /chat` and `POST /runs`; polling via `GET /runs/{id}/status` and `GET /runs/{id}/events`.

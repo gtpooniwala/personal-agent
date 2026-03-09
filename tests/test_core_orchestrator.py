@@ -19,6 +19,7 @@ CORE_ORCHESTRATOR_IMPORT_ERROR = ""
 try:
     from backend.orchestrator.core import CoreOrchestrator
     from backend.database.operations import db_ops
+    from backend.llm import MissingProviderKeyError
     from langchain_core.messages import AIMessage, HumanMessage
 except Exception as exc:
     CORE_ORCHESTRATOR_TESTS_AVAILABLE = False
@@ -394,6 +395,37 @@ class TestCoreOrchestrator(unittest.TestCase):
         incremented_keys = [call.args[0] for call in mock_increment.call_args_list]
         self.assertIn("orchestrator.tool_calls_total", incremented_keys)
         self.assertIn("orchestrator.tool_calls.calculator.total", incremented_keys)
+
+    def test_process_request_does_not_persist_user_message_when_setup_fails(self):
+        with patch.object(
+            self.orchestrator,
+            "_ensure_llm",
+            side_effect=MissingProviderKeyError("missing model key"),
+        ), patch("backend.orchestrator.core.db_ops") as mock_db_ops, patch(
+            "backend.orchestrator.core.increment_counter"
+        ), patch("backend.orchestrator.core.observe_operation") as mock_obs:
+            mock_obs.return_value.__enter__ = Mock(return_value=None)
+            mock_obs.return_value.__exit__ = Mock(return_value=False)
+            mock_db_ops.save_message.return_value = None
+
+            result = asyncio.run(
+                self.orchestrator.process_request(
+                    "Hello",
+                    "conv-setup-fail",
+                    selected_documents=[],
+                )
+            )
+
+        self.assertTrue(result["error"])
+        self.assertEqual(mock_db_ops.save_message.call_count, 1)
+        self.assertEqual(
+            mock_db_ops.save_message.call_args.args,
+            (
+                "conv-setup-fail",
+                "assistant",
+                "I can't process this request right now because the model configuration is unavailable.",
+            ),
+        )
 
     def test_format_document_status_prefers_selected_document_state(self):
         status = self.orchestrator._format_document_status(

@@ -113,17 +113,25 @@ class CoreOrchestrator:
         user_request: str,
         conversation_id: str,
         selected_documents: Optional[List[str]] = None,
+        condensed_history: Optional[List[Dict[str, Any]]] = None,
+        llm: Any = None,
+        run_registry: Optional[ToolRegistry] = None,
+        run_agent: Any = None,
     ) -> OrchestratorRunContext:
         """Assemble all request-scoped state needed for one foreground run."""
         selected_documents = list(selected_documents or [])
-        llm = self._ensure_llm()
-        run_registry = self.tool_registry.clone_with_selected_documents(selected_documents)
-        condensed_history = self.get_condensed_conversation_history(conversation_id)
-        run_agent = self._build_orchestrator_agent(
-            conversation_id,
-            run_registry,
-            llm=llm,
-        )
+        if llm is None:
+            llm = self._ensure_llm()
+        if run_registry is None:
+            run_registry = self.tool_registry.clone_with_selected_documents(selected_documents)
+        if condensed_history is None:
+            condensed_history = self.get_condensed_conversation_history(conversation_id)
+        if run_agent is None:
+            run_agent = self._build_orchestrator_agent(
+                conversation_id,
+                run_registry,
+                llm=llm,
+            )
         return OrchestratorRunContext(
             user_request=user_request,
             conversation_id=conversation_id,
@@ -257,13 +265,30 @@ class CoreOrchestrator:
             metadata={"component": "orchestrator"},
         ) as operation_observation:
             try:
+                llm = self._ensure_llm()
+                run_registry = self.tool_registry.clone_with_selected_documents(
+                    selected_documents
+                )
+                run_agent = self._build_orchestrator_agent(
+                    conversation_id,
+                    run_registry,
+                    llm=llm,
+                )
+
                 # Save user message to database
                 db_ops.save_message(conversation_id, "user", user_request)
 
+                condensed_history = self.get_condensed_conversation_history(
+                    conversation_id
+                )
                 context = self._build_run_context(
                     user_request=user_request,
                     conversation_id=conversation_id,
                     selected_documents=selected_documents,
+                    condensed_history=condensed_history,
+                    llm=llm,
+                    run_registry=run_registry,
+                    run_agent=run_agent,
                 )
                 messages = self._build_langgraph_messages(context.condensed_history)
                 token_usage = None
