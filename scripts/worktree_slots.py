@@ -46,7 +46,7 @@ class PullRequestInfo:
     number: int
     state: str
     url: str
-    merge_commit_oid: str | None
+    head_ref_oid: str | None
 
 
 def now_iso() -> str:
@@ -345,13 +345,10 @@ def _parse_pull_request_info(item: dict[str, Any]) -> PullRequestInfo | None:
     url = item.get("url")
     if not isinstance(number, int) or not isinstance(state, str) or not isinstance(url, str):
         return None
-    merge_commit = item.get("mergeCommit")
-    merge_commit_oid = None
-    if isinstance(merge_commit, dict):
-        oid = merge_commit.get("oid")
-        if isinstance(oid, str):
-            merge_commit_oid = oid
-    return PullRequestInfo(number=number, state=state, url=url, merge_commit_oid=merge_commit_oid)
+    head_ref_oid = item.get("headRefOid")
+    if head_ref_oid is not None and not isinstance(head_ref_oid, str):
+        return None
+    return PullRequestInfo(number=number, state=state, url=url, head_ref_oid=head_ref_oid)
 
 
 @lru_cache(maxsize=128)
@@ -366,7 +363,7 @@ def cached_branch_pr_info(shared_root: str, branch: str) -> PullRequestInfo | No
         "view",
         branch,
         "--json",
-        "number,state,url,mergeCommit",
+        "number,state,url,headRefOid",
         cwd=shared_root_path,
         check=False,
         capture_stderr=True,
@@ -390,7 +387,7 @@ def cached_branch_pr_info(shared_root: str, branch: str) -> PullRequestInfo | No
         "--state",
         "all",
         "--json",
-        "number,state,url,mergeCommit",
+        "number,state,url,headRefOid",
         cwd=shared_root_path,
         check=False,
         capture_stderr=True,
@@ -410,6 +407,13 @@ def cached_branch_pr_info(shared_root: str, branch: str) -> PullRequestInfo | No
 
 def branch_pr_info(ctx: RepoContext, branch: str) -> PullRequestInfo | None:
     return cached_branch_pr_info(str(ctx.shared_root), branch)
+
+
+def branch_tip_oid(ctx: RepoContext, branch: str) -> str | None:
+    if not local_branch_exists(ctx, branch):
+        return None
+    output = git("rev-parse", branch, cwd=ctx.shared_root)
+    return output or None
 
 
 def branch_worktree_map(ctx: RepoContext) -> dict[str, str]:
@@ -454,7 +458,8 @@ def branch_merged_into_main(ctx: RepoContext, branch: str) -> bool | None:
     if merged:
         return True
     pr_info = branch_pr_info(ctx, branch)
-    if pr_info is not None and pr_info.state == "MERGED":
+    branch_tip = branch_tip_oid(ctx, branch)
+    if pr_info is not None and pr_info.state == "MERGED" and branch_tip is not None and pr_info.head_ref_oid == branch_tip:
         return True
     return False
 
