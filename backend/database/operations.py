@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, func, text
+from sqlalchemy import create_engine, func, or_, text
 from sqlalchemy.orm import sessionmaker, Session
 from backend.database.models import (
     Base,
@@ -135,6 +135,71 @@ class DatabaseOperations:
                 }
                 for conv in conversations
             ]
+        finally:
+            session.close()
+
+    def find_conversations_needing_title(
+        self,
+        *,
+        delay_minutes: int,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Return stale untitled conversations that already contain messages."""
+        if delay_minutes < 0:
+            raise ValueError("delay_minutes must be non-negative")
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+
+        untitled_filters = [
+            Conversation.title.like(f"{prefix}%")
+            for prefix in UNTITLED_CONVERSATION_PREFIXES
+        ]
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=delay_minutes)
+
+        session = self.get_session()
+        try:
+            rows = (
+                session.query(Conversation.id)
+                .outerjoin(Message, Message.conversation_id == Conversation.id)
+                .filter(Conversation.updated_at <= cutoff)
+                .filter(or_(*untitled_filters))
+                .group_by(Conversation.id, Conversation.updated_at)
+                .having(func.count(Message.id) >= 1)
+                .order_by(Conversation.updated_at.asc())
+                .limit(limit)
+                .all()
+            )
+            return [{"id": row.id} for row in rows]
+        finally:
+            session.close()
+
+    def find_stale_empty_conversations(
+        self,
+        *,
+        older_than_days: int = 1,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Return empty conversations that are old enough to delete automatically."""
+        if older_than_days < 0:
+            raise ValueError("older_than_days must be non-negative")
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=older_than_days)
+
+        session = self.get_session()
+        try:
+            rows = (
+                session.query(Conversation.id)
+                .outerjoin(Message, Message.conversation_id == Conversation.id)
+                .filter(Conversation.created_at <= cutoff)
+                .group_by(Conversation.id, Conversation.created_at)
+                .having(func.count(Message.id) == 0)
+                .order_by(Conversation.created_at.asc())
+                .limit(limit)
+                .all()
+            )
+            return [{"id": row.id} for row in rows]
         finally:
             session.close()
     

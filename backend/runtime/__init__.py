@@ -22,9 +22,11 @@ from .lifecycle import (
     TERMINAL_RUN_STATUSES as LIFECYCLE_TERMINAL_RUN_STATUSES,
 )
 from .heartbeat import HeartbeatService
+from .conversation_maintenance import ConversationMaintenanceService
 from .scheduler import SchedulerService
 
 __all__ = [
+    "ConversationMaintenanceService",
     "DEFAULT_EVENTS_LIMIT",
     "DbRunStore",
     "HeartbeatService",
