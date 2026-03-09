@@ -11,6 +11,8 @@ import { subscribeToRunStream } from "@/lib/runStream";
 
 const RUN_POLL_INTERVAL_MS = 500;
 const RUN_POLL_MAX_ATTEMPTS = 120;
+const RUN_TRANSPORT_TIMEOUT_MESSAGE =
+  "Live updates timed out. The run may still be in progress. Refresh the conversation to check for the final response.";
 const MAX_VISIBLE_RUN_EVENTS = 4;
 const NEW_CONVERSATION_KEY = "__new__";
 const DEFAULT_LEFT_PANEL_WIDTH = 272;
@@ -26,6 +28,20 @@ const PANEL_GAP = 16;
 const DESKTOP_RESIZE_BREAKPOINT = 1120;
 
 const RUN_IN_PROGRESS_STATUSES = new Set(["queued", "running", "retrying", "cancelling"]);
+
+class RunTransportTimeoutError extends Error {
+  constructor(message = "Run transport timed out") {
+    super(message);
+    this.name = "RunTransportTimeoutError";
+  }
+}
+
+function ensureError(error, fallbackMessage) {
+  if (error instanceof Error) {
+    return error;
+  }
+  return new Error(fallbackMessage);
+}
 
 function localId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -528,9 +544,9 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
                 latestEvent: mergedEvents[mergedEvents.length - 1] || previousRunState.latestEvent || null,
               };
             });
-          } catch {
+          } catch (error) {
             if (attempt === RUN_POLL_MAX_ATTEMPTS - 1) {
-              throw new Error("Run status polling failed");
+              throw ensureError(error, "Run status polling failed");
             }
             await sleep(RUN_POLL_INTERVAL_MS);
             continue;
@@ -544,7 +560,7 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
         }
 
         if (!pollStatus || RUN_IN_PROGRESS_STATUSES.has(pollStatus.status)) {
-          throw new Error("Run polling timed out");
+          throw new RunTransportTimeoutError("Run polling timed out before terminal state");
         }
 
         return pollStatus;
@@ -597,7 +613,7 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
       const status = { status: runFinalStatus, error: runFinalError };
 
       if (!status.status || RUN_IN_PROGRESS_STATUSES.has(status.status)) {
-        throw new Error("Run polling timed out");
+        throw new RunTransportTimeoutError("Run polling timed out before terminal state");
       }
 
       await loadConversations();
@@ -608,8 +624,15 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
           setChatError(status.error || "Run failed.");
         }
       }
-    } catch {
+    } catch (error) {
       if (streamCleanup) activeStreamCleanupsRef.current.delete(streamCleanup);
+
+      if (error instanceof RunTransportTimeoutError) {
+        if (requestConversationId && activeConversationIdRef.current === requestConversationId) {
+          setChatError(RUN_TRANSPORT_TIMEOUT_MESSAGE);
+        }
+        return;
+      }
 
       if (!requestConversationId) {
         setChatError("Failed to start a conversation.");

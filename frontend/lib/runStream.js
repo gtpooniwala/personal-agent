@@ -1,6 +1,16 @@
 import { RUNTIME_API_BASE } from "@/lib/api";
 
-export function subscribeToRunStream(runId, { onStateUpdate, onComplete, onFallback }) {
+export const DEFAULT_RUN_STREAM_INACTIVITY_TIMEOUT_MS = 60_000;
+
+export function subscribeToRunStream(
+  runId,
+  {
+    onStateUpdate,
+    onComplete,
+    onFallback,
+    inactivityTimeoutMs = DEFAULT_RUN_STREAM_INACTIVITY_TIMEOUT_MS,
+  },
+) {
   if (typeof EventSource === "undefined") {
     onFallback();
     return () => {};
@@ -8,22 +18,48 @@ export function subscribeToRunStream(runId, { onStateUpdate, onComplete, onFallb
 
   let closed = false;
   let es;
+  let watchdogTimer = null;
+
+  const clearWatchdog = () => {
+    if (watchdogTimer !== null) {
+      clearTimeout(watchdogTimer);
+      watchdogTimer = null;
+    }
+  };
+
+  const triggerFallback = () => {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    clearWatchdog();
+    es.close();
+    onFallback();
+  };
+
+  const resetWatchdog = () => {
+    clearWatchdog();
+    watchdogTimer = setTimeout(() => {
+      triggerFallback();
+    }, inactivityTimeoutMs);
+  };
+
   try {
     es = new EventSource(`${RUNTIME_API_BASE}/runs/${runId}/stream`);
   } catch {
     onFallback();
     return () => {};
   }
+  resetWatchdog();
 
   es.addEventListener("run_event", (event) => {
     if (closed) return;
+    resetWatchdog();
     let data;
     try {
       data = JSON.parse(event.data);
     } catch {
-      closed = true;
-      es.close();
-      onFallback();
+      triggerFallback();
       return;
     }
     onStateUpdate({ type: "run_event", event: normalizeRunEventData(data) });
@@ -31,32 +67,36 @@ export function subscribeToRunStream(runId, { onStateUpdate, onComplete, onFallb
 
   es.addEventListener("run_complete", (event) => {
     if (closed) return;
+    clearWatchdog();
     let data;
     try {
       data = JSON.parse(event.data);
     } catch {
-      closed = true;
-      es.close();
-      onFallback();
+      triggerFallback();
       return;
     }
     closed = true;
+    clearWatchdog();
     es.close();
     onStateUpdate({ type: "run_complete", status: data.status, error: data.error ?? null });
     onComplete(data);
   });
 
-  es.addEventListener("heartbeat", () => {});
+  es.addEventListener("heartbeat", () => {
+    if (closed) return;
+    resetWatchdog();
+  });
 
   es.onerror = () => {
-    if (closed) return;
-    closed = true;
-    es.close();
-    onFallback();
+    triggerFallback();
   };
 
   return () => {
+    if (closed) {
+      return;
+    }
     closed = true;
+    clearWatchdog();
     es.close();
   };
 }
