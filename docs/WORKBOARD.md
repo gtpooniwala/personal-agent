@@ -20,20 +20,29 @@ Important rule:
 - Blocking orchestration work has already been moved off the FastAPI event loop into a bounded worker pool as the `#51` migration step.
 - Foreground orchestration now builds explicit request-scoped execution context, so per-run state no longer lives implicitly on the long-lived orchestrator instance.
 - Runtime support services are in place: orphan recovery heartbeat, scheduled task loop, scheduled task CRUD/API, and runtime shutdown wiring.
-- Frontend migration, Gmail Docker readiness, conversation naming, config validation, and runtime eval harness work are already landed.
-- The architecture still has important follow-up debt: mixed LLM plus rule-based tool routing, in-process follow-up tasks, no final lifecycle policy for in-flight/background work, no SSE stream, and true end-to-end async execution is still future work.
+- Normal-path tool selection is model-owned, the backend SSE stream exists, and foreground orchestration is request-scoped after the recent `#101`, `#104`, and `#106` work.
+- Frontend migration, document workflow clarity, Gmail Docker readiness, conversation naming, config validation, and runtime eval harness work are already landed.
+- The remaining follow-up debt is narrower now: retry/fallback cleanup, frontend transport adoption and deduplication, product-correctness cleanup, durable follow-up work, and true end-to-end async execution.
 
 ## Recommended Order
 
 ### Core Runtime And Orchestrator
-- [ ] `todo` Let the orchestrator LLM own normal tool selection and reduce rule-based routing ([#101](https://github.com/gtpooniwala/personal-agent/issues/101))
+- [ ] `todo` Add retry policy for transient orchestrator and LLM execution failures ([#120](https://github.com/gtpooniwala/personal-agent/issues/120))
+- [ ] `todo` Revisit and potentially remove degraded fallback behavior after retry policy lands ([#119](https://github.com/gtpooniwala/personal-agent/issues/119))
 - [ ] `todo` Define the long-term lifecycle contract for the execution plane, shutdown behavior, and in-flight run handling ([#102](https://github.com/gtpooniwala/personal-agent/issues/102))
 - [ ] `todo` Separate background follow-up budget from foreground run attempts ([#109](https://github.com/gtpooniwala/personal-agent/issues/109))
 - [ ] `todo` Persist follow-up work such as summarisation as queued task types instead of `asyncio.create_task(...)` ([#105](https://github.com/gtpooniwala/personal-agent/issues/105))
 - [ ] `todo` Investigate true async orchestration/runtime paths instead of thread or sync islands ([#103](https://github.com/gtpooniwala/personal-agent/issues/103))
-- [ ] `todo` Add SSE streaming on top of the existing run/event store ([#104](https://github.com/gtpooniwala/personal-agent/issues/104))
 
-### Product And Prompting Follow-Ups
+### Product, Transport, And Prompting Follow-Ups
+- [ ] `todo` Adopt the SSE run stream in the frontend while keeping fallback behavior ([#122](https://github.com/gtpooniwala/personal-agent/issues/122))
+- [ ] `todo` Deduplicate overlapping polling and SSE run-progress transport logic ([#121](https://github.com/gtpooniwala/personal-agent/issues/121))
+- [ ] `todo` Add timeout/watchdog handling for stalled SSE run streams ([#130](https://github.com/gtpooniwala/personal-agent/issues/130))
+- [x] `done` Stop conversation list reads from scheduling maintenance work ([#140](https://github.com/gtpooniwala/personal-agent/issues/140))
+- [ ] `todo` Keep document-search responses scoped to selected documents ([#137](https://github.com/gtpooniwala/personal-agent/issues/137))
+- [ ] `todo` Reassess whether `response_agent` should synthesize every final answer ([#138](https://github.com/gtpooniwala/personal-agent/issues/138))
+- [ ] `todo` Make run timing fields and observability metrics truthful ([#139](https://github.com/gtpooniwala/personal-agent/issues/139))
+- [ ] `todo` Extract non-run app helpers from `CoreOrchestrator` ([#134](https://github.com/gtpooniwala/personal-agent/issues/134))
 - [ ] `todo` Strengthen prompt architecture and prompting contracts ([#68](https://github.com/gtpooniwala/personal-agent/issues/68))
 - [ ] `todo` Improve document UX and RAG workflow clarity in the frontend ([#64](https://github.com/gtpooniwala/personal-agent/issues/64))
 
@@ -43,10 +52,13 @@ Work this track after the core runtime/orchestrator plan above is stable enough.
 - [ ] `todo` Keep the GCP ADR current and finalize remaining deployment decisions ([#81](https://github.com/gtpooniwala/personal-agent/issues/81))
 - [ ] `todo` Cloud SQL production database setup ([#80](https://github.com/gtpooniwala/personal-agent/issues/80))
 - [ ] `todo` Secret Manager integration for production secrets ([#82](https://github.com/gtpooniwala/personal-agent/issues/82))
-- [ ] `todo` Migrate document storage from local filesystem to GCS ([#79](https://github.com/gtpooniwala/personal-agent/issues/79))
-- [ ] `todo` Cloud Run service definitions for backend and frontend ([#85](https://github.com/gtpooniwala/personal-agent/issues/85))
-- [ ] `todo` IAP setup for personal cloud authentication ([#83](https://github.com/gtpooniwala/personal-agent/issues/83))
+- [ ] `todo` Bearer-token auth middleware for the FastAPI backend ([#83](https://github.com/gtpooniwala/personal-agent/issues/83))
+- [ ] `todo` Deploy the Next.js frontend to Vercel ([#127](https://github.com/gtpooniwala/personal-agent/issues/127))
+- [ ] `todo` Add a Next.js API proxy route for server-side bearer token injection ([#132](https://github.com/gtpooniwala/personal-agent/issues/132))
+- [ ] `todo` Cloud Run service definition for the backend ([#85](https://github.com/gtpooniwala/personal-agent/issues/85))
 - [ ] `todo` GitHub Actions CI/CD pipeline for Cloud Run deployment ([#86](https://github.com/gtpooniwala/personal-agent/issues/86))
+- [ ] `todo` Update Gmail OAuth redirect URIs for production domains ([#129](https://github.com/gtpooniwala/personal-agent/issues/129))
+- [ ] `todo` Migrate document storage from local filesystem to GCS ([#79](https://github.com/gtpooniwala/personal-agent/issues/79))
 - [ ] `todo` Cold-start and min-instances tuning once the cloud baseline exists ([#87](https://github.com/gtpooniwala/personal-agent/issues/87))
 
 ## Trigger And Automation Track
@@ -64,9 +76,9 @@ Keep this compressed. Use Git history and GitHub issues for detail.
 - [x] `done` Foundation hardening and local workflow reliability: `#7` to `#13`, `#20`, `#40`
 - [x] `done` Async runtime baseline: `#14` to `#19`
 - [x] `done` Event-loop responsiveness migration step with worker-pool orchestration offload: `#51`
-- [x] `done` Per-run orchestrator isolation and runtime correctness follow-ups: `#50`, `#72`, `#73`, `#74`
-- [x] `done` Foreground request-scoped orchestrator execution to remove implicit per-run instance state: `#106`
+- [x] `done` Per-run orchestrator isolation, model-owned tool selection, backend SSE stream, and request-scoped orchestration: `#50`, `#72`, `#73`, `#74`, `#101`, `#104`, `#106`
 - [x] `done` Scheduler-backed recurring task baseline: `#18`, `#89`
+- [x] `done` Conversation list reads are now side-effect-free: `#140`
 - [x] `done` Planning docs for cloud deployment and event-driven triggers: `#78`
 
 ## Backlog

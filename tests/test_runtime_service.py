@@ -5,7 +5,7 @@ import sys
 import threading
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 # Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -139,6 +139,30 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         self.assertIn("started", event_types)
         self.assertIn("tool_result", event_types)
         self.assertIn("succeeded", event_types)
+
+    async def test_submit_run_triggers_background_title_generation(self):
+        orchestrator = SuccessfulOrchestrator()
+        title_generated = asyncio.Event()
+
+        async def generate_title(conversation_id):
+            title_generated.set()
+            return "Generated Title"
+
+        orchestrator.generate_conversation_title = AsyncMock(side_effect=generate_title)
+        service = self._make_service(
+            orchestrator=orchestrator,
+            orchestrator_factory=build_factory(SuccessfulOrchestrator),
+            run_store=InMemoryRunStore(),
+        )
+        submitted = await service.submit_run(
+            RuntimeRequest(message="hello", conversation_id="conv-1", selected_documents=[])
+        )
+
+        status = await self._wait_for_terminal(service, submitted["run_id"])
+        self.assertEqual(status["status"], "succeeded")
+
+        await asyncio.wait_for(title_generated.wait(), timeout=1.0)
+        orchestrator.generate_conversation_title.assert_awaited_once_with("conv-1")
 
     async def test_submit_run_transitions_to_failed(self):
         service = self._make_service(

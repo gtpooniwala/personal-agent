@@ -16,60 +16,75 @@ That means:
 ### What Is Already Landed
 - Async run submission is the primary execution contract via `POST /chat` and `POST /runs`.
 - Run state is durable in PostgreSQL-backed runtime tables: `runs`, `run_events`, and `leases`.
-- Polling clients can observe progress through `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events`.
+- Polling clients can observe progress through `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events`, and the backend now also exposes `GET /runs/{run_id}/stream`.
 - Per-conversation serialization, retry behavior, orphan recovery heartbeat, and scheduled task support are already implemented.
 - The `#51` migration step is landed: runtime coordination stays on the event loop while blocking orchestration attempts run on a bounded worker pool.
-- The `#106` follow-up is landed: foreground orchestration now uses explicit request-scoped execution state instead of relying on implicit per-run state on the long-lived orchestrator object.
+- Normal-path tool selection is now model-owned from the bound tool set; the old handwritten router is no longer the primary orchestration path.
+- Foreground orchestration now runs through request-scoped execution context rather than shared per-run instance state.
+- Frontend document workflow clarity and prompt/source-card UX have both already improved materially.
 - Frontend is on Next.js and the local workflow, eval harness, naming behavior, and Gmail Docker path have all been tightened recently.
 
 ### What Still Matters Most
-- Tool-selection ownership is still split between the LangGraph agent and rule-based fallback logic.
+- Retry and degraded-fallback behavior still need a cleaner final contract now that normal-path routing is model-owned.
+- The frontend still needs to prefer the SSE run stream and then deduplicate its fallback transport behavior.
+- Some product-correctness cleanup remains around selected-document scoping, response synthesis layering, and truthful runtime metrics.
 - Some follow-up work still runs as in-process background tasks instead of durable queued work.
 - The runtime is responsive during blocking orchestration now, but it still relies on a worker-pool execution plane rather than true end-to-end async internals.
 - Executor lifecycle policy and background execution budgeting still need a cleaner final contract.
 
 ## Recommended Execution Order
 
-### Phase 1: Make Runtime Ownership Clear
-1. [#101](https://github.com/gtpooniwala/personal-agent/issues/101) Move normal tool selection fully into the orchestrator LLM contract.
-2. [#102](https://github.com/gtpooniwala/personal-agent/issues/102) Define executor ownership and graceful shutdown behavior.
-3. [#109](https://github.com/gtpooniwala/personal-agent/issues/109) Separate background execution budget from foreground run attempts.
+### Phase 1: Finish The Runtime Contract Cleanly
+1. [#120](https://github.com/gtpooniwala/personal-agent/issues/120) Add explicit retry policy for transient orchestrator and provider failures.
+2. [#119](https://github.com/gtpooniwala/personal-agent/issues/119) Reassess whether any degraded deterministic fallback still needs to exist after retries land.
+3. [#122](https://github.com/gtpooniwala/personal-agent/issues/122) Adopt the SSE run stream in the frontend while preserving fallback behavior.
+4. [#121](https://github.com/gtpooniwala/personal-agent/issues/121) Deduplicate overlapping polling and SSE transport logic.
+5. [#130](https://github.com/gtpooniwala/personal-agent/issues/130) Add a watchdog for stalled SSE run streams.
+6. [#102](https://github.com/gtpooniwala/personal-agent/issues/102) Define executor ownership and graceful shutdown behavior.
+7. [#109](https://github.com/gtpooniwala/personal-agent/issues/109) Separate background execution budget from foreground run attempts.
 
 Why this first:
-- It removes the biggest reasoning ambiguity in the current architecture.
-- It makes later runtime changes easier to test and document.
-- It turns the post-`#51` worker-pool runtime from "responsive" into "predictable."
+- The main orchestration path is already much cleaner than it was before `#101` and `#106`; the remaining work is mostly contract cleanup.
+- Streaming and retry behavior now sit directly on user-visible paths, so drift here is costlier than deeper refactors.
+- It turns the post-`#51` runtime from "responsive and mostly correct" into "predictable and easier to debug."
 
-### Phase 2: Make Follow-Up Work Durable
-1. [#105](https://github.com/gtpooniwala/personal-agent/issues/105) Persist summarisation and other follow-up work as queued task types.
-2. [#103](https://github.com/gtpooniwala/personal-agent/issues/103) Investigate true async runtime/orchestrator paths.
+### Phase 2: Fix Product-Correctness Debt On Top Of The New Runtime
+1. [#137](https://github.com/gtpooniwala/personal-agent/issues/137) Keep document-search responses scoped to selected documents.
+2. [#138](https://github.com/gtpooniwala/personal-agent/issues/138) Reassess whether `response_agent` should synthesize every final answer.
+3. [#139](https://github.com/gtpooniwala/personal-agent/issues/139) Make run timing fields and observability metrics truthful.
+4. [#134](https://github.com/gtpooniwala/personal-agent/issues/134) Extract non-run app helpers from `CoreOrchestrator`.
+5. [#68](https://github.com/gtpooniwala/personal-agent/issues/68) Continue prompt architecture hardening.
+6. [#64](https://github.com/gtpooniwala/personal-agent/issues/64) Continue document UX and RAG workflow follow-ups.
 
 Why this second:
-- It removes ephemeral behavior that is hard to observe and recover.
-- It keeps concurrency decisions out of hidden in-memory task scheduling.
-- It positions the runtime for broader automation and cloud hosting.
+- Several of these are now clearer because the runtime and frontend transport foundations are already in place.
+- They tighten the product contract without forcing a broad architectural migration first.
+- They remove AI-style redundancy and hidden side effects that are now more obvious after the recent UX and runtime work.
 
-### Phase 3: Improve Client Experience On Top Of Stable Runtime
-1. [#104](https://github.com/gtpooniwala/personal-agent/issues/104) Add SSE streaming while keeping polling as fallback.
-2. [#64](https://github.com/gtpooniwala/personal-agent/issues/64) Improve document UX and RAG clarity.
-3. [#68](https://github.com/gtpooniwala/personal-agent/issues/68) Continue prompt architecture hardening.
+### Phase 3: Continue The Deeper Runtime Migration
+1. [#105](https://github.com/gtpooniwala/personal-agent/issues/105) Persist summarisation and other follow-up work as queued task types.
+2. [#103](https://github.com/gtpooniwala/personal-agent/issues/103) Investigate true async runtime/orchestrator paths.
+3. [#135](https://github.com/gtpooniwala/personal-agent/issues/135) Revisit whether remaining shared orchestrator dependencies should become fully injected/stateless.
 
 Why this third:
-- Streaming and UX polish are more valuable once the underlying runtime contract is stable.
-- Prompt and UX changes are safer after routing ownership is simplified.
+- These are important, but they are less urgent than the contract and product-correctness cleanup above.
+- They are more valuable once the current runtime behavior is smaller, cleaner, and easier to trust.
 
 ## Cloud Deployment Track
 This remains a real goal, but it should build on the runtime order above rather than compete with it.
 
 Recommended order:
-1. [#81](https://github.com/gtpooniwala/personal-agent/issues/81) Keep the GCP ADR current and resolve remaining design decisions.
+1. [#81](https://github.com/gtpooniwala/personal-agent/issues/81) Keep the GCP ADR current and finalize remaining deployment decisions.
 2. [#80](https://github.com/gtpooniwala/personal-agent/issues/80) Cloud SQL production baseline.
 3. [#82](https://github.com/gtpooniwala/personal-agent/issues/82) Secret Manager integration.
-4. [#79](https://github.com/gtpooniwala/personal-agent/issues/79) GCS-backed document storage.
-5. [#85](https://github.com/gtpooniwala/personal-agent/issues/85) Cloud Run service definitions.
-6. [#83](https://github.com/gtpooniwala/personal-agent/issues/83) IAP and authentication boundary.
-7. [#86](https://github.com/gtpooniwala/personal-agent/issues/86) CI/CD deployment pipeline.
-8. [#87](https://github.com/gtpooniwala/personal-agent/issues/87) Cold-start and min-instances tuning.
+4. [#83](https://github.com/gtpooniwala/personal-agent/issues/83) Bearer-token auth middleware for the FastAPI backend.
+5. [#127](https://github.com/gtpooniwala/personal-agent/issues/127) Deploy the Next.js frontend to Vercel.
+6. [#132](https://github.com/gtpooniwala/personal-agent/issues/132) Add a Next.js API proxy route for server-side bearer token injection.
+7. [#85](https://github.com/gtpooniwala/personal-agent/issues/85) Cloud Run service definition for the backend.
+8. [#86](https://github.com/gtpooniwala/personal-agent/issues/86) CI/CD deployment pipeline.
+9. [#129](https://github.com/gtpooniwala/personal-agent/issues/129) Update Gmail OAuth redirect URIs for production domains.
+10. [#79](https://github.com/gtpooniwala/personal-agent/issues/79) GCS-backed document storage.
+11. [#87](https://github.com/gtpooniwala/personal-agent/issues/87) Cold-start and min-instances tuning.
 
 ## Event-Driven Automation Track
 The runtime already includes scheduler primitives and scheduled tasks. The remaining work is the external trigger layer and mobile-facing surfaces.
@@ -93,5 +108,7 @@ The target shape is a personal agent with:
 ## Compressed Completed Context
 - `#7` to `#13`, `#20`, `#40`: baseline hardening and local workflow quality.
 - `#14` to `#19`: async runtime design, storage, API contract, worker semantics, scheduler, and eval coverage.
-- `#50`, `#51`, `#72`, `#73`, `#74`, `#89`, `#106`: follow-up runtime isolation, worker-pool responsiveness, request-scoped orchestration, naming, validation, and recurring task support.
+- `#50`, `#51`, `#72`, `#73`, `#74`, `#89`: follow-up runtime isolation, worker-pool responsiveness, naming, validation, and recurring task support.
+- `#101`, `#104`, `#106`: model-owned normal tool selection, backend SSE run streaming, and request-scoped foreground orchestration.
+- `#140`: conversation list reads are now side-effect-free.
 - `#78`: deployment and trigger planning docs.
