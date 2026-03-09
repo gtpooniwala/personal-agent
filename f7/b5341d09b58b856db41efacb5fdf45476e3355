@@ -1,0 +1,27 @@
+frontend/components/WorkspaceApp.jsx
+  9063423eb0b6240c 151,426,557,593,595,612,871-872
+frontend/tests/sendMessage.test.jsx
+  9063423eb0b6240c 9-12
+frontend/lib/runStream.js
+  9063423eb0b6240c 10-16,24,38,53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "f7b5341d09b58b856db41efacb5fdf45476e3355",
+  "prompts": {
+    "9063423eb0b6240c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4fd65edf-1354-412d-a7be-b54532fe3c7e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 25,
+      "total_deletions": 12,
+      "accepted_lines": 22,
+      "overriden_lines": 0
+    }
+  }
+}
