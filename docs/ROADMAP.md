@@ -80,19 +80,19 @@ Key decisions finalized: Vercel for frontend hosting (free hobby tier, zero code
 
 Already done:
 - [#81](https://github.com/gtpooniwala/personal-agent/issues/81) GCP deployment architecture decisions finalized.
+- [#83](https://github.com/gtpooniwala/personal-agent/issues/83) Bearer-token auth middleware for the FastAPI backend.
 
 Recommended order:
 1. [#80](https://github.com/gtpooniwala/personal-agent/issues/80) Cloud SQL production baseline.
 2. [#82](https://github.com/gtpooniwala/personal-agent/issues/82) Secret Manager integration (includes `AGENT_API_KEY` for bearer token).
-3. [#83](https://github.com/gtpooniwala/personal-agent/issues/83) Bearer-token auth middleware for the FastAPI backend (must land before backend deploy).
-4. [#127](https://github.com/gtpooniwala/personal-agent/issues/127) Deploy the Next.js frontend to Vercel.
-5. [#132](https://github.com/gtpooniwala/personal-agent/issues/132) Add a Next.js API proxy route for server-side bearer token injection.
-6. [#85](https://github.com/gtpooniwala/personal-agent/issues/85) Cloud Run service definition for the backend (deploy with auth already in image).
-7. [#86](https://github.com/gtpooniwala/personal-agent/issues/86) CI/CD deployment pipeline.
-8. [#129](https://github.com/gtpooniwala/personal-agent/issues/129) Update Gmail OAuth redirect URIs for production domains.
-9. [#88](https://github.com/gtpooniwala/personal-agent/issues/88) Event trigger framework + Cloud Scheduler provisioning (required for scale-to-zero polling).
-10. [#79](https://github.com/gtpooniwala/personal-agent/issues/79) GCS-backed document storage (deferred; not a blocker for initial deploy).
-11. [#87](https://github.com/gtpooniwala/personal-agent/issues/87) Cold-start and min-instances tuning (optional; `min-instances=0` is final).
+3. [#127](https://github.com/gtpooniwala/personal-agent/issues/127) Deploy the Next.js frontend to Vercel.
+4. [#132](https://github.com/gtpooniwala/personal-agent/issues/132) Add a Next.js API proxy route for server-side bearer token injection.
+5. [#85](https://github.com/gtpooniwala/personal-agent/issues/85) Cloud Run service definition for the backend (deploy with auth already in image).
+6. [#86](https://github.com/gtpooniwala/personal-agent/issues/86) CI/CD deployment pipeline.
+7. [#129](https://github.com/gtpooniwala/personal-agent/issues/129) Update Gmail OAuth redirect URIs for production domains.
+8. [#88](https://github.com/gtpooniwala/personal-agent/issues/88) Event trigger framework + Cloud Scheduler provisioning (required for scale-to-zero polling).
+9. [#79](https://github.com/gtpooniwala/personal-agent/issues/79) GCS-backed document storage (deferred; not a blocker for initial deploy).
+10. [#87](https://github.com/gtpooniwala/personal-agent/issues/87) Cold-start and min-instances tuning (optional; `min-instances=0` is final).
 
 ## Event-Driven Automation Track
 The runtime already includes scheduler primitives and scheduled tasks. The remaining work is the external trigger layer and mobile-facing surfaces.

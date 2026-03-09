@@ -38,6 +38,12 @@ LANGFUSE_BASE_URL=https://cloud.langfuse.com
 LANGFUSE_ENABLED=true
 ```
 
+Optional local auth testing:
+```env
+AGENT_API_KEY=replace-with-a-long-random-token
+ENVIRONMENT=local
+```
+
 Optional Gmail in Docker:
 ```bash
 mkdir -p data/gmail
@@ -51,11 +57,16 @@ docker compose up --build
 Access:
 - Frontend: `http://127.0.0.1:3001` by default
 - Backend: `http://127.0.0.1:8001` by default
-- Swagger: `http://127.0.0.1:8001/docs` by default
+- Swagger: `http://127.0.0.1:8001/docs` by default when `AGENT_API_KEY` is unset
 
 These Docker ports come from:
 - `DOCKER_FRONTEND_PORT`
 - `DOCKER_API_PORT`
+
+Auth behavior:
+- If `AGENT_API_KEY` is unset and `ENVIRONMENT=local`, the backend stays open for local development.
+- If `AGENT_API_KEY` is set, send `Authorization: Bearer <AGENT_API_KEY>` to backend endpoints.
+- When local auth is enabled, `/docs` and `/openapi.json` are protected too, so browser-loaded Swagger is not anonymously reachable.
 
 ## Local Debug Path
 Use this when you need local Python or frontend debugging outside containers.
@@ -70,6 +81,13 @@ Use this when you need local Python or frontend debugging outside containers.
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r backend/requirements.txt
+uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Optional authenticated local backend run:
+```bash
+export ENVIRONMENT=local
+export AGENT_API_KEY="$(openssl rand -base64 48)"
 uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 

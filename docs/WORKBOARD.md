@@ -52,7 +52,7 @@ Work this track after the core runtime/orchestrator plan above is stable enough.
 - [x] `done` GCP deployment architecture decisions finalized ([#81](https://github.com/gtpooniwala/personal-agent/issues/81))
 - [ ] `todo` Cloud SQL production database setup ([#80](https://github.com/gtpooniwala/personal-agent/issues/80))
 - [ ] `todo` Secret Manager integration for production secrets ([#82](https://github.com/gtpooniwala/personal-agent/issues/82))
-- [ ] `todo` Bearer-token auth middleware for the FastAPI backend — must land before backend deploy ([#83](https://github.com/gtpooniwala/personal-agent/issues/83))
+- [x] `done` Bearer-token auth middleware for the FastAPI backend ([#83](https://github.com/gtpooniwala/personal-agent/issues/83))
 - [ ] `todo` Deploy the Next.js frontend to Vercel ([#127](https://github.com/gtpooniwala/personal-agent/issues/127))
 - [ ] `todo` Add a Next.js API proxy route for server-side bearer token injection ([#132](https://github.com/gtpooniwala/personal-agent/issues/132))
 - [ ] `todo` Cloud Run service definition for the backend — deploy with auth already in image ([#85](https://github.com/gtpooniwala/personal-agent/issues/85))

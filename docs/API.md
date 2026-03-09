@@ -1,6 +1,6 @@
 # API Documentation
 
-## Scope And Status (As Of March 8, 2026)
+## Scope And Status (As Of March 9, 2026)
 This document reflects the current split route model:
 - Bare runtime endpoints for async run submission, polling, and run streaming.
 - `/api/v1` endpoints for conversations, tools, documents, and health.
@@ -15,16 +15,29 @@ Routing conventions:
 - Non-runtime endpoints: mounted under `/api/v1`.
 
 ## Authentication
-Implemented now: no auth; single default-user behavior.
-All endpoints execute with full privileges for the single default user.
+Bearer-token auth is implemented at the FastAPI app boundary.
 
-Security constraint: do not bind this API to non-loopback interfaces or expose it behind a reverse proxy without adding authentication/authorization (for example, FastAPI auth dependencies, an authenticating reverse proxy, or VPN-restricted access).
+Environment contract:
+- If `AGENT_API_KEY` is set, bearer auth is enabled in any environment.
+- If `AGENT_API_KEY` is unset and `ENVIRONMENT=local`, the API stays open for local/dev compatibility.
+- If `AGENT_API_KEY` is unset and `ENVIRONMENT!=local`, backend startup fails before serving traffic.
 
-Production/shared deployment requirement: before exposing this service beyond strictly local trusted use on `127.0.0.1`, add authentication/authorization and restrict access appropriately.
+When auth is enabled:
+- Every non-`OPTIONS` route requires `Authorization: Bearer <AGENT_API_KEY>`.
+- Failure response is `401 Unauthorized` with `WWW-Authenticate: Bearer`.
+- Bare runtime routes, `/api/v1/*`, `/scheduler/tasks/*`, `/docs`, `/redoc`, and `/openapi.json` are all protected.
+- CORS preflight `OPTIONS` requests bypass auth so browser preflight still succeeds.
+
+Operational note:
+- Local developers who set `AGENT_API_KEY` should expect `/docs` and `/openapi.json` to require the bearer token too. FastAPI's default Swagger UI HTML is not anonymously reachable in that mode.
 
 ## Endpoint Matrix
 
 ### Implemented Now (Current Mainline)
+
+Authentication note for all endpoints below:
+- Send `Authorization: Bearer <AGENT_API_KEY>` whenever auth is enabled.
+- `OPTIONS` preflight is the only unauthenticated transport exception.
 
 #### POST `/chat`
 Asynchronous conversational submit endpoint.

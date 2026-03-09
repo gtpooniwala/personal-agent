@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     # Future settings with defaults for cloud deployment
     environment: str = "local"
     redis_url: Optional[str] = None
+    agent_api_key: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("AGENT_API_KEY"),
+    )
     jwt_secret: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("JWT_SECRET", "SECRET_KEY"),
