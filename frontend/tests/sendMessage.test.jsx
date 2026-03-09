@@ -175,7 +175,7 @@ describe('sendMessage first-message flow', () => {
 
 describe('sendMessage conversation scoping (issue #31)', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
   });
 
   test('isSending is false for the non-sending conversation while another is in-flight', async () => {
@@ -299,7 +299,7 @@ describe('sendMessage conversation scoping (issue #31)', () => {
 
 describe('sendMessage SSE vs fallback paths', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
   });
 
   test('SSE path: run completes via SSE without polling /status', async () => {

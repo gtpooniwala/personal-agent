@@ -64,11 +64,11 @@ export function subscribeToRunStream(runId, { onStateUpdate, onComplete, onFallb
 function normalizeRunEventData(data) {
   return {
     event_id: data.event_id,
-    event_type: data.event_type,
+    type: data.event_type,
     status: data.status,
     message: data.payload?.message ?? null,
     tool: data.payload?.tool ?? null,
     metadata: data.payload?.metadata ?? null,
-    timestamp: data.timestamp,
+    created_at: data.timestamp,
   };
 }

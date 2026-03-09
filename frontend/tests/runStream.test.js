@@ -30,6 +30,37 @@ describe('subscribeToRunStream', () => {
     global.EventSource = savedEventSource;
   });
 
+  test('calls onFallback when EventSource constructor throws', () => {
+    const savedEventSource = global.EventSource;
+    global.EventSource = class {
+      constructor() {
+        throw new Error('constructor error');
+      }
+    };
+
+    const callbacks = makeCallbacks();
+    subscribeToRunStream('run-xyz', callbacks);
+
+    expect(callbacks.onFallback).toHaveBeenCalledTimes(1);
+    expect(callbacks.onStateUpdate).not.toHaveBeenCalled();
+    expect(callbacks.onComplete).not.toHaveBeenCalled();
+
+    global.EventSource = savedEventSource;
+  });
+
+  test('calls onFallback when run_event has malformed JSON', () => {
+    const callbacks = makeCallbacks();
+    subscribeToRunStream('run-xyz', callbacks);
+
+    const es = MockEventSource.instances[0];
+    // Emit a raw event with invalid JSON data
+    const listeners = es._listeners['run_event'] || [];
+    listeners.forEach((fn) => fn({ data: 'not-valid-json' }));
+
+    expect(callbacks.onFallback).toHaveBeenCalledTimes(1);
+    expect(callbacks.onStateUpdate).not.toHaveBeenCalled();
+  });
+
   test('opens EventSource at correct URL', () => {
     const callbacks = makeCallbacks();
     subscribeToRunStream('run-xyz', callbacks);
@@ -56,12 +87,12 @@ describe('subscribeToRunStream', () => {
       type: 'run_event',
       event: {
         event_id: 'evt-1',
-        event_type: 'tool_call',
+        type: 'tool_call',
         status: 'running',
         message: 'hello',
         tool: 'search',
         metadata: { k: 'v' },
-        timestamp: '2024-01-01T00:00:00Z',
+        created_at: '2024-01-01T00:00:00Z',
       },
     });
     expect(callbacks.onComplete).not.toHaveBeenCalled();
