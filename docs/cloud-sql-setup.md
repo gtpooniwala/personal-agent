@@ -21,7 +21,7 @@ REGION="us-central1"
 INSTANCE_NAME="personal-agent-db"
 DB_NAME="personal_agent"
 DB_USER="personal_agent"
-DB_PASSWORD="$(openssl rand -base64 32)"   # save this securely before continuing
+DB_PASSWORD="$(openssl rand -hex 32)"      # hex is URL-safe; save this before continuing
 SECRET_NAME="personal-agent-database-url"
 CR_SA="personal-agent-backend@${PROJECT_ID}.iam.gserviceaccount.com"
 ```
