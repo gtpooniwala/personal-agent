@@ -1,0 +1,23 @@
+frontend/app/layout.js
+  1853a4cafbe284c2 14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "bb4de6d000b10e314df7ca771c2d7b4301df8077",
+  "prompts": {
+    "1853a4cafbe284c2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "07a5d6aa-3382-4ae4-a140-68f1b8e8ae2e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
