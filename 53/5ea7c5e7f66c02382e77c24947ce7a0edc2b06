@@ -1,0 +1,23 @@
+backend/observability/tracking.py
+  9063423eb0b6240c 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "535ea7c5e7f66c02382e77c24947ce7a0edc2b06",
+  "prompts": {
+    "9063423eb0b6240c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4fd65edf-1354-412d-a7be-b54532fe3c7e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
