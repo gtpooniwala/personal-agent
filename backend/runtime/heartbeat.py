@@ -85,6 +85,7 @@ class HeartbeatService:
             extra={"event": "heartbeat.orphans_found", "count": len(orphans)},
         )
 
+        supports_completed_at = self._supports_completed_at(db.update_run)
         for run in orphans:
             run_id = str(run["id"])
             run_status = (run.get("status") or "").lower()
@@ -107,7 +108,7 @@ class HeartbeatService:
                     "status": RUN_STATUS_FAILED,
                     "error": ORPHAN_ERROR_MESSAGE,
                 }
-                if self._supports_completed_at(db.update_run):
+                if supports_completed_at:
                     update_kwargs["completed_at"] = utcnow()
                 db.update_run(**update_kwargs)
                 db.append_run_event(

@@ -65,8 +65,11 @@ class TestAPIRoutes(unittest.TestCase):
             "run_id": "run-1",
             "status": "running",
             "conversation_id": "conv-1",
+            "attempt_count": 1,
             "created_at": "2026-03-06T10:00:00Z",
             "updated_at": "2026-03-06T10:00:01Z",
+            "started_at": "2026-03-06T10:00:00Z",
+            "completed_at": None,
             "error": None,
             "result": None,
         }
@@ -74,6 +77,7 @@ class TestAPIRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["status"], "running")
+        self.assertEqual(payload["attempt_count"], 1)
 
     @patch("backend.api.runtime_routes.runtime_service.get_run_events", new_callable=AsyncMock)
     def test_runtime_run_events_endpoint(self, mock_get_events):
