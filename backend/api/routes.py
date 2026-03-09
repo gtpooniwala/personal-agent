@@ -7,26 +7,17 @@ from backend.api.models import (
     TitleGenerationResponse
 )
 from backend.services.document_service import doc_processor
-from backend.config import settings, agent_config
+from backend.config import settings
 from typing import List
-from datetime import datetime, timedelta
-import asyncio
+from datetime import datetime
 import logging
 from backend.api.state import orchestrator
-from backend.database.operations import db_ops, UNTITLED_CONVERSATION_PREFIXES
-from backend.observability import observe_operation, update_observation, increment_counter
+from backend.database.operations import db_ops
+from backend.observability import observe_operation, update_observation
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-_NAMING_CFG = agent_config.get("conversation_naming", {})
-_NAMING_DELAY_MINUTES: int = _NAMING_CFG.get("delay_minutes", 5)
-_NAMING_RETRY_DELAY_MINUTES: int = _NAMING_CFG.get("retry_delay_minutes", 2)
-_NAMING_MAX_RETRIES: int = _NAMING_CFG.get("max_retries", 3)
-
-# Canonical untitled-title patterns, sourced from database.operations.
-_UNTITLED_PREFIXES = UNTITLED_CONVERSATION_PREFIXES
 
 
 def _average(total: int, count: int) -> float | None:
@@ -40,109 +31,9 @@ def _percentage(numerator: int, denominator: int) -> float | None:
         return None
     return round((numerator / denominator) * 100, 1)
 
-# Async task functions for conversation maintenance
-async def async_generate_title(conversation_id: str):
-    """Asynchronously generate a title with automatic retry on empty result or failure."""
-    with observe_operation(
-        name="maintenance.generate_title",
-        counter_prefix="maintenance.generate_title",
-        as_type="chain",
-        conversation_id=conversation_id,
-        metadata={"component": "maintenance"},
-    ):
-        for attempt in range(1, _NAMING_MAX_RETRIES + 1):
-            try:
-                logger.info(
-                    f"Title generation attempt {attempt}/{_NAMING_MAX_RETRIES} "
-                    f"for conversation {conversation_id}"
-                )
-                title = await orchestrator.generate_conversation_title(conversation_id)
-                if title:
-                    logger.info(f"Generated title for {conversation_id}: {title}")
-                    return
-                logger.warning(
-                    f"Attempt {attempt}: title generation returned empty for {conversation_id}"
-                )
-            except Exception:
-                logger.exception(
-                    f"Attempt {attempt}: title generation failed for {conversation_id}"
-                )
-                if attempt == _NAMING_MAX_RETRIES:
-                    logger.error(
-                        f"All {_NAMING_MAX_RETRIES} title generation attempts exhausted "
-                        f"for conversation {conversation_id}"
-                    )
-                    return
-
-            if attempt < _NAMING_MAX_RETRIES:
-                still_untitled = await asyncio.to_thread(
-                    db_ops.is_conversation_untitled, conversation_id
-                )
-                if not still_untitled:
-                    return
-                logger.info(
-                    f"Retrying title generation in {_NAMING_RETRY_DELAY_MINUTES}m "
-                    f"(next attempt {attempt + 1}/{_NAMING_MAX_RETRIES})"
-                )
-                await asyncio.sleep(_NAMING_RETRY_DELAY_MINUTES * 60)
-
-async def async_delete_empty_conversation(conversation_id: str):
-    """Asynchronously delete an empty old conversation."""
-    with observe_operation(
-        name="maintenance.delete_empty_conversation",
-        counter_prefix="maintenance.delete_empty_conversation",
-        as_type="span",
-        conversation_id=conversation_id,
-        metadata={"component": "maintenance"},
-    ):
-        try:
-            logger.info(f"Starting async deletion of empty conversation: {conversation_id}")
-            db_ops.delete_conversation(conversation_id)
-            logger.info(f"Successfully deleted empty conversation: {conversation_id}")
-        except Exception as e:
-            logger.error(f"Failed to delete conversation {conversation_id}: {str(e)}")
-            raise
-
-def check_conversation_maintenance(conversations: List[dict]) -> None:
-    """Check conversations for maintenance tasks and trigger them asynchronously."""
-    increment_counter("maintenance.scan_total")
-    now = datetime.now()
-    
-    for conv in conversations:
-        conversation_id = conv["id"]
-        title = conv["title"]
-        message_count = conv["message_count"]
-        updated_at = datetime.fromisoformat(conv["updated_at"].replace("Z", "+00:00"))
-        created_at = datetime.fromisoformat(conv["created_at"].replace("Z", "+00:00"))
-        
-        # Make times timezone-naive for comparison (assuming UTC)
-        if updated_at.tzinfo:
-            updated_at = updated_at.replace(tzinfo=None)
-        if created_at.tzinfo:
-            created_at = created_at.replace(tzinfo=None)
-        
-        # Check for title generation (≥1 message, inactive ≥ delay, untitled)
-        if (message_count >= 1 and
-            title and any(title.startswith(p) for p in _UNTITLED_PREFIXES) and
-            (now - updated_at) > timedelta(minutes=_NAMING_DELAY_MINUTES)):
-            
-            logger.info(f"Scheduling title generation for conversation {conversation_id} "
-                       f"(messages: {message_count}, age: {now - updated_at})")
-            increment_counter("maintenance.generate_title.scheduled_total")
-            asyncio.create_task(async_generate_title(conversation_id))
-        
-        # Check for deletion (0 messages, >1 day old)
-        elif (message_count == 0 and 
-              (now - created_at) > timedelta(days=1)):
-            
-            logger.info(f"Scheduling deletion of empty conversation {conversation_id} "
-                       f"(age: {now - created_at})")
-            increment_counter("maintenance.delete_empty_conversation.scheduled_total")
-            asyncio.create_task(async_delete_empty_conversation(conversation_id))
-
 @router.get("/conversations", response_model=List[ConversationResponse])
 async def get_conversations():
-    """Get all conversations for the user."""
+    """Get all conversations for the user without triggering maintenance work."""
     with observe_operation(
         name="api.conversations.list",
         counter_prefix="api.conversations.list",
@@ -151,11 +42,6 @@ async def get_conversations():
     ) as observation:
         try:
             conversations = orchestrator.get_conversations()
-
-            # Trigger passive maintenance tasks (title generation and cleanup)
-            logger.info(f"Running conversation maintenance check for {len(conversations)} conversations")
-            check_conversation_maintenance(conversations)
-
             update_observation(observation, output={"conversation_count": len(conversations)})
             return [ConversationResponse(**conv) for conv in conversations]
         except Exception as e:
