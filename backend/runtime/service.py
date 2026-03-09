@@ -315,10 +315,11 @@ class RuntimeService:
             "run_id": execution.run_id,
             "status": RUN_STATUS_RUNNING,
             "attempt_count": attempt,
+            "completed_at": None,
+            "error": None,
         }
         if attempt == 1:
             update_run_kwargs["started_at"] = utcnow()
-            update_run_kwargs["completed_at"] = None
 
         self._run_store.update_run(**update_run_kwargs)
         self._run_store.append_event(

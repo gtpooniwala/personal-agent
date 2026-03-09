@@ -2,6 +2,7 @@
 
 Uses injected fake db_ops so no real database is required.
 """
+from datetime import datetime
 import sys
 import unittest
 import os
@@ -46,6 +47,18 @@ class FakeDbOps:
         return self._runs.get(run_id)
 
 
+class TimestampAwareFakeDbOps(FakeDbOps):
+    def update_run(self, run_id, status, error=None, completed_at=None):
+        self.updated.append(
+            {
+                "run_id": run_id,
+                "status": status,
+                "error": error,
+                "completed_at": completed_at,
+            }
+        )
+
+
 class ErrorDbOps:
     def find_orphaned_runs(self):
         raise RuntimeError("db down")
@@ -67,6 +80,27 @@ class TestHeartbeatService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(fake_db.events[0]["run_id"], "run-1")
         self.assertEqual(fake_db.events[0]["status"], RUN_STATUS_FAILED)
         self.assertEqual(fake_db.events[0]["event_type"], RUN_EVENT_FAILED)
+
+    async def test_sweep_passes_completed_at_when_db_supports_it(self):
+        orphans = [{"id": "run-1", "conversation_id": "conv-1", "status": "running"}]
+        fake_db = TimestampAwareFakeDbOps(orphans=orphans)
+        service = HeartbeatService(poll_interval_seconds=9999, db_ops=fake_db)
+
+        await service._sweep()
+
+        self.assertEqual(len(fake_db.updated), 1)
+        self.assertIsInstance(fake_db.updated[0]["completed_at"], datetime)
+
+    async def test_sweep_remains_compatible_with_legacy_update_signature(self):
+        orphans = [{"id": "run-1", "conversation_id": "conv-1", "status": "running"}]
+        fake_db = FakeDbOps(orphans=orphans)
+        service = HeartbeatService(poll_interval_seconds=9999, db_ops=fake_db)
+
+        await service._sweep()
+
+        self.assertEqual(len(fake_db.updated), 1)
+        self.assertEqual(fake_db.updated[0]["status"], RUN_STATUS_FAILED)
+        self.assertEqual(len(fake_db.events), 1)
 
     async def test_sweep_noop_when_no_orphans(self):
         fake_db = FakeDbOps(orphans=[])

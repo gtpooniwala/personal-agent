@@ -1,6 +1,6 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 import sys
 import threading
@@ -17,6 +17,7 @@ RUNTIME_SERVICE_IMPORT_ERROR = ""
 
 try:
     from backend.runtime.service import RuntimeService
+    from backend.runtime.service import RunExecution
     from backend.runtime.store import InMemoryRunStore
 except (ImportError, ModuleNotFoundError) as exc:
     RUNTIME_SERVICE_TESTS_AVAILABLE = False
@@ -89,6 +90,17 @@ class FailingOrchestrator(BaseTestOrchestrator):
             "conversation_id": conversation_id,
             "error": True,
         }
+
+
+class RecordingRunStore(InMemoryRunStore):
+    def __init__(self):
+        super().__init__()
+        self.running_update_kwargs = []
+
+    def update_run(self, **kwargs):
+        if kwargs.get("status") == "running":
+            self.running_update_kwargs.append(dict(kwargs))
+        return super().update_run(**kwargs)
 
 
 @unittest.skipUnless(
@@ -318,6 +330,42 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         allow_second_attempt_to_finish.set()
         terminal_status = await self._wait_for_terminal(service, submitted["run_id"])
         self.assertEqual(terminal_status["status"], "succeeded")
+
+    async def test_retry_attempt_clears_terminal_fields_when_returning_to_running(self):
+        store = RecordingRunStore()
+        service = self._make_service(
+            orchestrator=SuccessfulOrchestrator(),
+            orchestrator_factory=build_factory(SuccessfulOrchestrator),
+            run_store=store,
+        )
+        run = store.create_run(
+            conversation_id="conv-retry-field-reset",
+            message="hello",
+            selected_documents=[],
+        )
+        store.update_run(
+            run_id=run.run_id,
+            status="failed",
+            error="stale error",
+            completed_at=datetime.now(timezone.utc),
+        )
+
+        await service._execute_attempt(
+            RunExecution(
+                run_id=run.run_id,
+                conversation_id="conv-retry-field-reset",
+                message="hello",
+                selected_documents=(),
+            ),
+            attempt=2,
+        )
+
+        running_updates = [
+            kwargs for kwargs in store.running_update_kwargs if kwargs.get("attempt_count") == 2
+        ]
+        self.assertEqual(len(running_updates), 1)
+        self.assertIsNone(running_updates[0]["completed_at"])
+        self.assertIsNone(running_updates[0]["error"])
 
     async def test_status_polling_remains_prompt_during_blocking_attempt(self):
         started_event = threading.Event()

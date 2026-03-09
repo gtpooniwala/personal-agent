@@ -67,6 +67,23 @@ class TestInMemoryRunStore(unittest.TestCase):
         self.assertEqual(updated.started_at, started_at)
         self.assertEqual(updated.completed_at, completed_at)
 
+    def test_update_run_rejects_naive_lifecycle_timestamps(self):
+        run = self.store.create_run(conversation_id="conv-1", message="hello", selected_documents=[])
+
+        with self.assertRaisesRegex(ValueError, "started_at must be a timezone-aware datetime or None"):
+            self.store.update_run(
+                run_id=run.run_id,
+                status="running",
+                started_at=datetime.now(),
+            )
+
+        with self.assertRaisesRegex(ValueError, "completed_at must be a timezone-aware datetime or None"):
+            self.store.update_run(
+                run_id=run.run_id,
+                status="failed",
+                completed_at=datetime.now(),
+            )
+
     def test_store_prunes_old_runs_when_capacity_exceeded(self):
         original_max = InMemoryRunStore.MAX_STORED_RUNS
         InMemoryRunStore.MAX_STORED_RUNS = 2

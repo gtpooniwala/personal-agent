@@ -48,8 +48,8 @@ class RunStore(ABC):
         *,
         run_id: str,
         status: str,
-        error: Optional[str] = None,
-        result: Optional[str] = None,
+        error: Any = _UNSET,
+        result: Any = _UNSET,
         attempt_count: Optional[int] = None,
         started_at: Any = _UNSET,
         completed_at: Any = _UNSET,
@@ -144,11 +144,22 @@ class InMemoryRunStore(RunStore):
             if attempt_count is not None:
                 record.attempt_count = attempt_count
             if started_at is not _UNSET:
+                self._validate_optional_timestamp("started_at", started_at)
                 record.started_at = started_at
             if completed_at is not _UNSET:
+                self._validate_optional_timestamp("completed_at", completed_at)
                 record.completed_at = completed_at
             self._prune_runs_locked()
             return replace(record)
+
+    @staticmethod
+    def _validate_optional_timestamp(field_name: str, value: Any) -> None:
+        if value is not None and not (
+            isinstance(value, datetime)
+            and value.tzinfo is not None
+            and value.tzinfo.utcoffset(value) is not None
+        ):
+            raise ValueError(f"{field_name} must be a timezone-aware datetime or None")
 
     def append_event(
         self,
@@ -248,8 +259,8 @@ class SqliteRunStorePlaceholder(RunStore):
         *,
         run_id: str,
         status: str,
-        error: Optional[str] = None,
-        result: Optional[str] = None,
+        error: Any = _UNSET,
+        result: Any = _UNSET,
         attempt_count: Optional[int] = None,
         started_at: Any = _UNSET,
         completed_at: Any = _UNSET,
@@ -478,8 +489,8 @@ class PostgresRunStorePlaceholder(RunStore):
         *,
         run_id: str,
         status: str,
-        error: Optional[str] = None,
-        result: Optional[str] = None,
+        error: Any = _UNSET,
+        result: Any = _UNSET,
         attempt_count: Optional[int] = None,
         started_at: Any = _UNSET,
         completed_at: Any = _UNSET,
