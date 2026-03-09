@@ -608,6 +608,8 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
         }
       }
     } catch {
+      activeStreamCleanupRef.current = null;
+
       if (!requestConversationId) {
         setChatError("Failed to start a conversation.");
       }

@@ -11,15 +11,29 @@ export function subscribeToRunStream(runId, { onStateUpdate, onComplete, onFallb
 
   es.addEventListener("run_event", (event) => {
     if (closed) return;
-    const data = JSON.parse(event.data);
+    let data;
+    try {
+      data = JSON.parse(event.data);
+    } catch {
+      es.close();
+      onFallback();
+      return;
+    }
     onStateUpdate({ type: "run_event", event: normalizeRunEventData(data) });
   });
 
   es.addEventListener("run_complete", (event) => {
     if (closed) return;
+    let data;
+    try {
+      data = JSON.parse(event.data);
+    } catch {
+      es.close();
+      onFallback();
+      return;
+    }
     closed = true;
     es.close();
-    const data = JSON.parse(event.data);
     onStateUpdate({ type: "run_complete", status: data.status, error: data.error ?? null });
     onComplete(data);
   });
