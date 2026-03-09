@@ -1,0 +1,25 @@
+tests/test_core_orchestrator.py
+  f9ef681de68e3c28 149-193,355
+backend/orchestrator/core.py
+  f9ef681de68e3c28 5,38-50,69,83-84,88-90,101,103,108-133,135-158,259-262,264,267,278,284-288,305,307,320,462,467,472
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "2015b05b42fa77710efbbebcdb04fcab327e7593",
+  "prompts": {
+    "f9ef681de68e3c28": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019cd023-bf86-7ae1-9972-602442f96729",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 142,
+      "total_deletions": 35,
+      "accepted_lines": 137,
+      "overriden_lines": 0
+    }
+  }
+}
