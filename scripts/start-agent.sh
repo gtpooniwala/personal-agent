@@ -78,4 +78,17 @@ if [[ "${AGENT}" == "codex" && "${MODE}" == "app" ]]; then
 fi
 
 cd "${slot_path}"
+
+# Activate the base repo's venv so all slots share a consistent Python environment.
+# This ensures dev tools (pytest, etc.) installed in the canonical venv are always
+# available regardless of which per-worktree venv may be on $PATH.
+VENV="${ROOT_DIR}/.venv"
+if [[ -f "${VENV}/bin/activate" ]]; then
+  # shellcheck source=/dev/null
+  source "${VENV}/bin/activate"
+  echo "Activated Python venv: ${VENV}"
+else
+  echo "Warning: base repo venv not found at ${VENV}; using system Python" >&2
+fi
+
 exec claude
