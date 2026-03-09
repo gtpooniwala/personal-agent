@@ -193,7 +193,7 @@ class DocumentProcessor:
 
             for page_num, page in enumerate(pdf_reader.pages):
                 try:
-                    page_text = page.extract_text()
+                    page_text = page.extract_text() or ""
                     if page_text.strip():
                         text_content.append(f"[Page {page_num + 1}]\n{page_text}")
                 except Exception as e:
