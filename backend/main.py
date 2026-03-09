@@ -1,6 +1,13 @@
+import logging
+import secrets
+import uuid
+from contextlib import asynccontextmanager
+from time import perf_counter
+
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
+from fastapi.responses import JSONResponse
 
 # Configure warnings early to suppress known upstream issues
 from backend.config.warnings_shim import configure_warnings
@@ -12,10 +19,6 @@ from backend.api.runtime_routes import runtime_router
 from backend.api.scheduler_routes import scheduler_router
 from backend.config import settings
 from backend.observability import configure_logging, langfuse_manager, push_context
-import logging
-import uvicorn
-from time import perf_counter
-import uuid
 from sqlalchemy.engine.url import make_url
 
 # Configure structured logging
@@ -32,6 +35,64 @@ def _safe_database_url() -> str:
         return "<invalid DATABASE_URL>"
 
 
+def _is_local_environment() -> bool:
+    return (settings.environment or "").strip().lower() == "local"
+
+
+def _configured_agent_api_key() -> str | None:
+    if not settings.agent_api_key:
+        return None
+    token = settings.agent_api_key.strip()
+    return token or None
+
+
+def _auth_is_enabled() -> bool:
+    return _configured_agent_api_key() is not None
+
+
+def _apply_cors_headers(request, response) -> None:
+    origin = request.headers.get("Origin")
+    if not origin:
+        return
+
+    if "*" in allow_origins:
+        if allow_credentials:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Vary"] = "Origin"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+        else:
+            response.headers["Access-Control-Allow-Origin"] = "*"
+        return
+
+    if origin not in allow_origins:
+        return
+
+    response.headers["Access-Control-Allow-Origin"] = origin
+    response.headers["Vary"] = "Origin"
+    if allow_credentials:
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+
+
+def _is_authorized_request(request) -> bool:
+    expected_token = _configured_agent_api_key()
+    if expected_token is None:
+        return True
+
+    authorization = request.headers.get("Authorization")
+    if not authorization:
+        return False
+
+    scheme, _, provided_token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not provided_token:
+        return False
+
+    return secrets.compare_digest(provided_token, expected_token)
+
+
+def _authorization_header_present(request) -> bool:
+    return bool(request.headers.get("Authorization"))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
@@ -39,6 +100,10 @@ async def lifespan(app: FastAPI):
     logger.info("Personal Agent API starting up...")
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Database URL: {_safe_database_url()}")
+    if not _is_local_environment() and not _auth_is_enabled():
+        raise RuntimeError(
+            "AGENT_API_KEY must be configured when ENVIRONMENT is not local."
+        )
     if not settings.gemini_api_key and not settings.openai_api_key:
         raise RuntimeError(
             "Either GEMINI_API_KEY or OPENAI_API_KEY must be configured."
@@ -98,20 +163,41 @@ async def request_context_middleware(request, call_next):
     start = perf_counter()
 
     with push_context(request_id=request_id, route=request.url.path):
-        try:
-            response = await call_next(request)
-        except Exception:
+        if request.method != "OPTIONS" and _auth_is_enabled() and not _is_authorized_request(request):
             latency_ms = int((perf_counter() - start) * 1000)
-            logger.exception(
-                "Request failed",
+            response = JSONResponse(
+                status_code=401,
+                content={"detail": "Unauthorized"},
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+            _apply_cors_headers(request, response)
+            response.headers["X-Request-ID"] = request_id
+            logger.warning(
+                "Request unauthorized",
                 extra={
-                    "event": "http.request.failed",
+                    "event": "http.request.unauthorized",
                     "method": request.method,
                     "path": request.url.path,
+                    "status_code": response.status_code,
                     "latency_ms": latency_ms,
+                    "auth_header_present": _authorization_header_present(request),
                 },
             )
-            raise
+        else:
+            try:
+                response = await call_next(request)
+            except Exception:
+                latency_ms = int((perf_counter() - start) * 1000)
+                logger.exception(
+                    "Request failed",
+                    extra={
+                        "event": "http.request.failed",
+                        "method": request.method,
+                        "path": request.url.path,
+                        "latency_ms": latency_ms,
+                    },
+                )
+                raise
 
         latency_ms = int((perf_counter() - start) * 1000)
         response.headers["X-Request-ID"] = request_id

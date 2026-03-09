@@ -33,7 +33,7 @@ Three-container Docker Compose setup:
 Limitations:
 - Runs only on local machine; no remote access
 - Local `./data` volume is local-only and not backed up (data loss risk)
-- No auth; exposed to anyone on the network
+- Local auth is optional today; production/shared exposure still requires `AGENT_API_KEY`
 - No CI/CD deploy path
 - Runtime automation primitives exist locally, but external trigger and deployment behavior are not yet productionized
 
@@ -121,8 +121,10 @@ Secrets to migrate:
 **Implementation:**
 - Generate a long random token: `openssl rand -base64 48`
 - Store in Secret Manager as `AGENT_API_KEY`
+- Set `ENVIRONMENT=production` (or any non-`local` value) in Cloud Run so startup fails fast if the token is missing
 - Cloud Run service is deployed with **unauthenticated HTTP invocation enabled** (`--allow-unauthenticated`); access control is enforced entirely by the bearer-token middleware inside the service (no IAP or IAM-based invoker in the request path)
-- FastAPI middleware checks `Authorization: Bearer <token>` on all protected routes
+- FastAPI middleware checks `Authorization: Bearer <token>` on every non-`OPTIONS` route when `AGENT_API_KEY` is configured
+- There are no anonymous route exemptions in auth-enabled environments: `/api/v1/health`, runtime routes, scheduler routes, `/docs`, `/redoc`, and `/openapi.json` all require the bearer token
 - Cloud Run injects `AGENT_API_KEY` from Secret Manager at startup
 - Vercel reads `AGENT_API_KEY` as a private env var and injects it server-side via the Next.js API proxy route (#132)
 - Cloud Scheduler jobs that call the backend use HTTP targets pointing at the Cloud Run URL and include `Authorization: Bearer <AGENT_API_KEY>` in the request headers
@@ -132,6 +134,8 @@ Secrets to migrate:
 Tracked in #83.
 
 **Note on browser-side requests:** Browser-side (`"use client"`) components cannot access non-`NEXT_PUBLIC_` env vars, so a Next.js API proxy route is required to inject the bearer token server-side before forwarding requests to Cloud Run. Storing the token as `NEXT_PUBLIC_AGENT_API_KEY` would expose it to all visitors. See #132.
+
+**Operational note on docs:** In auth-enabled environments, `/docs` and `/openapi.json` are also protected. Use authenticated HTTP requests or temporarily run locally without `AGENT_API_KEY` if you need anonymous Swagger access during development.
 
 ---
 
@@ -192,7 +196,7 @@ Cloud Scheduler job provisioning is in scope for #88.
 
 ## Things Not to Forget
 
-- **Bearer token** — `AGENT_API_KEY` must be set in both Secret Manager (for Cloud Run) and Vercel env vars before any API calls work end-to-end; without it the backend will reject all requests
+- **Bearer token** — `AGENT_API_KEY` must be set in both Secret Manager (for Cloud Run) and Vercel env vars before any API calls work end-to-end; without it the backend will reject all requests, and non-local startup should fail immediately
 - **GCS migration is not a blocker** — ephemeral storage is acceptable for the initial deploy; documents will not persist across container restarts until #79 is done
 - **Gmail OAuth redirect URIs** — must be updated in Google Cloud Console to include Cloud Run and Vercel URLs before Gmail polling works in production (#129)
 - **VPC connector** — needed for Cloud SQL private IP access from Cloud Run
