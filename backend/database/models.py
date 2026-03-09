@@ -10,7 +10,7 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy.orm import deferred, relationship, declarative_base
 from datetime import datetime, timezone
 import uuid
 
@@ -100,7 +100,11 @@ class Document(Base):
     
     # Document summary for context
     summary = Column(Text, nullable=True)  # AI-generated one-sentence summary
-    
+
+    # Binary content stored in DB (eliminates filesystem dependency for Cloud Run).
+    # Deferred so PDF bytes are not loaded by queries that only need metadata.
+    file_content = deferred(Column(LargeBinary, nullable=True))
+
     # Relationship to document chunks
     chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
 

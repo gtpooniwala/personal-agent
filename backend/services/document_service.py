@@ -2,9 +2,9 @@
 Document processing service for PDF text extraction and chunking.
 """
 
+import io
 import uuid
 from typing import List, Dict, Any, Optional
-from pathlib import Path
 from pypdf import PdfReader
 import logging
 
@@ -46,8 +46,6 @@ class DocumentProcessor:
             length_function=len,
             separators=["\n\n", "\n", " ", ""]
         )
-        self.upload_dir = Path("data/uploads")
-        self.upload_dir.mkdir(parents=True, exist_ok=True)
 
     def _require_embeddings_model(self) -> None:
         if self.embeddings is None:
@@ -83,16 +81,12 @@ class DocumentProcessor:
         document_id: Optional[str] = None
         try:
             self._require_processing_models()
-            # Generate unique filename and save file
+            # Generate unique stored filename (no filesystem write needed)
             file_id = str(uuid.uuid4())
-            file_extension = Path(filename).suffix
-            stored_filename = f"{file_id}{file_extension}"
-            file_path = self.upload_dir / stored_filename
-            
-            with open(file_path, "wb") as f:
-                f.write(file_content)
-            
-            # Create document record
+            file_extension = filename.rsplit(".", 1)[-1] if "." in filename else ""
+            stored_filename = f"{file_id}.{file_extension}" if file_extension else file_id
+
+            # Create document record with binary content stored in DB
             session = db_ops.get_session()
             try:
                 document = Document(
@@ -101,16 +95,17 @@ class DocumentProcessor:
                     file_size=len(file_content),
                     content_type="application/pdf",
                     user_id=user_id,
-                    processed="processing"
+                    processed="processing",
+                    file_content=file_content,
                 )
                 session.add(document)
                 session.commit()
                 document_id = document.id
             finally:
                 session.close()
-            
+
             # Process document content
-            await self._process_document_content(document_id, file_path)
+            await self._process_document_content(document_id, file_content)
             
             return document_id
             
@@ -130,12 +125,12 @@ class DocumentProcessor:
                     session.close()
             raise
     
-    async def _process_document_content(self, document_id: str, file_path: Path):
+    async def _process_document_content(self, document_id: str, file_content: bytes):
         """Extract text from PDF, generate summary, and create embeddings."""
         try:
             self._require_processing_models()
             # Extract text from PDF
-            text_content = self._extract_pdf_text(file_path)
+            text_content = self._extract_pdf_text(file_content)
             
             # Generate document summary
             summary = await self._generate_document_summary(text_content)
@@ -190,25 +185,23 @@ class DocumentProcessor:
                 session.close()
             raise
     
-    def _extract_pdf_text(self, file_path: Path) -> str:
-        """Extract text content from PDF file."""
+    def _extract_pdf_text(self, file_content: bytes) -> str:
+        """Extract text content from PDF bytes."""
         try:
             text_content = []
-            
-            with open(file_path, 'rb') as file:
-                pdf_reader = PdfReader(file)
-                
-                for page_num, page in enumerate(pdf_reader.pages):
-                    try:
-                        page_text = page.extract_text()
-                        if page_text.strip():
-                            text_content.append(f"[Page {page_num + 1}]\n{page_text}")
-                    except Exception as e:
-                        logger.warning(f"Error extracting text from page {page_num + 1}: {str(e)}")
-                        continue
-            
+            pdf_reader = PdfReader(io.BytesIO(file_content))
+
+            for page_num, page in enumerate(pdf_reader.pages):
+                try:
+                    page_text = page.extract_text() or ""
+                    if page_text.strip():
+                        text_content.append(f"[Page {page_num + 1}]\n{page_text}")
+                except Exception as e:
+                    logger.warning(f"Error extracting text from page {page_num + 1}: {str(e)}")
+                    continue
+
             return "\n\n".join(text_content)
-            
+
         except Exception as e:
             logger.error(f"Error extracting PDF text: {str(e)}")
             raise
@@ -433,15 +426,7 @@ class DocumentProcessor:
             
             if not document:
                 return False
-            
-            # Delete file from disk
-            try:
-                file_path = self.upload_dir / document.filename
-                if file_path.exists():
-                    file_path.unlink()
-            except Exception as e:
-                logger.warning(f"Error deleting file {document.filename}: {str(e)}")
-            
+
             # Delete from database (chunks will be deleted via cascade)
             session.delete(document)
             session.commit()
