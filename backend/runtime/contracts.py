@@ -69,8 +69,11 @@ class RunRecord:
     status: str
     message: str
     selected_documents: Sequence[str] = field(default_factory=tuple)
+    attempt_count: int = 0
     created_at: datetime = field(default_factory=utcnow)
     updated_at: datetime = field(default_factory=utcnow)
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
     error: Optional[str] = None
     result: Optional[str] = None
 
@@ -79,8 +82,13 @@ class RunRecord:
             "run_id": self.run_id,
             "status": self.status,
             "conversation_id": self.conversation_id,
+            "attempt_count": self.attempt_count,
             "created_at": isoformat_utc(self.created_at),
             "updated_at": isoformat_utc(self.updated_at),
+            "started_at": isoformat_utc(self.started_at) if self.started_at else None,
+            "completed_at": isoformat_utc(self.completed_at)
+            if self.completed_at
+            else None,
             "error": self.error,
             "result": self.result,
         }

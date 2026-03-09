@@ -4,6 +4,8 @@ import asyncio
 import logging
 from typing import Optional
 
+from backend.runtime.contracts import utcnow
+
 logger = logging.getLogger(__name__)
 
 ORPHAN_ERROR_MESSAGE = "Run abandoned: process crashed or lease expired"
@@ -85,7 +87,12 @@ class HeartbeatService:
                 continue
 
             try:
-                db.update_run(run_id=run_id, status=RUN_STATUS_FAILED, error=ORPHAN_ERROR_MESSAGE)
+                db.update_run(
+                    run_id=run_id,
+                    status=RUN_STATUS_FAILED,
+                    error=ORPHAN_ERROR_MESSAGE,
+                    completed_at=utcnow(),
+                )
                 db.append_run_event(
                     run_id=run_id,
                     event_type=RUN_EVENT_FAILED,

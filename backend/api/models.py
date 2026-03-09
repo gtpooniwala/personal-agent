@@ -31,8 +31,11 @@ class RunStatusResponse(BaseModel):
     run_id: str = Field(..., description="Run ID")
     status: str = Field(..., description="Current run status")
     conversation_id: str = Field(..., description="Conversation ID")
+    attempt_count: int = Field(..., description="Number of execution attempts")
     created_at: str = Field(..., description="Run creation timestamp")
     updated_at: str = Field(..., description="Last update timestamp")
+    started_at: Optional[str] = Field(None, description="Run start timestamp")
+    completed_at: Optional[str] = Field(None, description="Completion timestamp")
     error: Optional[str] = Field(None, description="Failure details if present")
     result: Optional[str] = Field(None, description="Final assistant response if completed")
 

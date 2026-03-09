@@ -34,6 +34,7 @@ from backend.runtime.contracts import (
     RUN_STATUS_RETRYING,
     RUN_STATUS_RUNNING,
     RUN_STATUS_SUCCEEDED,
+    utcnow,
 )
 from backend.runtime.orchestration import (
     OrchestrationAttempt,
@@ -141,7 +142,7 @@ class RuntimeService:
             "create_conversation",
         )
 
-    async def get_run_status(self, run_id: str) -> Dict[str, Optional[str]]:
+    async def get_run_status(self, run_id: str) -> Dict[str, object]:
         run = self._run_store.get_run(run_id)
         return run.to_status_payload()
 
@@ -187,19 +188,10 @@ class RuntimeService:
                     max_attempts=3,
                 )
                 if lease is None:
-                    self._run_store.update_run(
+                    self._mark_run_failed(
                         run_id=execution.run_id,
-                        status=RUN_STATUS_FAILED,
-                        error=SESSION_BUSY_MESSAGE,
-                        result=None,
+                        error_message=SESSION_BUSY_MESSAGE,
                     )
-                    self._run_store.append_event(
-                        run_id=execution.run_id,
-                        event_type=RUN_EVENT_FAILED,
-                        status=RUN_STATUS_FAILED,
-                        message=SESSION_BUSY_MESSAGE,
-                    )
-                    increment_counter("runtime.runs.failed_total")
                     update_observation(
                         observation,
                         output={"status": RUN_STATUS_FAILED, "run_id": execution.run_id},
@@ -281,24 +273,15 @@ class RuntimeService:
                     extra={"event": "runtime.run_crash", "run_id": execution.run_id},
                 )
                 try:
-                    self._run_store.update_run(
+                    self._mark_run_failed(
                         run_id=execution.run_id,
-                        status=RUN_STATUS_FAILED,
-                        error=GENERIC_RUNTIME_FAILURE_MESSAGE,
-                        result=None,
-                    )
-                    self._run_store.append_event(
-                        run_id=execution.run_id,
-                        event_type=RUN_EVENT_FAILED,
-                        status=RUN_STATUS_FAILED,
-                        message=GENERIC_RUNTIME_FAILURE_MESSAGE,
+                        error_message=GENERIC_RUNTIME_FAILURE_MESSAGE,
                     )
                 except RunNotFoundError:
                     logger.warning(
                         "Run disappeared while storing failure",
                         extra={"event": "runtime.run_missing", "run_id": execution.run_id},
                     )
-                increment_counter("runtime.runs.failed_total")
                 update_observation(
                     observation,
                     output={"status": RUN_STATUS_FAILED, "run_id": execution.run_id},
@@ -328,17 +311,23 @@ class RuntimeService:
 
     async def _execute_attempt(self, execution: RunExecution, attempt: int) -> None:
         """A single orchestration attempt: bookkeeping here, heavy work in the pool."""
+        update_run_kwargs = {
+            "run_id": execution.run_id,
+            "status": RUN_STATUS_RUNNING,
+            "attempt_count": attempt,
+        }
         if attempt == 1:
-            self._run_store.update_run(
-                run_id=execution.run_id,
-                status=RUN_STATUS_RUNNING,
-            )
-            self._run_store.append_event(
-                run_id=execution.run_id,
-                event_type=RUN_EVENT_STARTED,
-                status=RUN_STATUS_RUNNING,
-                message="Run started",
-            )
+            update_run_kwargs["started_at"] = utcnow()
+            update_run_kwargs["completed_at"] = None
+
+        self._run_store.update_run(**update_run_kwargs)
+        self._run_store.append_event(
+            run_id=execution.run_id,
+            event_type=RUN_EVENT_STARTED,
+            status=RUN_STATUS_RUNNING,
+            message="Run started" if attempt == 1 else f"Run attempt {attempt} started",
+        )
+        if attempt == 1:
             increment_counter("runtime.runs.running_total")
 
         attempt_orchestrator = self._execution_plane.create_orchestrator()
@@ -357,19 +346,10 @@ class RuntimeService:
 
         if result.get("error", False):
             error_message = result.get("response") or "Run failed"
-            self._run_store.update_run(
+            self._mark_run_failed(
                 run_id=execution.run_id,
-                status=RUN_STATUS_FAILED,
-                error=error_message,
-                result=None,
+                error_message=error_message,
             )
-            self._run_store.append_event(
-                run_id=execution.run_id,
-                event_type=RUN_EVENT_FAILED,
-                status=RUN_STATUS_FAILED,
-                message=error_message,
-            )
-            increment_counter("runtime.runs.failed_total")
             return
 
         for action in result.get("orchestration_actions") or []:
@@ -388,6 +368,7 @@ class RuntimeService:
             status=RUN_STATUS_SUCCEEDED,
             result=response,
             error=None,
+            completed_at=utcnow(),
         )
         self._run_store.append_event(
             run_id=execution.run_id,
@@ -405,6 +386,22 @@ class RuntimeService:
                 self._maybe_summarise_in_background(execution.conversation_id)
             )
         )
+
+    def _mark_run_failed(self, *, run_id: str, error_message: str) -> None:
+        self._run_store.update_run(
+            run_id=run_id,
+            status=RUN_STATUS_FAILED,
+            error=error_message,
+            result=None,
+            completed_at=utcnow(),
+        )
+        self._run_store.append_event(
+            run_id=run_id,
+            event_type=RUN_EVENT_FAILED,
+            status=RUN_STATUS_FAILED,
+            message=error_message,
+        )
+        increment_counter("runtime.runs.failed_total")
 
     async def _acquire_lease_with_retry(
         self,
