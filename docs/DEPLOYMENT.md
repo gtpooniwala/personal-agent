@@ -1,12 +1,25 @@
 # GCP Deployment Architecture
 
-Last updated: March 8, 2026
+Last updated: March 9, 2026
 
 This document is the architecture decision record (ADR) and deployment plan for moving from local Docker Compose to Google Cloud Platform (GCP) for personal cloud use.
 
 Current status:
-- this is still a planning ADR, not a record of completed cloud rollout work,
-- issue [#81](https://github.com/gtpooniwala/personal-agent/issues/81) remains open specifically so this document can stay current as decisions are finalized.
+- decisions are finalized; this ADR is a record of settled choices (closed via #81).
+
+---
+
+## Decisions Finalized
+
+| Topic | Decision |
+|-------|----------|
+| Compute (backend) | Cloud Run |
+| Frontend hosting | Vercel (free hobby tier) |
+| Auth | Bearer token (long random key in Secret Manager) |
+| Cloud Run min-instances | Backend service: `min-instances=0` (scale-to-zero) |
+| Document storage | Deferred — ephemeral OK for initial deploy; GCS is the target (#79) |
+| Custom domain | Not initially; `*.run.app` + Vercel-assigned domain |
+| Cost estimate | ~$7–25/month (Cloud SQL $7–20, Cloud Run ~$0–5, Vercel free) |
 
 ---
 
@@ -30,23 +43,23 @@ Limitations:
 
 ### Services
 
-| Component | GCP Service | Notes |
-|-----------|-------------|-------|
-| Backend (FastAPI) | Cloud Run | Stateless container; auto-scales |
-| Frontend (Next.js) | Cloud Run or Firebase Hosting | See decision below |
+| Component | Service | Notes |
+|-----------|---------|-------|
+| Backend (FastAPI) | Cloud Run | Stateless container; scale to zero; `min-instances=0` |
+| Frontend (Next.js) | Vercel | Free hobby tier; zero code changes; best Next.js DX |
 | Database | Cloud SQL (Postgres) | Managed, auto-backups |
-| Document storage | Cloud Storage (GCS) | Replaces ephemeral `./data` volume |
+| Document storage | Ephemeral (initial); GCS (target) | Deferred; see §3 and #79 |
 | Secrets | Secret Manager | All API keys and OAuth credentials |
-| Auth | Identity-Aware Proxy (IAP) | Google account gates access |
+| Auth | Bearer token | Long random key; FastAPI middleware; stored in Secret Manager |
 | CI/CD | GitHub Actions → Cloud Run | Deploy on merge to main |
 
 ---
 
 ## Architecture Decisions
 
-### 1. Compute: Cloud Run (preferred, not final)
+### 1. Compute: Cloud Run
 
-**Preference:** Cloud Run for backend and frontend.
+**Decision:** Cloud Run for the backend.
 
 **Rationale:**
 - No Kubernetes complexity for a personal-use project
@@ -54,18 +67,9 @@ Limitations:
 - Pay per request; scale to zero when idle
 - Same container image as local Docker; minimal code changes
 
-**Other options considered:**
+**min-instances: 0 (final)**
 
-| Option | Cost (personal) | Notes |
-|--------|----------------|-------|
-| **Cloud Run** | ~$0–15/mo | Preferred. Scale to zero, managed HTTPS, no VM to maintain |
-| **Compute Engine (VM)** | ~$7–20/mo always-on | Simplest migration path — run Docker Compose directly on the VM. No GCS migration required for local filesystem. Valid faster-path option. |
-| **GKE** | ~$75+/mo | Overkill for personal use |
-| **App Engine** | ~$5–20/mo | Older, less flexible, harder to migrate existing Docker setup |
-
-**Faster alternative:** If the priority is "get it running in the cloud quickly," a Compute Engine VM is simpler — you run Docker Compose on it and skip the GCS migration. Cloud Run is the better long-term choice but has more setup steps and requires the GCS migration (#79) before it works correctly. Decide based on timeline.
-
-**Decision deferred on min-instances:** The choice of `min-instances=0` vs `min-instances=1` has significant implications for the event trigger architecture and is linked to that decision. See #87 (cold start) and #88 (event trigger framework). Discuss during implementation.
+Scale to zero. Personal use; occasional cold starts of ~2–3s are acceptable. Free when idle. Cloud Scheduler drives periodic polling triggers via HTTP requests to wake the container — no always-warm container required. See §7.
 
 ---
 
@@ -82,13 +86,15 @@ Limitations:
 
 ---
 
-### 3. Document Storage: Google Cloud Storage
+### 3. Document Storage: Deferred
 
-**Decision:** Migrate from local `./data` volume to GCS.
+**Decision:** Deferred from initial deploy. Ephemeral filesystem is acceptable for the initial Cloud Run baseline.
 
-**Rationale:** Cloud Run has an ephemeral filesystem. Anything written to disk is lost on container restart or scale-in. All document uploads must go to GCS.
+**Target implementation:** GCS (Google Cloud Storage), tracked in #79. Standard Cloud Run pattern; cheaper storage at ~$0.02/GB vs Cloud SQL's ~$0.17/GB for BLOBs; keeps the database lean.
 
-**This is a code change** tracked separately in a sub-issue. The backend file-handling paths need to be updated to use the GCS SDK.
+**Note:** Current file handling accepts PDFs only. Multi-format support (Word, txt, images) is a separate concern independent of storage location.
+
+When tackled (#79): add GCS SDK dependency, update file upload/retrieval paths, add `GCS_BUCKET_NAME` env var wired through Secret Manager.
 
 ---
 
@@ -101,100 +107,98 @@ Secrets to migrate:
 - `GEMINI_API_KEY`
 - `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`
 - Database connection string
+- `AGENT_API_KEY` (bearer token for auth)
 - Any future API keys
 
 **Action required:** Grant Cloud Run service account `roles/secretmanager.secretAccessor`.
 
 ---
 
-### 5. Auth: Identity-Aware Proxy (IAP)
+### 5. Auth: Bearer Token
 
-**Decision:** Use IAP for personal authentication.
+**Decision:** Bearer token authentication for personal cloud access.
 
-**Rationale:**
-- Simplest personal-use auth; Google account gates all access
-- No login flows to build or maintain
-- IAP sits in front of the Cloud Run service; the app itself requires no auth code changes
+**Implementation:**
+- Generate a long random token: `openssl rand -base64 48`
+- Store in Secret Manager as `AGENT_API_KEY`
+- Cloud Run service is deployed with **unauthenticated HTTP invocation enabled** (`--allow-unauthenticated`); access control is enforced entirely by the bearer-token middleware inside the service (no IAP or IAM-based invoker in the request path)
+- FastAPI middleware checks `Authorization: Bearer <token>` on all protected routes
+- Cloud Run injects `AGENT_API_KEY` from Secret Manager at startup
+- Vercel reads `AGENT_API_KEY` as a private env var and injects it server-side via the Next.js API proxy route (#132)
+- Cloud Scheduler jobs that call the backend use HTTP targets pointing at the Cloud Run URL and include `Authorization: Bearer <AGENT_API_KEY>` in the request headers
 
-**Action required:** Enable IAP on the backend Cloud Run service. Allowlist your Google account.
+**Why not IAP:** IAP + Vercel requires service-to-service token complexity (identity tokens, refresh logic in the frontend). For personal single-user use, a long random bearer token is simpler and equally secure. No Google account dependency in the auth path.
 
-**Deferred: Frontend-to-backend API calls through IAP**
-IAP works well for browser requests (it redirects to a Google login page). However, when the Next.js frontend makes `fetch()` API calls to the backend, those are not browser navigations — they need to include an IAP identity token in the `Authorization` header. Getting and refreshing that token in the frontend adds complexity. The resolution depends on how the frontend is hosted:
-- If the frontend is on Cloud Run behind IAP too, service-to-service auth (using a GCP service account) is one path
-- If the frontend is on Vercel or Firebase Hosting (outside GCP), it needs to obtain a user identity token via Google Sign-In and pass it to the backend
+Tracked in #83.
 
-This needs to be worked out during implementation of #83 (IAP) alongside the frontend hosting decision (#85).
+**Note on browser-side requests:** Browser-side (`"use client"`) components cannot access non-`NEXT_PUBLIC_` env vars, so a Next.js API proxy route is required to inject the bearer token server-side before forwarding requests to Cloud Run. Storing the token as `NEXT_PUBLIC_AGENT_API_KEY` would expose it to all visitors. See #132.
 
 ---
 
-### 6. Frontend Hosting: Decision Deferred
+### 6. Frontend Hosting: Vercel
 
-**Decision deferred** — to be finalized during implementation of #85 (Cloud Run service definitions).
+**Decision:** Vercel (free hobby tier).
 
-Key prerequisite question: does the Next.js app use server-side rendering (SSR) or Next.js API routes? Check `next.config.js` before deciding. If yes, options B and D below require code changes.
+**Rationale:**
+- Purpose-built for Next.js; zero code changes required
+- Free for 3–10 DAU indefinitely on the hobby tier
+- Best Next.js developer experience; preview deploys included
+- `API_BASE_URL` stored as a **private** Vercel env var pointing to the Cloud Run `*.run.app` URL; used server-side by the Next.js API proxy route only — not exposed in the browser bundle
+- `AGENT_API_KEY` stored as a **private** Vercel env var; injected server-side via the Next.js API proxy route (#132) so the token is never exposed in the browser
 
-| Option | Pros | Cons |
-|--------|------|------|
-| **A: Cloud Run** | Consistent deploy model; no code changes; works with SSR | Slightly higher latency than CDN; not optimized for static assets |
-| **B: Firebase Hosting** | Better CDN; generous free tier | Requires `output: 'export'` in `next.config.js`; dynamic routes may need refactoring |
-| **C: Cloud Run + Cloud CDN** | CDN performance with full Next.js support | More infrastructure; adds cost and complexity |
-| **D: Vercel** | Purpose-built for Next.js; zero config; excellent CDN; preview deploys | Outside GCP ecosystem; IAP integration more complex (see §5); separate billing |
-
-**Notes:**
-- Vercel is the most ergonomic option for a Next.js project and worth considering if you want the smoothest frontend deployment experience. The tradeoff is that it lives outside GCP, which complicates IAP integration.
-- For initial deploy, Cloud Run (Option A) is the lowest friction path and keeps everything in one ecosystem.
-- Revisit if CDN performance or Vercel's developer experience matters more than ecosystem consistency.
+Tracked in #127. API proxy route tracked in #132.
 
 ---
 
 ### 7. Cold Starts and min-instances
 
-**Default preference:** `min-instances=0` (scale to zero).
+**Decision: `min-instances=0` (scale to zero). Final.**
 
-**Rationale:** Personal use; occasional cold starts of ~2-3s are acceptable. Free when idle.
+**Rationale:** Personal use; occasional cold starts of ~2–3s are acceptable. Free when idle.
 
-**Optional:** Set `min-instances=1` on the backend if always-warm is preferred. Adds approximately $5-15/month.
+**Trigger architecture with scale-to-zero:**
 
-**Decision linked to event trigger architecture (#88):** This is not just a cost/latency tradeoff. The min-instances setting determines which trigger architectures are viable:
+- Push-based triggers (Cloud Scheduler HTTP requests, Telegram webhooks, incoming webhooks) wake the container via HTTP — fully compatible with `min-instances=0`.
+- Polling-based triggers (email poller, scheduler heartbeat) are driven externally: Cloud Scheduler sends HTTP requests to `/triggers/email-poll` and `/triggers/schedule` on a cron cadence, waking the container to do the poll and dispatch.
 
-- **`min-instances=0` (scale to zero):** Internal polling loops (email poller, scheduler heartbeat) don't run when the container is idle — there's no process alive to do the polling. Push-based and webhook-based triggers (Telegram webhook, Cloud Scheduler sending an HTTP request to wake the container) still work fine because an incoming HTTP request wakes the container.
-- **`min-instances=1` (always warm):** Internal polling loops work because the container is always running. Simpler trigger implementations, but adds fixed monthly cost.
-
-The event trigger framework design depends on this choice. If scale-to-zero is preferred, polling-based triggers (email, scheduled tasks) need to be driven externally (e.g. Cloud Scheduler sends an HTTP request to a trigger endpoint, which then does the poll and dispatch). This is a valid architecture but changes the implementation. Discuss during #87 (cold start) and #88 (trigger framework).
+Cloud Scheduler job provisioning is in scope for #88.
 
 ---
 
 ### 8. Networking and Domains
 
 - Cloud Run provides automatic HTTPS on `*.run.app` — no TLS setup needed
-- Custom domain: use Cloud Run domain mapping (e.g. `agent.yourdomain.com`)
-- Backend and frontend communicate via internal Cloud Run service URLs (no public internet hop)
+- Frontend is Vercel-assigned domain (e.g. `personal-agent.vercel.app`)
+- Custom domain: can attach an owned domain to Cloud Run or Vercel later; not required initially
+- Backend and frontend communicate via Cloud Run `*.run.app` URL (set as `NEXT_PUBLIC_API_BASE_URL` in Vercel)
 - Cloud SQL: private IP via VPC connector; do not expose public IP
 
 ---
 
 ## Deployment Plan (Ordered)
 
-1. **Keep the ADR current** (#81) — resolve remaining frontend hosting and auth boundary decisions
-2. **Cloud SQL** (#80) — provision instance, migrate schema, update `DATABASE_URL`
-3. **Secret Manager** (#82) — migrate all secrets, update Cloud Run service account
-4. **GCS** (#79) — create bucket, update backend file-handling code
-5. **Backend and frontend Cloud Run services** (#85)
-6. **IAP** (#83) — enable authentication boundary for personal cloud access
-7. **CI/CD** (#86) — build and deploy on merge to `main`
-8. **Cold-start tuning** (#87) — optimize once the baseline deployment exists
-9. **Custom domain** (optional)
+1. **Cloud SQL** (#80) — provision instance, migrate schema, update `DATABASE_URL`
+2. **Secret Manager** (#82) — migrate all secrets; add `AGENT_API_KEY`; update Cloud Run service account
+3. **Bearer token auth middleware** (#83) — FastAPI middleware; generate and store token in Secret Manager
+4. **Backend Cloud Run service** (#85) — Cloud Run YAML/config; env vars from Secret Manager; VPC connector; `min-instances=0`; deploy backend with auth middleware already in the image; record `*.run.app` URL
+5. **Vercel frontend deploy** (#127) — connect repo; set `NEXT_PUBLIC_API_BASE_URL` and bearer token handling; verify end-to-end
+6. **Gmail OAuth redirect URIs** (#129) — add Cloud Run and Vercel URLs to Google Cloud Console OAuth credentials; test Gmail OAuth flow
+7. **CI/CD** (#86) — build and deploy backend on merge to `main`
+8. **Event trigger framework + Cloud Scheduler** (#88) — implement trigger dispatcher; provision Cloud Scheduler jobs for polling endpoints
+9. **GCS document storage** (#79) — when durable document persistence is needed
+10. **Cold-start tuning** (#87) — optional; revisit once cloud baseline is running
 
 ---
 
 ## Things Not to Forget
 
-- **GCS migration is required** — local `./data` volume is ephemeral on Cloud Run; documents will not persist without this change
-- **IAP** — without it, the backend is exposed on the public internet
-- **Gmail OAuth redirect URIs** — must be updated to include the Cloud Run or custom domain URL in the Google Cloud Console
+- **Bearer token** — `AGENT_API_KEY` must be set in both Secret Manager (for Cloud Run) and Vercel env vars before any API calls work end-to-end; without it the backend will reject all requests
+- **GCS migration is not a blocker** — ephemeral storage is acceptable for the initial deploy; documents will not persist across container restarts until #79 is done
+- **Gmail OAuth redirect URIs** — must be updated in Google Cloud Console to include Cloud Run and Vercel URLs before Gmail polling works in production (#129)
 - **VPC connector** — needed for Cloud SQL private IP access from Cloud Run
-- **Custom domain DNS** — if using a custom domain, update DNS records after Cloud Run domain mapping
-- **Cost estimate** — approximately $10-30/month depending on Cloud SQL tier and min-instances setting
+- **Cloud Scheduler jobs** — required for email polling and scheduled task triggers when running at `min-instances=0` (scale to zero); provisioned in #88
+- **Custom domain DNS** — if attaching an owned domain later, update DNS records after Cloud Run domain mapping or Vercel domain config
+- **Cost estimate** — approximately $7–25/month: Cloud SQL $7–20, Cloud Run ~$0–5, Vercel free
 
 ---
 
@@ -206,7 +210,10 @@ The event trigger framework design depends on this choice. If scale-to-zero is p
 | #80 | feat: Cloud SQL setup and production database configuration |
 | #81 | docs: GCP deployment architecture decision record |
 | #82 | feat: Secret Manager integration for production API keys |
-| #83 | feat: IAP setup for personal cloud authentication |
-| #85 | feat: Cloud Run service definitions for backend and frontend |
+| #83 | feat: bearer token auth middleware for FastAPI backend |
+| #85 | feat: Cloud Run service definition for backend |
 | #86 | feat: GitHub Actions CI/CD pipeline for Cloud Run deployment |
 | #87 | chore: cold start optimization and min-instances strategy for Cloud Run |
+| #127 | feat: deploy Next.js frontend to Vercel |
+| #129 | chore: update Gmail OAuth redirect URIs for production domains |
+| #132 | feat: Next.js API proxy route for server-side bearer token injection |

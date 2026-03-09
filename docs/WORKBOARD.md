@@ -49,23 +49,23 @@ Important rule:
 ## Deployment Track
 Work this track after the core runtime/orchestrator plan above is stable enough.
 
-- [ ] `todo` Keep the GCP ADR current and finalize remaining deployment decisions ([#81](https://github.com/gtpooniwala/personal-agent/issues/81))
+- [x] `done` GCP deployment architecture decisions finalized ([#81](https://github.com/gtpooniwala/personal-agent/issues/81))
 - [ ] `todo` Cloud SQL production database setup ([#80](https://github.com/gtpooniwala/personal-agent/issues/80))
 - [ ] `todo` Secret Manager integration for production secrets ([#82](https://github.com/gtpooniwala/personal-agent/issues/82))
-- [ ] `todo` Bearer-token auth middleware for the FastAPI backend ([#83](https://github.com/gtpooniwala/personal-agent/issues/83))
+- [ ] `todo` Bearer-token auth middleware for the FastAPI backend — must land before backend deploy ([#83](https://github.com/gtpooniwala/personal-agent/issues/83))
 - [ ] `todo` Deploy the Next.js frontend to Vercel ([#127](https://github.com/gtpooniwala/personal-agent/issues/127))
 - [ ] `todo` Add a Next.js API proxy route for server-side bearer token injection ([#132](https://github.com/gtpooniwala/personal-agent/issues/132))
-- [ ] `todo` Cloud Run service definition for the backend ([#85](https://github.com/gtpooniwala/personal-agent/issues/85))
+- [ ] `todo` Cloud Run service definition for the backend — deploy with auth already in image ([#85](https://github.com/gtpooniwala/personal-agent/issues/85))
 - [ ] `todo` GitHub Actions CI/CD pipeline for Cloud Run deployment ([#86](https://github.com/gtpooniwala/personal-agent/issues/86))
 - [ ] `todo` Update Gmail OAuth redirect URIs for production domains ([#129](https://github.com/gtpooniwala/personal-agent/issues/129))
-- [ ] `todo` Migrate document storage from local filesystem to GCS ([#79](https://github.com/gtpooniwala/personal-agent/issues/79))
+- [ ] `todo` Migrate document storage from local filesystem to GCS — deferred; not a blocker for initial deploy ([#79](https://github.com/gtpooniwala/personal-agent/issues/79))
 - [ ] `todo` Cold-start and min-instances tuning once the cloud baseline exists ([#87](https://github.com/gtpooniwala/personal-agent/issues/87))
 
 ## Trigger And Automation Track
 Current scheduler primitives already exist. The remaining work is the external trigger layer.
 
 - [x] `done` Scheduled task runner and scheduler-backed recurring runs ([#89](https://github.com/gtpooniwala/personal-agent/issues/89))
-- [ ] `todo` Event trigger framework for external trigger types ([#88](https://github.com/gtpooniwala/personal-agent/issues/88))
+- [ ] `todo` Event trigger framework for external trigger types + Cloud Scheduler provisioning for scale-to-zero polling ([#88](https://github.com/gtpooniwala/personal-agent/issues/88))
 - [ ] `todo` Add `trigger_run` for agent-spawned runs ([#90](https://github.com/gtpooniwala/personal-agent/issues/90))
 - [ ] `todo` Email-triggered task execution ([#91](https://github.com/gtpooniwala/personal-agent/issues/91))
 - [ ] `todo` Telegram bot integration for mobile task monitoring and triggering ([#92](https://github.com/gtpooniwala/personal-agent/issues/92))
