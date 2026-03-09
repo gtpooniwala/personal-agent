@@ -7,6 +7,7 @@ import ConversationList from "@/components/ConversationList";
 import DocumentsPanel from "@/components/DocumentsPanel";
 import MetricsDashboard from "@/components/MetricsDashboard";
 import { apiCall, runtimeApiCall, uploadPdf } from "@/lib/api";
+import { subscribeToRunStream } from "@/lib/runStream";
 
 const RUN_POLL_INTERVAL_MS = 500;
 const RUN_POLL_MAX_ATTEMPTS = 120;
@@ -147,6 +148,7 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
   const [resizingSidebar, setResizingSidebar] = useState(null);
 
   const appRootRef = useRef(null);
+  const activeStreamCleanupsRef = useRef(new Set());
   const fileInputRef = useRef(null);
   const messageInputRef = useRef(null);
   const focusAnimationFrameRef = useRef(null);
@@ -421,6 +423,7 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
     setSendingConversations((prev) => new Set(prev).add(sendingConversationKey));
     setChatError("");
     let thinkingId = null;
+    let streamCleanup = null;
 
     try {
       if (!requestConversationId) {
@@ -482,9 +485,6 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
         throw new Error("Run submission did not return run_id");
       }
 
-      let status = null;
-      let latestEventsCursor = null;
-
       updateRunState(requestConversationId, {
         runId,
         status: "queued",
@@ -493,53 +493,110 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
         events: [],
       });
 
-      for (let attempt = 0; attempt < RUN_POLL_MAX_ATTEMPTS; attempt += 1) {
-        try {
-          const [statusResult, eventsResult] = await Promise.allSettled([
-            runtimeApiCall(`/runs/${runId}/status`),
-            runtimeApiCall(buildRunEventsUrl(runId, latestEventsCursor)),
-          ]);
+      async function pollRunUntilComplete(pollRunId, conversationId) {
+        let pollStatus = null;
+        let latestEventsCursor = null;
 
-          if (statusResult.status !== "fulfilled") {
-            throw statusResult.reason || new Error("Run status request failed");
+        for (let attempt = 0; attempt < RUN_POLL_MAX_ATTEMPTS; attempt += 1) {
+          try {
+            const [statusResult, eventsResult] = await Promise.allSettled([
+              runtimeApiCall(`/runs/${pollRunId}/status`),
+              runtimeApiCall(buildRunEventsUrl(pollRunId, latestEventsCursor)),
+            ]);
+
+            if (statusResult.status !== "fulfilled") {
+              throw statusResult.reason || new Error("Run status request failed");
+            }
+
+            pollStatus = statusResult.value;
+            let nextEvents = [];
+
+            if (eventsResult.status === "fulfilled") {
+              const eventsPayload = eventsResult.value;
+              nextEvents = Array.isArray(eventsPayload?.events) ? eventsPayload.events : [];
+              latestEventsCursor = eventsPayload?.next_after || latestEventsCursor;
+            }
+
+            updateRunState(conversationId, (previousRunState) => {
+              const mergedEvents = mergeRunEvents(previousRunState.events, nextEvents);
+
+              return {
+                runId: pollRunId,
+                status: pollStatus?.status || previousRunState.status || "queued",
+                error: pollStatus?.error || "",
+                events: mergedEvents,
+                latestEvent: mergedEvents[mergedEvents.length - 1] || previousRunState.latestEvent || null,
+              };
+            });
+          } catch {
+            if (attempt === RUN_POLL_MAX_ATTEMPTS - 1) {
+              throw new Error("Run status polling failed");
+            }
+            await sleep(RUN_POLL_INTERVAL_MS);
+            continue;
           }
 
-          status = statusResult.value;
-          let nextEvents = [];
-
-          if (eventsResult.status === "fulfilled") {
-            const eventsPayload = eventsResult.value;
-            nextEvents = Array.isArray(eventsPayload?.events) ? eventsPayload.events : [];
-            latestEventsCursor = eventsPayload?.next_after || latestEventsCursor;
+          if (!RUN_IN_PROGRESS_STATUSES.has(pollStatus?.status)) {
+            break;
           }
 
-          updateRunState(requestConversationId, (previousRunState) => {
-            const mergedEvents = mergeRunEvents(previousRunState.events, nextEvents);
-
-            return {
-              runId,
-              status: status?.status || previousRunState.status || "queued",
-              error: status?.error || "",
-              events: mergedEvents,
-              latestEvent: mergedEvents[mergedEvents.length - 1] || previousRunState.latestEvent || null,
-            };
-          });
-        } catch {
-          if (attempt === RUN_POLL_MAX_ATTEMPTS - 1) {
-            throw new Error("Run status polling failed");
-          }
           await sleep(RUN_POLL_INTERVAL_MS);
-          continue;
         }
 
-        if (!RUN_IN_PROGRESS_STATUSES.has(status?.status)) {
-          break;
+        if (!pollStatus || RUN_IN_PROGRESS_STATUSES.has(pollStatus.status)) {
+          throw new Error("Run polling timed out");
         }
 
-        await sleep(RUN_POLL_INTERVAL_MS);
+        return pollStatus;
       }
 
-      if (!status || RUN_IN_PROGRESS_STATUSES.has(status.status)) {
+      let runFinalStatus = null;
+      let runFinalError = null;
+
+      await new Promise((resolve, reject) => {
+        streamCleanup = subscribeToRunStream(runId, {
+          onStateUpdate: ({ type, event, status: completeStatus, error }) => {
+            if (type === "run_event") {
+              updateRunState(requestConversationId, (prev) => {
+                const merged = mergeRunEvents(prev.events, [event]);
+                return {
+                  runId,
+                  status: event.status || prev.status,
+                  error: prev.error,
+                  events: merged,
+                  latestEvent: merged[merged.length - 1] || prev.latestEvent || null,
+                };
+              });
+            } else if (type === "run_complete") {
+              runFinalStatus = completeStatus;
+              runFinalError = error;
+              updateRunState(requestConversationId, (prev) => ({
+                ...prev,
+                status: completeStatus,
+                error: error || "",
+              }));
+            }
+          },
+          onComplete: () => {
+            resolve();
+          },
+          onFallback: () => {
+            pollRunUntilComplete(runId, requestConversationId)
+              .then((s) => {
+                runFinalStatus = s?.status;
+                runFinalError = s?.error;
+                resolve();
+              })
+              .catch(reject);
+          },
+        });
+        activeStreamCleanupsRef.current.add(streamCleanup);
+      });
+      activeStreamCleanupsRef.current.delete(streamCleanup);
+
+      const status = { status: runFinalStatus, error: runFinalError };
+
+      if (!status.status || RUN_IN_PROGRESS_STATUSES.has(status.status)) {
         throw new Error("Run polling timed out");
       }
 
@@ -552,6 +609,8 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
         }
       }
     } catch {
+      if (streamCleanup) activeStreamCleanupsRef.current.delete(streamCleanup);
+
       if (!requestConversationId) {
         setChatError("Failed to start a conversation.");
       }
@@ -807,6 +866,10 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
 
       if (uploadResetTimerRef.current) {
         clearTimeout(uploadResetTimerRef.current);
+      }
+
+      for (const cleanup of activeStreamCleanupsRef.current) {
+        cleanup();
       }
     };
   }, []);

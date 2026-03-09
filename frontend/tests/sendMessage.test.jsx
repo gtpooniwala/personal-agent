@@ -3,6 +3,14 @@ import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import HomePage from '@/app/page';
 import { apiCall, runtimeApiCall } from '@/lib/api';
+import { subscribeToRunStream } from '@/lib/runStream';
+
+jest.mock('@/lib/runStream', () => ({
+  subscribeToRunStream: jest.fn((_runId, { onFallback }) => {
+    onFallback();
+    return () => {};
+  }),
+}));
 
 jest.mock('@/lib/api', () => ({
   apiCall: jest.fn(),
@@ -21,6 +29,7 @@ function setupApiMocks({
   runtimeChatResponse = async () => ({ run_id: 'run-1' }),
   conversations = CONVERSATIONS,
   createdConversationId = 'conv-new',
+  sseMode = 'complete', // 'complete' | 'fallback' | 'pending'
 } = {}) {
   apiCall.mockImplementation(async (path, options = {}) => {
     if (path === '/tools') return [];
@@ -36,6 +45,17 @@ function setupApiMocks({
     if (path.includes('/status')) return Promise.resolve({ status: 'succeeded' });
     if (path.includes('/events')) return Promise.resolve({ events: [], next_after: null });
     return Promise.resolve({});
+  });
+
+  subscribeToRunStream.mockImplementation((_runId, { onStateUpdate, onComplete, onFallback }) => {
+    if (sseMode === 'complete') {
+      onStateUpdate({ type: 'run_complete', status: 'succeeded', error: null });
+      onComplete({ status: 'succeeded', error: null });
+    } else if (sseMode === 'fallback') {
+      onFallback();
+    }
+    // 'pending' — never resolves, simulates in-flight
+    return () => {};
   });
 }
 
@@ -155,7 +175,7 @@ describe('sendMessage first-message flow', () => {
 
 describe('sendMessage conversation scoping (issue #31)', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
   });
 
   test('isSending is false for the non-sending conversation while another is in-flight', async () => {
@@ -226,7 +246,7 @@ describe('sendMessage conversation scoping (issue #31)', () => {
       resolveStatus = resolve;
     });
 
-    setupApiMocks({ runtimeChatResponse: async () => ({ run_id: 'run-1' }) });
+    setupApiMocks({ runtimeChatResponse: async () => ({ run_id: 'run-1' }), sseMode: 'fallback' });
     runtimeApiCall.mockImplementation(async (path) => {
       if (path === '/chat') return { run_id: 'run-1' };
       if (path.includes('/status')) {
@@ -274,5 +294,57 @@ describe('sendMessage conversation scoping (issue #31)', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /^send$/i })).not.toBeDisabled();
     });
+  });
+});
+
+describe('sendMessage SSE vs fallback paths', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
+  test('SSE path: run completes via SSE without polling /status', async () => {
+    const user = userEvent.setup();
+
+    setupApiMocks({ sseMode: 'complete' });
+
+    await act(async () => {
+      render(<HomePage />);
+    });
+
+    await waitFor(() => screen.getByRole('button', { name: /Conv A/i }));
+
+    const input = screen.getByRole('textbox');
+    await user.type(input, 'hello via sse');
+    await user.click(screen.getByRole('button', { name: /^send$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^send$/i })).not.toBeDisabled();
+    });
+
+    const statusCalls = runtimeApiCall.mock.calls.filter(([path]) => path && path.includes('/status'));
+    expect(statusCalls).toHaveLength(0);
+  });
+
+  test('fallback path: run completes via polling when SSE triggers onFallback', async () => {
+    const user = userEvent.setup();
+
+    setupApiMocks({ sseMode: 'fallback' });
+
+    await act(async () => {
+      render(<HomePage />);
+    });
+
+    await waitFor(() => screen.getByRole('button', { name: /Conv A/i }));
+
+    const input = screen.getByRole('textbox');
+    await user.type(input, 'hello via fallback');
+    await user.click(screen.getByRole('button', { name: /^send$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^send$/i })).not.toBeDisabled();
+    });
+
+    const statusCalls = runtimeApiCall.mock.calls.filter(([path]) => path && path.includes('/status'));
+    expect(statusCalls.length).toBeGreaterThan(0);
   });
 });
