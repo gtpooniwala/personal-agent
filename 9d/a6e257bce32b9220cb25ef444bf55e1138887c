@@ -1,0 +1,35 @@
+backend/api/models.py
+  642ef89868df2a9f 34,37-38
+backend/runtime/contracts.py
+  642ef89868df2a9f 72,75-76,85,88-91
+backend/runtime/store.py
+  642ef89868df2a9f 7,53-55,127-129,135-136,144-149,253-255,300,303-304,323,326-327,339-341,349-354,365,368-369,483-485
+backend/runtime/service.py
+  642ef89868df2a9f 37,145,191,193,276,278,314-318,320,322-323,328,349,351,371,390-392,396-399,404
+tests/test_runtime_store.py
+  642ef89868df2a9f 2,16-18,53-68
+tests/test_runtime_service.py
+  642ef89868df2a9f 137-139,146-169,182-184,228-230,260-265,271-320
+backend/runtime/heartbeat.py
+  642ef89868df2a9f 7-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "9da6e257bce32b9220cb25ef444bf55e1138887c",
+  "prompts": {
+    "642ef89868df2a9f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019cd090-992f-70d2-b349-dbc868e6d74c",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 186,
+      "total_deletions": 46,
+      "accepted_lines": 187,
+      "overriden_lines": 0
+    }
+  }
+}
