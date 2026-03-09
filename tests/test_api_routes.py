@@ -35,6 +35,7 @@ class TestAPIRoutes(unittest.TestCase):
         self.client = TestClient(app)
 
     def tearDown(self):
+        self.client.close()
         self._default_settings.__exit__(None, None, None)
 
     def _override_settings(self, **overrides):
