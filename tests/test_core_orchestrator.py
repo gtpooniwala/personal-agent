@@ -19,6 +19,7 @@ CORE_ORCHESTRATOR_IMPORT_ERROR = ""
 try:
     from backend.orchestrator.core import CoreOrchestrator
     from backend.database.operations import db_ops
+    from backend.llm import MissingProviderKeyError
     from langchain_core.messages import AIMessage, HumanMessage
 except Exception as exc:
     CORE_ORCHESTRATOR_TESTS_AVAILABLE = False
@@ -146,6 +147,54 @@ class TestCoreOrchestrator(unittest.TestCase):
         self.assertIsInstance(messages[0], HumanMessage)
         self.assertEqual(messages[0].content, "Hello")
 
+    def test_build_run_context_keeps_request_state_local(self):
+        """Foreground execution context should carry request state instead of writing it to self."""
+        mock_agent = Mock()
+        mock_registry = Mock()
+        mock_registry.selected_documents = ["doc-1"]
+
+        with patch.object(
+            self.orchestrator.tool_registry,
+            "clone_with_selected_documents",
+            return_value=mock_registry,
+        ) as mock_clone, patch.object(
+            self.orchestrator,
+            "_build_orchestrator_agent",
+            return_value=mock_agent,
+        ) as mock_build, patch.object(
+            self.orchestrator,
+            "_ensure_llm",
+            return_value="fake-llm",
+        ), patch.object(
+            self.orchestrator,
+            "get_condensed_conversation_history",
+            return_value=[{"role": "user", "content": "Hello"}],
+        ):
+            context = self.orchestrator._build_run_context(
+                user_request="Hi there",
+                conversation_id="conv-ctx",
+                selected_documents=["doc-1"],
+            )
+
+        mock_clone.assert_called_once_with(["doc-1"])
+        mock_build.assert_called_once_with(
+            "conv-ctx",
+            mock_registry,
+            llm="fake-llm",
+        )
+        self.assertEqual(context.user_request, "Hi there")
+        self.assertEqual(context.conversation_id, "conv-ctx")
+        self.assertEqual(context.selected_documents, ("doc-1",))
+        self.assertEqual(
+            context.condensed_history,
+            ({"role": "user", "content": "Hello"},),
+        )
+        self.assertIs(context.run_registry, mock_registry)
+        self.assertIs(context.run_agent, mock_agent)
+        self.assertEqual(context.llm, "fake-llm")
+        self.assertFalse(hasattr(self.orchestrator, "selected_documents"))
+        self.assertFalse(hasattr(self.orchestrator, "run_agent"))
+
     def test_generate_direct_response_uses_structured_fallback_prompt(self):
         """Direct fallback responses should use the shared honesty-first prompt contract."""
         self.orchestrator.llm = Mock()
@@ -177,7 +226,7 @@ class TestCoreOrchestrator(unittest.TestCase):
         mock_agent = MagicMock()
         mock_agent.invoke.return_value = {"messages": []}
         response_agent_tool = Mock()
-        response_agent_tool._run.return_value = (
+        response_agent_tool.synthesize.return_value = (
             "I'm sorry, I wasn't able to process your uploaded contract to find information "
             "about termination. Please try uploading the document again."
         )
@@ -206,7 +255,7 @@ class TestCoreOrchestrator(unittest.TestCase):
             )
 
         mock_agent.invoke.assert_called_once()
-        response_agent_tool._run.assert_called_once()
+        response_agent_tool.synthesize.assert_called_once()
         direct_response.assert_not_awaited()
         self.assertEqual(result["orchestration_actions"], [])
         self.assertIn("contract", result["response"].lower())
@@ -242,7 +291,7 @@ class TestCoreOrchestrator(unittest.TestCase):
             )
 
         direct_response.assert_awaited_once()
-        response_agent_tool._run.assert_not_called()
+        response_agent_tool.synthesize.assert_not_called()
         self.assertEqual(result["response"], "Fallback answer")
         self.assertEqual(result["orchestration_actions"], [])
 
@@ -284,6 +333,100 @@ class TestCoreOrchestrator(unittest.TestCase):
         self.assertIn("no documents are currently selected", result["response"].lower())
         self.assertNotIn("successfully uploaded", result["response"].lower())
 
+    def test_process_request_clears_tool_actions_when_response_composition_falls_back(self):
+        mock_agent = MagicMock()
+        mock_tool_call = {
+            "id": "tool-call-1",
+            "name": "calculator",
+            "args": {"expression": "2+2"},
+        }
+        mock_ai_message = Mock()
+        mock_ai_message.tool_calls = [mock_tool_call]
+        mock_tool_message = Mock()
+        mock_tool_message.tool_calls = []
+        mock_tool_message.tool_call_id = "tool-call-1"
+        mock_tool_message.content = "4"
+        mock_agent.invoke.return_value = {"messages": [mock_ai_message, mock_tool_message]}
+        run_registry = Mock()
+        response_agent_tool = Mock()
+        response_agent_tool.synthesize.side_effect = RuntimeError("response synthesis failed")
+        run_registry.get_tool.side_effect = (
+            lambda name: response_agent_tool if name == "response_agent" else None
+        )
+        direct_response = AsyncMock(return_value="Fallback answer")
+
+        with patch.object(
+            self.orchestrator.tool_registry,
+            "clone_with_selected_documents",
+            return_value=run_registry,
+        ), patch.object(
+            self.orchestrator,
+            "_build_orchestrator_agent",
+            return_value=mock_agent,
+        ), patch.object(
+            self.orchestrator,
+            "_ensure_llm",
+            return_value=Mock(),
+        ), patch.object(
+            self.orchestrator,
+            "_generate_direct_response",
+            direct_response,
+        ), patch("backend.orchestrator.core.db_ops") as mock_db_ops, patch(
+            "backend.orchestrator.core.increment_counter"
+        ) as mock_increment, patch(
+            "backend.orchestrator.core.observe_operation"
+        ) as mock_obs:
+            mock_obs.return_value.__enter__ = Mock(return_value=None)
+            mock_obs.return_value.__exit__ = Mock(return_value=False)
+            mock_db_ops.get_conversation_history.return_value = []
+            mock_db_ops.save_message.return_value = None
+
+            result = asyncio.run(
+                self.orchestrator.process_request(
+                    "What is 2+2?",
+                    "conv-compose-fallback",
+                    selected_documents=[],
+                )
+            )
+
+        direct_response.assert_awaited_once()
+        self.assertEqual(result["response"], "Fallback answer")
+        self.assertEqual(result["orchestration_actions"], [])
+        incremented_keys = [call.args[0] for call in mock_increment.call_args_list]
+        self.assertIn("orchestrator.tool_calls_total", incremented_keys)
+        self.assertIn("orchestrator.tool_calls.calculator.total", incremented_keys)
+
+    def test_process_request_does_not_persist_user_message_when_setup_fails(self):
+        with patch.object(
+            self.orchestrator,
+            "_ensure_llm",
+            side_effect=MissingProviderKeyError("missing model key"),
+        ), patch("backend.orchestrator.core.db_ops") as mock_db_ops, patch(
+            "backend.orchestrator.core.increment_counter"
+        ), patch("backend.orchestrator.core.observe_operation") as mock_obs:
+            mock_obs.return_value.__enter__ = Mock(return_value=None)
+            mock_obs.return_value.__exit__ = Mock(return_value=False)
+            mock_db_ops.save_message.return_value = None
+
+            result = asyncio.run(
+                self.orchestrator.process_request(
+                    "Hello",
+                    "conv-setup-fail",
+                    selected_documents=[],
+                )
+            )
+
+        self.assertTrue(result["error"])
+        self.assertEqual(mock_db_ops.save_message.call_count, 1)
+        self.assertEqual(
+            mock_db_ops.save_message.call_args.args,
+            (
+                "conv-setup-fail",
+                "assistant",
+                "I can't process this request right now because the model configuration is unavailable.",
+            ),
+        )
+
     def test_format_document_status_prefers_selected_document_state(self):
         status = self.orchestrator._format_document_status(
             {
@@ -307,7 +450,7 @@ class TestCoreOrchestrator(unittest.TestCase):
         capture_lock = threading.Lock()
         overlap_barrier = threading.Barrier(2, timeout=5)
 
-        def capturing_build(conversation_id, tool_registry):
+        def capturing_build(conversation_id, tool_registry, **kwargs):
             with capture_lock:
                 captured_registries[conversation_id] = tool_registry
 

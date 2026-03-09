@@ -30,6 +30,7 @@ The runtime migration introduced a run ledger so the system could:
 ### Runtime Services
 - `RuntimeService` handles submission, retries, terminal status updates, and tool-result event emission.
 - `OrchestrationExecutionPlane` keeps blocking orchestration attempts off the FastAPI event loop via a bounded worker pool.
+- `CoreOrchestrator` now assembles explicit request-scoped execution context for each foreground run, so run-specific tool and model state is not stored implicitly on the shared orchestrator object.
 - `HeartbeatService` sweeps orphaned runs.
 - `SchedulerService` dispatches due scheduled tasks into the same runtime path.
 
@@ -41,7 +42,6 @@ Open follow-ups:
 - [#102](https://github.com/gtpooniwala/personal-agent/issues/102): define executor lifecycle and shutdown behavior
 - [#109](https://github.com/gtpooniwala/personal-agent/issues/109): budget follow-up work separately from foreground attempts
 - [#105](https://github.com/gtpooniwala/personal-agent/issues/105): persist follow-up work as queued task types
-- [#106](https://github.com/gtpooniwala/personal-agent/issues/106): make the orchestrator more stateless
 - [#103](https://github.com/gtpooniwala/personal-agent/issues/103): investigate true async internals
 - [#104](https://github.com/gtpooniwala/personal-agent/issues/104): add SSE streaming on top of the same event store
 
