@@ -16,7 +16,7 @@ services:
       ENVIRONMENT: local
     volumes:
       - ./backend:/app/backend
-      - ./data:/app/data
+      - ./backend/data:/app/data
       - ./logs:/app/logs
 
   frontend:
