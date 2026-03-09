@@ -27,7 +27,7 @@ That means:
 ### What Still Matters Most
 - Retry and degraded-fallback behavior still need a cleaner final contract now that normal-path routing is model-owned.
 - The frontend still needs to prefer the SSE run stream and then deduplicate its fallback transport behavior.
-- Some product-correctness cleanup remains around selected-document scoping, conversation-list side effects, response synthesis layering, and truthful runtime metrics.
+- Some product-correctness cleanup remains around selected-document scoping, response synthesis layering, and truthful runtime metrics.
 - Some follow-up work still runs as in-process background tasks instead of durable queued work.
 - The runtime is responsive during blocking orchestration now, but it still relies on a worker-pool execution plane rather than true end-to-end async internals.
 - Executor lifecycle policy and background execution budgeting still need a cleaner final contract.

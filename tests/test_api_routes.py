@@ -124,7 +124,7 @@ class TestAPIRoutes(unittest.TestCase):
         self.assertEqual(len(payload), 1)
         self.assertEqual(payload[0]["id"], "conv-1")
         mock_get_conversations.assert_called_once_with()
-        mock_generate_conversation_title.assert_not_awaited()
+        mock_generate_conversation_title.assert_not_called()
         mock_delete_conversation.assert_not_called()
 
     def test_upload_document_rejects_non_pdf(self):
