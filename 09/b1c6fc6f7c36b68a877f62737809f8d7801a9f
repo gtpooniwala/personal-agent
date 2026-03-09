@@ -1,0 +1,25 @@
+tests/test_worktree_slots.py
+  a8dc2891da57e1d3 6-7,15-24,166-240
+scripts/worktree_slots.py
+  a8dc2891da57e1d3 44-51,342-384,393-408,411-414,442,453-459,470-471,473
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "09b1c6fc6f7c36b68a877f62737809f8d7801a9f",
+  "prompts": {
+    "a8dc2891da57e1d3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019cd27c-10b5-7310-9d38-522ac2d8467e",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 190,
+      "total_deletions": 34,
+      "accepted_lines": 172,
+      "overriden_lines": 0
+    }
+  }
+}
