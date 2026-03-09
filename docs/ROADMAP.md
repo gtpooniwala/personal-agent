@@ -117,3 +117,4 @@ The target shape is a personal agent with:
 - `#101`, `#104`, `#106`: model-owned normal tool selection, backend SSE run streaming, and request-scoped foreground orchestration.
 - `#140`: conversation list reads are now side-effect-free.
 - `#78`: deployment and trigger planning docs.
+- `#81`: GCP deployment architecture decisions finalized (Vercel, bearer token, min-instances=0).

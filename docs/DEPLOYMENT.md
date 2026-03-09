@@ -5,8 +5,7 @@ Last updated: March 9, 2026
 This document is the architecture decision record (ADR) and deployment plan for moving from local Docker Compose to Google Cloud Platform (GCP) for personal cloud use.
 
 Current status:
-- decisions are finalized; this ADR is now a record of settled choices,
-- issue [#81](https://github.com/gtpooniwala/personal-agent/issues/81) tracks keeping this document current.
+- decisions are finalized; this ADR is a record of settled choices (closed via #81).
 
 ---
 
@@ -130,6 +129,8 @@ Secrets to migrate:
 
 Tracked in #83.
 
+**Note on browser-side requests:** Browser-side (`"use client"`) components cannot access non-`NEXT_PUBLIC_` env vars, so a Next.js API proxy route is required to inject the bearer token server-side before forwarding requests to Cloud Run. Storing the token as `NEXT_PUBLIC_AGENT_API_KEY` would expose it to all visitors. See #132.
+
 ---
 
 ### 6. Frontend Hosting: Vercel
@@ -140,10 +141,10 @@ Tracked in #83.
 - Purpose-built for Next.js; zero code changes required
 - Free for 3–10 DAU indefinitely on the hobby tier
 - Best Next.js developer experience; preview deploys included
-- `NEXT_PUBLIC_API_BASE_URL` points to the Cloud Run backend `*.run.app` URL
-- `AGENT_API_KEY` injected via Vercel env vars
+- `NEXT_PUBLIC_API_BASE_URL` points to the Cloud Run backend `*.run.app` URL (used by the Next.js API proxy)
+- `AGENT_API_KEY` stored as a **private** Vercel env var (no `NEXT_PUBLIC_` prefix); injected server-side via a Next.js API proxy route (#132) so the token is never exposed in the browser
 
-Tracked in #127.
+Tracked in #127. API proxy route tracked in #132.
 
 ---
 
@@ -176,9 +177,9 @@ Cloud Scheduler job provisioning is in scope for #88.
 
 1. **Cloud SQL** (#80) — provision instance, migrate schema, update `DATABASE_URL`
 2. **Secret Manager** (#82) — migrate all secrets; add `AGENT_API_KEY`; update Cloud Run service account
-3. **Backend Cloud Run service** (#85) — Cloud Run YAML/config; env vars from Secret Manager; VPC connector; `min-instances=0`; record `*.run.app` URL
-4. **Bearer token auth middleware** (#83) — FastAPI middleware; generate and store token; verify from Vercel
-5. **Vercel frontend deploy** (#127) — connect repo; set `NEXT_PUBLIC_API_BASE_URL` and `AGENT_API_KEY`; verify end-to-end
+3. **Bearer token auth middleware** (#83) — FastAPI middleware; generate and store token in Secret Manager
+4. **Backend Cloud Run service** (#85) — Cloud Run YAML/config; env vars from Secret Manager; VPC connector; `min-instances=0`; deploy backend with auth middleware already in the image; record `*.run.app` URL
+5. **Vercel frontend deploy** (#127) — connect repo; set `NEXT_PUBLIC_API_BASE_URL` and bearer token handling; verify end-to-end
 6. **Gmail OAuth redirect URIs** (#129) — add Cloud Run and Vercel URLs to Google Cloud Console OAuth credentials; test Gmail OAuth flow
 7. **CI/CD** (#86) — build and deploy backend on merge to `main`
 8. **Event trigger framework + Cloud Scheduler** (#88) — implement trigger dispatcher; provision Cloud Scheduler jobs for polling endpoints
@@ -213,3 +214,4 @@ Cloud Scheduler job provisioning is in scope for #88.
 | #87 | chore: cold start optimization and min-instances strategy for Cloud Run |
 | #127 | feat: deploy Next.js frontend to Vercel |
 | #129 | chore: update Gmail OAuth redirect URIs for production domains |
+| #132 | feat: Next.js API proxy route for server-side bearer token injection |
