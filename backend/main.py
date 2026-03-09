@@ -36,7 +36,7 @@ def _safe_database_url() -> str:
 
 
 def _is_local_environment() -> bool:
-    return settings.environment.strip().lower() == "local"
+    return (settings.environment or "").strip().lower() == "local"
 
 
 def _configured_agent_api_key() -> str | None:
@@ -48,6 +48,24 @@ def _configured_agent_api_key() -> str | None:
 
 def _auth_is_enabled() -> bool:
     return _configured_agent_api_key() is not None
+
+
+def _apply_cors_headers(request, response) -> None:
+    origin = request.headers.get("Origin")
+    if not origin:
+        return
+
+    if allow_origins == ["*"]:
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        return
+
+    if origin not in allow_origins:
+        return
+
+    response.headers["Access-Control-Allow-Origin"] = origin
+    response.headers["Vary"] = "Origin"
+    if allow_credentials:
+        response.headers["Access-Control-Allow-Credentials"] = "true"
 
 
 def _is_authorized_request(request) -> bool:
@@ -64,6 +82,10 @@ def _is_authorized_request(request) -> bool:
         return False
 
     return secrets.compare_digest(provided_token, expected_token)
+
+
+def _authorization_header_present(request) -> bool:
+    return bool(request.headers.get("Authorization"))
 
 
 @asynccontextmanager
@@ -143,6 +165,7 @@ async def request_context_middleware(request, call_next):
                 content={"detail": "Unauthorized"},
                 headers={"WWW-Authenticate": "Bearer"},
             )
+            _apply_cors_headers(request, response)
             response.headers["X-Request-ID"] = request_id
             logger.warning(
                 "Request unauthorized",
@@ -152,6 +175,7 @@ async def request_context_middleware(request, call_next):
                     "path": request.url.path,
                     "status_code": response.status_code,
                     "latency_ms": latency_ms,
+                    "auth_header_present": _authorization_header_present(request),
                 },
             )
         else:

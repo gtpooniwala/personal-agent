@@ -26,7 +26,15 @@ except Exception as exc:
 @unittest.skipUnless(API_TESTS_AVAILABLE, f"API test dependencies unavailable: {API_IMPORT_ERROR}")
 class TestAPIRoutes(unittest.TestCase):
     def setUp(self):
+        self._default_settings = self._override_settings(
+            environment="local",
+            agent_api_key=None,
+        )
+        self._default_settings.__enter__()
         self.client = TestClient(app)
+
+    def tearDown(self):
+        self._default_settings.__exit__(None, None, None)
 
     def _override_settings(self, **overrides):
         stack = ExitStack()
@@ -65,6 +73,16 @@ class TestAPIRoutes(unittest.TestCase):
         self.assertEqual(response.json(), {"detail": "Unauthorized"})
         self.assertEqual(response.headers["WWW-Authenticate"], "Bearer")
         self.assertIn("X-Request-ID", response.headers)
+
+    def test_health_endpoint_unauthorized_response_includes_cors_headers(self):
+        with self._override_settings(environment="local", agent_api_key="test-agent-key"):
+            response = self.client.get(
+                "/api/v1/health",
+                headers={"Origin": "http://localhost:3000"},
+            )
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.headers["Access-Control-Allow-Origin"], "http://localhost:3000")
+        self.assertEqual(response.headers["Access-Control-Allow-Credentials"], "true")
 
     def test_health_endpoint_accepts_bearer_token_when_configured(self):
         with self._override_settings(environment="local", agent_api_key="test-agent-key"):
