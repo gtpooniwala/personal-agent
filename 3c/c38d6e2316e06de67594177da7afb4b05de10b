@@ -1,0 +1,23 @@
+scripts/start-agent.sh
+  79073dbf36b12c89 81-93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "3cc38d6e2316e06de67594177da7afb4b05de10b",
+  "prompts": {
+    "79073dbf36b12c89": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "38a1048b-83f8-4b52-94a7-fc44e91ba15a",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 0,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}
