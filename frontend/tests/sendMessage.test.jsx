@@ -24,6 +24,8 @@ const CONVERSATIONS = [
   { id: 'conv-a', title: 'Conv A', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
   { id: 'conv-b', title: 'Conv B', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
 ];
+const RUN_TRANSPORT_TIMEOUT_MESSAGE =
+  'Live updates timed out. The run may still be in progress. Refresh the conversation to check for the final response.';
 
 function setupApiMocks({
   runtimeChatResponse = async () => ({ run_id: 'run-1' }),
@@ -302,6 +304,10 @@ describe('sendMessage SSE vs fallback paths', () => {
     jest.resetAllMocks();
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   test('SSE path: run completes via SSE without polling /status', async () => {
     const user = userEvent.setup();
 
@@ -346,5 +352,75 @@ describe('sendMessage SSE vs fallback paths', () => {
 
     const statusCalls = runtimeApiCall.mock.calls.filter(([path]) => path && path.includes('/status'));
     expect(statusCalls.length).toBeGreaterThan(0);
+  });
+
+  test('fallback polling timeout shows a soft warning without synthesizing a failed assistant message', async () => {
+    jest.useFakeTimers();
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+
+    setupApiMocks({ sseMode: 'fallback' });
+    runtimeApiCall.mockImplementation(async (path) => {
+      if (path === '/chat') return { run_id: 'run-1' };
+      if (path.includes('/status')) return { status: 'running', error: null };
+      if (path.includes('/events')) return { events: [], next_after: null };
+      return {};
+    });
+
+    await act(async () => {
+      render(<HomePage />);
+    });
+
+    await waitFor(() => screen.getByRole('button', { name: /Conv A/i }));
+
+    await user.type(screen.getByRole('textbox'), 'hello via stalled transport');
+    await user.click(screen.getByRole('button', { name: /^send$/i }));
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(60_000);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(RUN_TRANSPORT_TIMEOUT_MESSAGE)).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('[Error: Failed to send message]')).not.toBeInTheDocument();
+    expect(screen.getByText(/Thinking/)).toBeInTheDocument();
+    expect(screen.queryByText('Failed')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Running').length).toBeGreaterThan(0);
+  });
+
+  test('repeated polling failures exhaust into the same soft timeout path', async () => {
+    jest.useFakeTimers();
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+
+    setupApiMocks({ sseMode: 'fallback' });
+    runtimeApiCall.mockImplementation(async (path) => {
+      if (path === '/chat') return { run_id: 'run-1' };
+      if (path.includes('/status')) throw new Error('status unavailable');
+      if (path.includes('/events')) return { events: [], next_after: null };
+      return {};
+    });
+
+    await act(async () => {
+      render(<HomePage />);
+    });
+
+    await waitFor(() => screen.getByRole('button', { name: /Conv A/i }));
+
+    await user.type(screen.getByRole('textbox'), 'hello via repeated failures');
+    await user.click(screen.getByRole('button', { name: /^send$/i }));
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(60_000);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(RUN_TRANSPORT_TIMEOUT_MESSAGE)).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('[Error: Failed to send message]')).not.toBeInTheDocument();
+    expect(screen.getByText(/Thinking/)).toBeInTheDocument();
+    expect(screen.queryByText('Failed')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Queued').length).toBeGreaterThan(0);
   });
 });
