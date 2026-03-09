@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime, timezone
 
 from backend.runtime.store import InMemoryRunStore, InvalidEventsCursorError, RunNotFoundError
 
@@ -12,6 +13,9 @@ class TestInMemoryRunStore(unittest.TestCase):
         loaded = self.store.get_run(run.run_id)
         self.assertEqual(loaded.status, "queued")
         self.assertEqual(loaded.conversation_id, "conv-1")
+        self.assertEqual(loaded.attempt_count, 0)
+        self.assertIsNone(loaded.started_at)
+        self.assertIsNone(loaded.completed_at)
 
     def test_cursor_pagination(self):
         run = self.store.create_run(conversation_id="conv-1", message="hello", selected_documents=[])
@@ -45,6 +49,47 @@ class TestInMemoryRunStore(unittest.TestCase):
         updated = self.store.update_run(run_id=run.run_id, status="succeeded", error=None, result=None)
         self.assertIsNone(updated.error)
         self.assertIsNone(updated.result)
+
+    def test_update_run_tracks_attempts_and_lifecycle_timestamps(self):
+        run = self.store.create_run(conversation_id="conv-1", message="hello", selected_documents=[])
+        started_at = datetime.now(timezone.utc)
+        completed_at = datetime.now(timezone.utc)
+
+        updated = self.store.update_run(
+            run_id=run.run_id,
+            status="succeeded",
+            attempt_count=2,
+            started_at=started_at,
+            completed_at=completed_at,
+        )
+
+        self.assertEqual(updated.attempt_count, 2)
+        self.assertEqual(updated.started_at, started_at)
+        self.assertEqual(updated.completed_at, completed_at)
+
+    def test_update_run_rejects_naive_lifecycle_timestamps(self):
+        run = self.store.create_run(conversation_id="conv-1", message="hello", selected_documents=[])
+        original = self.store.get_run(run.run_id)
+
+        with self.assertRaisesRegex(ValueError, "started_at must be a timezone-aware datetime or None"):
+            self.store.update_run(
+                run_id=run.run_id,
+                status="running",
+                started_at=datetime.now(),
+            )
+        after_started_at_failure = self.store.get_run(run.run_id)
+        self.assertEqual(after_started_at_failure.status, original.status)
+        self.assertEqual(after_started_at_failure.updated_at, original.updated_at)
+
+        with self.assertRaisesRegex(ValueError, "completed_at must be a timezone-aware datetime or None"):
+            self.store.update_run(
+                run_id=run.run_id,
+                status="failed",
+                completed_at=datetime.now(),
+            )
+        after_completed_at_failure = self.store.get_run(run.run_id)
+        self.assertEqual(after_completed_at_failure.status, original.status)
+        self.assertEqual(after_completed_at_failure.updated_at, original.updated_at)
 
     def test_store_prunes_old_runs_when_capacity_exceeded(self):
         original_max = InMemoryRunStore.MAX_STORED_RUNS

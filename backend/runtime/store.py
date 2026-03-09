@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import replace
 from datetime import datetime
 from threading import RLock
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 from uuid import uuid4
 
 from backend.runtime.contracts import (
@@ -48,8 +48,11 @@ class RunStore(ABC):
         *,
         run_id: str,
         status: str,
-        error: Optional[str] = None,
-        result: Optional[str] = None,
+        error: Any = _UNSET,
+        result: Any = _UNSET,
+        attempt_count: Optional[int] = None,
+        started_at: Any = _UNSET,
+        completed_at: Any = _UNSET,
     ) -> RunRecord:
         raise NotImplementedError
 
@@ -121,11 +124,20 @@ class InMemoryRunStore(RunStore):
         status: str,
         error: Optional[str] = _UNSET,
         result: Optional[str] = _UNSET,
-    ) -> RunRecord:
+        attempt_count: Optional[int] = None,
+        started_at: Any = _UNSET,
+        completed_at: Any = _UNSET,
+        ) -> RunRecord:
         with self._lock:
             record = self._runs.get(run_id)
             if record is None:
                 raise RunNotFoundError(f"Run '{run_id}' was not found")
+            if attempt_count is not None and attempt_count < 0:
+                raise ValueError("attempt_count must be non-negative")
+            if started_at is not _UNSET:
+                self._validate_optional_timestamp("started_at", started_at)
+            if completed_at is not _UNSET:
+                self._validate_optional_timestamp("completed_at", completed_at)
 
             record.status = status
             record.updated_at = utcnow()
@@ -133,8 +145,23 @@ class InMemoryRunStore(RunStore):
                 record.error = error
             if result is not _UNSET:
                 record.result = result
+            if attempt_count is not None:
+                record.attempt_count = attempt_count
+            if started_at is not _UNSET:
+                record.started_at = started_at
+            if completed_at is not _UNSET:
+                record.completed_at = completed_at
             self._prune_runs_locked()
             return replace(record)
+
+    @staticmethod
+    def _validate_optional_timestamp(field_name: str, value: Any) -> None:
+        if value is not None and not (
+            isinstance(value, datetime)
+            and value.tzinfo is not None
+            and value.tzinfo.utcoffset(value) is not None
+        ):
+            raise ValueError(f"{field_name} must be a timezone-aware datetime or None")
 
     def append_event(
         self,
@@ -234,8 +261,11 @@ class SqliteRunStorePlaceholder(RunStore):
         *,
         run_id: str,
         status: str,
-        error: Optional[str] = None,
-        result: Optional[str] = None,
+        error: Any = _UNSET,
+        result: Any = _UNSET,
+        attempt_count: Optional[int] = None,
+        started_at: Any = _UNSET,
+        completed_at: Any = _UNSET,
     ) -> RunRecord:
         raise NotImplementedError(
             "Durable SQLite run store will land with issue #15 schema work"
@@ -280,8 +310,11 @@ class DbRunStore(RunStore):
             status=db_record["status"],
             message=message,
             selected_documents=tuple(selected_documents),
+            attempt_count=db_record["attempt_count"],
             created_at=self._parse_iso(db_record["created_at"]),
             updated_at=self._parse_iso(db_record["updated_at"]),
+            started_at=self._parse_iso(db_record["started_at"]),
+            completed_at=self._parse_iso(db_record["completed_at"]),
             error=db_record["error"],
             result=db_record["result"],
         )
@@ -300,8 +333,11 @@ class DbRunStore(RunStore):
             # Currently only available at creation time via create_run return value.
             message="",
             selected_documents=tuple(),
+            attempt_count=db_record["attempt_count"],
             created_at=self._parse_iso(db_record["created_at"]),
             updated_at=self._parse_iso(db_record["updated_at"]),
+            started_at=self._parse_iso(db_record["started_at"]),
+            completed_at=self._parse_iso(db_record["completed_at"]),
             error=db_record["error"],
             result=db_record["result"],
         )
@@ -313,6 +349,9 @@ class DbRunStore(RunStore):
         status: str,
         error: Optional[str] = _UNSET,
         result: Optional[str] = _UNSET,
+        attempt_count: Optional[int] = None,
+        started_at: Any = _UNSET,
+        completed_at: Any = _UNSET,
     ) -> RunRecord:
         # Build kwargs for db_ops, only including explicitly-set fields
         update_kwargs = {"run_id": run_id, "status": status}
@@ -320,6 +359,12 @@ class DbRunStore(RunStore):
             update_kwargs["error"] = error
         if result is not _UNSET:
             update_kwargs["result"] = result
+        if attempt_count is not None:
+            update_kwargs["attempt_count"] = attempt_count
+        if started_at is not _UNSET:
+            update_kwargs["started_at"] = started_at
+        if completed_at is not _UNSET:
+            update_kwargs["completed_at"] = completed_at
 
         db_record = self._db_ops.update_run(**update_kwargs)
         if db_record is None:
@@ -330,8 +375,11 @@ class DbRunStore(RunStore):
             status=db_record["status"],
             message="",
             selected_documents=tuple(),
+            attempt_count=db_record["attempt_count"],
             created_at=self._parse_iso(db_record["created_at"]),
             updated_at=self._parse_iso(db_record["updated_at"]),
+            started_at=self._parse_iso(db_record["started_at"]),
+            completed_at=self._parse_iso(db_record["completed_at"]),
             error=db_record["error"],
             result=db_record["result"],
         )
@@ -443,8 +491,11 @@ class PostgresRunStorePlaceholder(RunStore):
         *,
         run_id: str,
         status: str,
-        error: Optional[str] = None,
-        result: Optional[str] = None,
+        error: Any = _UNSET,
+        result: Any = _UNSET,
+        attempt_count: Optional[int] = None,
+        started_at: Any = _UNSET,
+        completed_at: Any = _UNSET,
     ) -> RunRecord:
         raise NotImplementedError(
             "Postgres run store will be wired in the migration PR"

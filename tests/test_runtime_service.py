@@ -1,5 +1,6 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 import os
 import sys
 import threading
@@ -16,6 +17,7 @@ RUNTIME_SERVICE_IMPORT_ERROR = ""
 
 try:
     from backend.runtime.service import RuntimeService
+    from backend.runtime.service import RunExecution
     from backend.runtime.store import InMemoryRunStore
 except (ImportError, ModuleNotFoundError) as exc:
     RUNTIME_SERVICE_TESTS_AVAILABLE = False
@@ -90,6 +92,17 @@ class FailingOrchestrator(BaseTestOrchestrator):
         }
 
 
+class RecordingRunStore(InMemoryRunStore):
+    def __init__(self):
+        super().__init__()
+        self.running_update_kwargs = []
+
+    def update_run(self, **kwargs):
+        if kwargs.get("status") == "running":
+            self.running_update_kwargs.append(dict(kwargs))
+        return super().update_run(**kwargs)
+
+
 @unittest.skipUnless(
     RUNTIME_SERVICE_TESTS_AVAILABLE,
     f"Runtime service test dependencies unavailable: {RUNTIME_SERVICE_IMPORT_ERROR}",
@@ -133,6 +146,9 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         status = await self._wait_for_terminal(service, run_id)
         self.assertEqual(status["status"], "succeeded")
         self.assertEqual(status["result"], "ok")
+        self.assertEqual(status["attempt_count"], 1)
+        self.assertIsNotNone(status["started_at"])
+        self.assertIsNotNone(status["completed_at"])
 
         events = await service.get_run_events(run_id=run_id, after=None, limit=100)
         event_types = [event["type"] for event in events["events"]]
@@ -175,6 +191,9 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         status = await self._wait_for_terminal(service, submitted["run_id"])
         self.assertEqual(status["status"], "failed")
         self.assertEqual(status["error"], "something failed")
+        self.assertEqual(status["attempt_count"], 1)
+        self.assertIsNotNone(status["started_at"])
+        self.assertIsNotNone(status["completed_at"])
 
     async def test_concurrent_runs_to_same_conversation_are_rejected(self):
         """Two concurrent runs to same conversation should result in one failing with session_busy."""
@@ -218,6 +237,9 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
             status2["error"],
             "Another operation is already running in this conversation.",
         )
+        self.assertEqual(status2["attempt_count"], 0)
+        self.assertIsNone(status2["started_at"])
+        self.assertIsNotNone(status2["completed_at"])
 
     async def test_orchestrator_exception_is_retried(self):
         """Orchestrator exceptions should trigger retries up to MAX_RETRY_ATTEMPTS."""
@@ -247,11 +269,105 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         status = await self._wait_for_terminal(service, submitted["run_id"])
         self.assertEqual(status["status"], "succeeded")
         self.assertEqual(attempt_count[0], 2)
+        self.assertEqual(status["attempt_count"], 2)
+        self.assertIsNotNone(status["started_at"])
+        self.assertIsNotNone(status["completed_at"])
+        started_at = datetime.fromisoformat(status["started_at"].replace("Z", "+00:00"))
+        completed_at = datetime.fromisoformat(status["completed_at"].replace("Z", "+00:00"))
+        self.assertLessEqual(started_at, completed_at)
 
         # Check that retrying event was logged
         events = await service.get_run_events(run_id=submitted["run_id"], after=None, limit=100)
         event_types = [event["type"] for event in events["events"]]
         self.assertIn("retrying", event_types)
+        self.assertEqual(event_types.count("started"), 2)
+
+    async def test_retry_attempt_sets_running_status_and_attempt_count(self):
+        second_attempt_started = threading.Event()
+        allow_second_attempt_to_finish = threading.Event()
+        attempts = [0]
+
+        class RetryBlockingOrchestrator(BaseTestOrchestrator):
+            async def process_request(
+                self, user_request, conversation_id, selected_documents=None
+            ):
+                attempts[0] += 1
+                if attempts[0] == 1:
+                    raise RuntimeError("temporary failure")
+
+                second_attempt_started.set()
+                if not allow_second_attempt_to_finish.wait(timeout=5.0):
+                    raise TimeoutError("test orchestrator did not receive finish signal")
+                return {
+                    "response": "ok",
+                    "conversation_id": conversation_id,
+                    "orchestration_actions": [],
+                    "token_usage": 4,
+                }
+
+        service = self._make_service(
+            orchestrator=RetryBlockingOrchestrator(),
+            orchestrator_factory=build_factory(RetryBlockingOrchestrator),
+            run_store=InMemoryRunStore(),
+        )
+        submitted = await service.submit_run(
+            RuntimeRequest(
+                message="hello",
+                conversation_id="conv-retry-running-status",
+                selected_documents=[],
+            )
+        )
+
+        await asyncio.to_thread(second_attempt_started.wait, 1.0)
+        self.assertTrue(second_attempt_started.is_set())
+
+        status = await service.get_run_status(submitted["run_id"])
+        self.assertEqual(status["status"], "running")
+        self.assertEqual(status["attempt_count"], 2)
+        self.assertIsNotNone(status["started_at"])
+        self.assertIsNone(status["completed_at"])
+
+        allow_second_attempt_to_finish.set()
+        terminal_status = await self._wait_for_terminal(service, submitted["run_id"])
+        self.assertEqual(terminal_status["status"], "succeeded")
+
+    async def test_retry_attempt_clears_terminal_fields_when_returning_to_running(self):
+        store = RecordingRunStore()
+        service = self._make_service(
+            orchestrator=SuccessfulOrchestrator(),
+            orchestrator_factory=build_factory(SuccessfulOrchestrator),
+            run_store=store,
+        )
+        run = store.create_run(
+            conversation_id="conv-retry-field-reset",
+            message="hello",
+            selected_documents=[],
+        )
+        store.update_run(
+            run_id=run.run_id,
+            status="failed",
+            error="stale error",
+            result="stale result",
+            completed_at=datetime.now(timezone.utc),
+        )
+
+        await service._execute_attempt(
+            RunExecution(
+                run_id=run.run_id,
+                conversation_id="conv-retry-field-reset",
+                message="hello",
+                selected_documents=(),
+            ),
+            attempt=2,
+        )
+
+        running_updates = [
+            kwargs for kwargs in store.running_update_kwargs if kwargs.get("attempt_count") == 2
+        ]
+        self.assertEqual(len(running_updates), 1)
+        self.assertIsNone(running_updates[0]["completed_at"])
+        self.assertIsNone(running_updates[0]["error"])
+        self.assertIsNone(running_updates[0]["result"])
 
     async def test_status_polling_remains_prompt_during_blocking_attempt(self):
         started_event = threading.Event()

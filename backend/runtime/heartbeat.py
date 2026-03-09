@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 from typing import Optional
+
+from backend.runtime.contracts import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +26,20 @@ class HeartbeatService:
             return self._db_ops
         from backend.database.operations import db_ops
         return db_ops
+
+    @staticmethod
+    def _supports_completed_at(update_run) -> bool:
+        try:
+            parameters = inspect.signature(update_run).parameters.values()
+        except (TypeError, ValueError):
+            return False
+
+        for parameter in parameters:
+            if parameter.kind == inspect.Parameter.VAR_KEYWORD:
+                return True
+            if parameter.name == "completed_at":
+                return True
+        return False
 
     async def start(self) -> None:
         logger.info("HeartbeatService starting", extra={"event": "heartbeat.start"})
@@ -68,6 +85,7 @@ class HeartbeatService:
             extra={"event": "heartbeat.orphans_found", "count": len(orphans)},
         )
 
+        supports_completed_at = self._supports_completed_at(db.update_run)
         for run in orphans:
             run_id = str(run["id"])
             run_status = (run.get("status") or "").lower()
@@ -85,7 +103,14 @@ class HeartbeatService:
                 continue
 
             try:
-                db.update_run(run_id=run_id, status=RUN_STATUS_FAILED, error=ORPHAN_ERROR_MESSAGE)
+                update_kwargs = {
+                    "run_id": run_id,
+                    "status": RUN_STATUS_FAILED,
+                    "error": ORPHAN_ERROR_MESSAGE,
+                }
+                if supports_completed_at:
+                    update_kwargs["completed_at"] = utcnow()
+                db.update_run(**update_kwargs)
                 db.append_run_event(
                     run_id=run_id,
                     event_type=RUN_EVENT_FAILED,
