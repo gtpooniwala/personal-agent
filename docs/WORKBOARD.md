@@ -20,9 +20,9 @@ Important rule:
 - Blocking orchestration work has already been moved off the FastAPI event loop into a bounded worker pool as the `#51` migration step.
 - Foreground orchestration now builds explicit request-scoped execution context, so per-run state no longer lives implicitly on the long-lived orchestrator instance.
 - Runtime support services are in place: orphan recovery heartbeat, scheduled task loop, scheduled task CRUD/API, and runtime shutdown wiring.
-- Normal-path tool selection is model-owned, the backend SSE stream exists, and foreground orchestration is request-scoped after the recent `#101`, `#104`, and `#106` work.
+- Normal-path tool selection is model-owned, the backend SSE stream exists, foreground orchestration is request-scoped, and the frontend now adopts the SSE stream with polling fallback after the recent `#101`, `#104`, `#106`, and `#122` work.
 - Frontend migration, document workflow clarity, Gmail Docker readiness, conversation naming, config validation, and runtime eval harness work are already landed.
-- The remaining follow-up debt is narrower now: retry/fallback cleanup, frontend transport adoption and deduplication, product-correctness cleanup, durable follow-up work, and true end-to-end async execution.
+- The remaining follow-up debt is narrower now: retry/fallback cleanup, transport deduplication, product-correctness cleanup, durable follow-up work, and true end-to-end async execution.
 
 ## Recommended Order
 
@@ -35,7 +35,7 @@ Important rule:
 - [ ] `todo` Investigate true async orchestration/runtime paths instead of thread or sync islands ([#103](https://github.com/gtpooniwala/personal-agent/issues/103))
 
 ### Product, Transport, And Prompting Follow-Ups
-- [ ] `todo` Adopt the SSE run stream in the frontend while keeping fallback behavior ([#122](https://github.com/gtpooniwala/personal-agent/issues/122))
+- [x] `done` Adopt the SSE run stream in the frontend while keeping fallback behavior ([#122](https://github.com/gtpooniwala/personal-agent/issues/122))
 - [ ] `todo` Deduplicate overlapping polling and SSE run-progress transport logic ([#121](https://github.com/gtpooniwala/personal-agent/issues/121))
 - [ ] `todo` Add timeout/watchdog handling for stalled SSE run streams ([#130](https://github.com/gtpooniwala/personal-agent/issues/130))
 - [x] `done` Stop conversation list reads from scheduling maintenance work ([#140](https://github.com/gtpooniwala/personal-agent/issues/140))
@@ -79,7 +79,10 @@ Keep this compressed. Use Git history and GitHub issues for detail.
 - [x] `done` Per-run orchestrator isolation, model-owned tool selection, backend SSE stream, and request-scoped orchestration: `#50`, `#72`, `#73`, `#74`, `#101`, `#104`, `#106`
 - [x] `done` Scheduler-backed recurring task baseline: `#18`, `#89`
 - [x] `done` Conversation list reads are now side-effect-free: `#140`
+- [x] `done` Runtime lifecycle observability fields made truthful: `#139`
 - [x] `done` Planning docs for cloud deployment and event-driven triggers: `#78`
+- [x] `done` Managed worktree slot workflow: `#125` — PR #125 (`8cc7e41`)
+- [x] `done` Frontend SSE run-progress client with polling fallback: `#122`
 
 ## Backlog
 - [ ] `todo` Chat naming polish ([#1](https://github.com/gtpooniwala/personal-agent/issues/1))

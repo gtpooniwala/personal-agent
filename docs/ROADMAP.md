@@ -23,21 +23,24 @@ That means:
 - Foreground orchestration now runs through request-scoped execution context rather than shared per-run instance state.
 - Frontend document workflow clarity and prompt/source-card UX have both already improved materially.
 - Frontend is on Next.js and the local workflow, eval harness, naming behavior, and Gmail Docker path have all been tightened recently.
+- LLM tool-selection ownership is fully in the orchestrator; rule-based routing fallback eliminated (`#101`, PR #124).
+- SSE stream endpoint (`GET /runs/{run_id}/stream`) with full backlog replay on reconnect (`#104`, PR #123).
+- Frontend SSE run-progress client with polling fallback; chat UI updates live via SSE (`#122`).
+- Managed worktree slot workflow for parallel agent execution (`#125`).
 
 ### What Still Matters Most
 - Retry and degraded-fallback behavior still need a cleaner final contract now that normal-path routing is model-owned.
-- The frontend still needs to prefer the SSE run stream and then deduplicate its fallback transport behavior.
+- Frontend transport deduplication (#121) and SSE watchdog (#130) remain as follow-ups after the SSE adoption lands.
 - Some product-correctness cleanup remains around selected-document scoping, response synthesis layering, and truthful runtime metrics.
 - Some follow-up work still runs as in-process background tasks instead of durable queued work.
 - The runtime is responsive during blocking orchestration now, but it still relies on a worker-pool execution plane rather than true end-to-end async internals.
-- Executor lifecycle policy and background execution budgeting still need a cleaner final contract.
 
 ## Recommended Execution Order
 
 ### Phase 1: Finish The Runtime Contract Cleanly
 1. [#120](https://github.com/gtpooniwala/personal-agent/issues/120) Add explicit retry policy for transient orchestrator and provider failures.
 2. [#119](https://github.com/gtpooniwala/personal-agent/issues/119) Reassess whether any degraded deterministic fallback still needs to exist after retries land.
-3. [#122](https://github.com/gtpooniwala/personal-agent/issues/122) Adopt the SSE run stream in the frontend while preserving fallback behavior.
+3. ~~[#122](https://github.com/gtpooniwala/personal-agent/issues/122) Adopt the SSE run stream in the frontend while preserving fallback behavior.~~ **Done — PR #126**
 4. [#121](https://github.com/gtpooniwala/personal-agent/issues/121) Deduplicate overlapping polling and SSE transport logic.
 5. [#130](https://github.com/gtpooniwala/personal-agent/issues/130) Add a watchdog for stalled SSE run streams.
 6. [#102](https://github.com/gtpooniwala/personal-agent/issues/102) Define executor ownership and graceful shutdown behavior.
@@ -115,6 +118,8 @@ The target shape is a personal agent with:
 - `#14` to `#19`: async runtime design, storage, API contract, worker semantics, scheduler, and eval coverage.
 - `#50`, `#51`, `#72`, `#73`, `#74`, `#89`: follow-up runtime isolation, worker-pool responsiveness, naming, validation, and recurring task support.
 - `#101`, `#104`, `#106`: model-owned normal tool selection, backend SSE run streaming, and request-scoped foreground orchestration.
-- `#140`: conversation list reads are now side-effect-free.
+- `#125`: managed worktree slot workflow for parallel agent execution.
+- `#139`, `#140`: runtime observability fields made truthful; conversation list reads are now side-effect-free.
+- `#122`: frontend SSE run-progress client with polling fallback — SSE is now end-to-end.
 - `#78`: deployment and trigger planning docs.
 - `#81`: GCP deployment architecture decisions finalized (Vercel, bearer token, min-instances=0).
