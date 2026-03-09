@@ -317,6 +317,7 @@ class RuntimeService:
             "attempt_count": attempt,
             "completed_at": None,
             "error": None,
+            "result": None,
         }
         if attempt == 1:
             update_run_kwargs["started_at"] = utcnow()

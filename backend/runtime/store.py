@@ -127,13 +127,17 @@ class InMemoryRunStore(RunStore):
         attempt_count: Optional[int] = None,
         started_at: Any = _UNSET,
         completed_at: Any = _UNSET,
-    ) -> RunRecord:
+        ) -> RunRecord:
         with self._lock:
             record = self._runs.get(run_id)
             if record is None:
                 raise RunNotFoundError(f"Run '{run_id}' was not found")
             if attempt_count is not None and attempt_count < 0:
                 raise ValueError("attempt_count must be non-negative")
+            if started_at is not _UNSET:
+                self._validate_optional_timestamp("started_at", started_at)
+            if completed_at is not _UNSET:
+                self._validate_optional_timestamp("completed_at", completed_at)
 
             record.status = status
             record.updated_at = utcnow()
@@ -144,10 +148,8 @@ class InMemoryRunStore(RunStore):
             if attempt_count is not None:
                 record.attempt_count = attempt_count
             if started_at is not _UNSET:
-                self._validate_optional_timestamp("started_at", started_at)
                 record.started_at = started_at
             if completed_at is not _UNSET:
-                self._validate_optional_timestamp("completed_at", completed_at)
                 record.completed_at = completed_at
             self._prune_runs_locked()
             return replace(record)

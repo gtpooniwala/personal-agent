@@ -347,6 +347,7 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
             run_id=run.run_id,
             status="failed",
             error="stale error",
+            result="stale result",
             completed_at=datetime.now(timezone.utc),
         )
 
@@ -366,6 +367,7 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(running_updates), 1)
         self.assertIsNone(running_updates[0]["completed_at"])
         self.assertIsNone(running_updates[0]["error"])
+        self.assertIsNone(running_updates[0]["result"])
 
     async def test_status_polling_remains_prompt_during_blocking_attempt(self):
         started_event = threading.Event()

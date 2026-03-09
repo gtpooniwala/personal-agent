@@ -69,6 +69,7 @@ class TestInMemoryRunStore(unittest.TestCase):
 
     def test_update_run_rejects_naive_lifecycle_timestamps(self):
         run = self.store.create_run(conversation_id="conv-1", message="hello", selected_documents=[])
+        original = self.store.get_run(run.run_id)
 
         with self.assertRaisesRegex(ValueError, "started_at must be a timezone-aware datetime or None"):
             self.store.update_run(
@@ -76,6 +77,9 @@ class TestInMemoryRunStore(unittest.TestCase):
                 status="running",
                 started_at=datetime.now(),
             )
+        after_started_at_failure = self.store.get_run(run.run_id)
+        self.assertEqual(after_started_at_failure.status, original.status)
+        self.assertEqual(after_started_at_failure.updated_at, original.updated_at)
 
         with self.assertRaisesRegex(ValueError, "completed_at must be a timezone-aware datetime or None"):
             self.store.update_run(
@@ -83,6 +87,9 @@ class TestInMemoryRunStore(unittest.TestCase):
                 status="failed",
                 completed_at=datetime.now(),
             )
+        after_completed_at_failure = self.store.get_run(run.run_id)
+        self.assertEqual(after_completed_at_failure.status, original.status)
+        self.assertEqual(after_completed_at_failure.updated_at, original.updated_at)
 
     def test_store_prunes_old_runs_when_capacity_exceeded(self):
         original_max = InMemoryRunStore.MAX_STORED_RUNS
