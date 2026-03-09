@@ -1,0 +1,23 @@
+docs/cloud-sql-setup.md
+  79073dbf36b12c89 1-169
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "86204d3fbc892fe4faa76b465e3852d513a076ef",
+  "prompts": {
+    "79073dbf36b12c89": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "38a1048b-83f8-4b52-94a7-fc44e91ba15a",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 169,
+      "overriden_lines": 0
+    }
+  }
+}
