@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import json
+import subprocess
 import unittest
 from tempfile import TemporaryDirectory
 
@@ -10,6 +12,16 @@ from scripts import worktree_slots
 
 
 class WorktreeSlotHelpersTest(unittest.TestCase):
+    def make_ctx(self, root: str = "/tmp/repo") -> worktree_slots.RepoContext:
+        repo_root = worktree_slots.Path(root)
+        return worktree_slots.RepoContext(
+            cwd_root=repo_root,
+            shared_root=repo_root,
+            common_dir=repo_root / ".git",
+            worktrees_dir=repo_root / ".worktrees",
+            state_dir=repo_root / ".worktrees" / "state",
+        )
+
     def test_sanitize_slug_normalizes_text(self) -> None:
         self.assertEqual(worktree_slots.sanitize_slug("Tool Routing"), "tool-routing")
         self.assertEqual(worktree_slots.sanitize_slug("  API + SSE  "), "api-sse")
@@ -150,6 +162,127 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
         finally:
             worktree_slots.git = original_git
             worktree_slots._parse_worktree_list_cached.cache_clear()
+
+    def test_branch_merged_into_main_uses_merged_pr_state_when_ancestry_check_fails(self) -> None:
+        ctx = self.make_ctx()
+        branch = "codex/fix/59-slot-release"
+        original_local_branch_exists = worktree_slots.local_branch_exists
+        original_base_ref = worktree_slots.base_ref
+        original_git = worktree_slots.git
+        original_run = worktree_slots.run
+        original_command_exists = worktree_slots.command_exists
+        worktree_slots.cached_branch_pr_info.cache_clear()
+
+        def fake_run(*args, **kwargs):
+            if args[:3] == ("git", "merge-base", "--is-ancestor"):
+                return subprocess.CompletedProcess(args, 1, "", "")
+            if args[:3] == ("gh", "pr", "view"):
+                payload = {
+                    "number": 17,
+                    "state": "MERGED",
+                    "url": "https://example.test/pull/17",
+                    "headRefOid": "deadbeef",
+                }
+                return subprocess.CompletedProcess(args, 0, json.dumps(payload), "")
+            raise AssertionError(f"unexpected command: {args}")
+
+        try:
+            worktree_slots.local_branch_exists = lambda _ctx, _branch: True
+            worktree_slots.base_ref = lambda _ctx: "origin/main"
+            worktree_slots.git = lambda *args, **kwargs: "deadbeef"
+            worktree_slots.command_exists = lambda name: name == "gh"
+            worktree_slots.run = fake_run
+
+            self.assertTrue(worktree_slots.branch_merged_into_main(ctx, branch))
+            self.assertEqual(
+                worktree_slots.branch_open_pr_hint(ctx, branch),
+                "PR #17 merged (https://example.test/pull/17)",
+            )
+        finally:
+            worktree_slots.local_branch_exists = original_local_branch_exists
+            worktree_slots.base_ref = original_base_ref
+            worktree_slots.git = original_git
+            worktree_slots.run = original_run
+            worktree_slots.command_exists = original_command_exists
+            worktree_slots.cached_branch_pr_info.cache_clear()
+
+    def test_branch_merged_into_main_keeps_unmerged_pr_as_unmerged(self) -> None:
+        ctx = self.make_ctx("/tmp/repo-closed-pr")
+        branch = "codex/fix/59-slot-release"
+        original_local_branch_exists = worktree_slots.local_branch_exists
+        original_base_ref = worktree_slots.base_ref
+        original_git = worktree_slots.git
+        original_run = worktree_slots.run
+        original_command_exists = worktree_slots.command_exists
+        worktree_slots.cached_branch_pr_info.cache_clear()
+
+        def fake_run(*args, **kwargs):
+            if args[:3] == ("git", "merge-base", "--is-ancestor"):
+                return subprocess.CompletedProcess(args, 1, "", "")
+            if args[:3] == ("gh", "pr", "view"):
+                payload = {
+                    "number": 18,
+                    "state": "CLOSED",
+                    "url": "https://example.test/pull/18",
+                    "headRefOid": "deadbeef",
+                }
+                return subprocess.CompletedProcess(args, 0, json.dumps(payload), "")
+            raise AssertionError(f"unexpected command: {args}")
+
+        try:
+            worktree_slots.local_branch_exists = lambda _ctx, _branch: True
+            worktree_slots.base_ref = lambda _ctx: "origin/main"
+            worktree_slots.git = lambda *args, **kwargs: "deadbeef"
+            worktree_slots.command_exists = lambda name: name == "gh"
+            worktree_slots.run = fake_run
+
+            self.assertFalse(worktree_slots.branch_merged_into_main(ctx, branch))
+        finally:
+            worktree_slots.local_branch_exists = original_local_branch_exists
+            worktree_slots.base_ref = original_base_ref
+            worktree_slots.git = original_git
+            worktree_slots.run = original_run
+            worktree_slots.command_exists = original_command_exists
+            worktree_slots.cached_branch_pr_info.cache_clear()
+
+    def test_branch_merged_into_main_rejects_merged_pr_when_branch_tip_has_advanced(self) -> None:
+        ctx = self.make_ctx("/tmp/repo-advanced-branch")
+        branch = "codex/fix/59-slot-release"
+        original_local_branch_exists = worktree_slots.local_branch_exists
+        original_base_ref = worktree_slots.base_ref
+        original_git = worktree_slots.git
+        original_run = worktree_slots.run
+        original_command_exists = worktree_slots.command_exists
+        worktree_slots.cached_branch_pr_info.cache_clear()
+
+        def fake_run(*args, **kwargs):
+            if args[:3] == ("git", "merge-base", "--is-ancestor"):
+                return subprocess.CompletedProcess(args, 1, "", "")
+            if args[:3] == ("gh", "pr", "view"):
+                payload = {
+                    "number": 19,
+                    "state": "MERGED",
+                    "url": "https://example.test/pull/19",
+                    "headRefOid": "mergedsha",
+                }
+                return subprocess.CompletedProcess(args, 0, json.dumps(payload), "")
+            raise AssertionError(f"unexpected command: {args}")
+
+        try:
+            worktree_slots.local_branch_exists = lambda _ctx, _branch: True
+            worktree_slots.base_ref = lambda _ctx: "origin/main"
+            worktree_slots.git = lambda *args, **kwargs: "currentsha"
+            worktree_slots.command_exists = lambda name: name == "gh"
+            worktree_slots.run = fake_run
+
+            self.assertFalse(worktree_slots.branch_merged_into_main(ctx, branch))
+        finally:
+            worktree_slots.local_branch_exists = original_local_branch_exists
+            worktree_slots.base_ref = original_base_ref
+            worktree_slots.git = original_git
+            worktree_slots.run = original_run
+            worktree_slots.command_exists = original_command_exists
+            worktree_slots.cached_branch_pr_info.cache_clear()
 
 
 if __name__ == "__main__":

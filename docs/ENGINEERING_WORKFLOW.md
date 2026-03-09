@@ -111,5 +111,6 @@ scripts/sync_skills.sh
   - `repo-workflow-env`: managed slot launch and rebase checkpoints
   - `repo-issue-flow`: issue creation, body normalization, and labeling
   - `repo-commit-pr-flow`: commit slicing, push/PR workflow, final checklist
+  - `repo-merge-pr-flow`: merge ready PRs and release the current managed slot after a successful merge
   - `gh-address-comments`: triage and resolve PR comments/threads
   - `gh-fix-ci`: investigate and fix failing GitHub Actions checks

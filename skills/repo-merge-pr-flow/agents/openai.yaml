@@ -1,0 +1,4 @@
+interface:
+  display_name: "Repo Merge PR Flow"
+  short_description: "Squash-merge PRs and release managed slots"
+  default_prompt: "Use $repo-merge-pr-flow to merge a ready PR with squash-and-merge, then release the current managed slot if this checkout is running from one."
