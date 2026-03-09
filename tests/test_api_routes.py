@@ -17,6 +17,7 @@ API_IMPORT_ERROR = ""
 try:
     from fastapi.testclient import TestClient
     from backend.api import routes, runtime_routes
+    import backend.main as main_module
     from backend.main import app, settings as app_settings
 except Exception as exc:
     API_TESTS_AVAILABLE = False
@@ -83,6 +84,21 @@ class TestAPIRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.headers["Access-Control-Allow-Origin"], "http://localhost:3000")
         self.assertEqual(response.headers["Access-Control-Allow-Credentials"], "true")
+
+    def test_health_endpoint_unauthorized_response_handles_mixed_wildcard_origins(self):
+        with patch.object(main_module, "allow_origins", ["*", "http://localhost:3000"]), patch.object(
+            main_module,
+            "allow_credentials",
+            True,
+        ), self._override_settings(environment="local", agent_api_key="test-agent-key"):
+            response = self.client.get(
+                "/api/v1/health",
+                headers={"Origin": "http://example.com"},
+            )
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.headers["Access-Control-Allow-Origin"], "http://example.com")
+        self.assertEqual(response.headers["Access-Control-Allow-Credentials"], "true")
+        self.assertEqual(response.headers["Vary"], "Origin")
 
     def test_health_endpoint_accepts_bearer_token_when_configured(self):
         with self._override_settings(environment="local", agent_api_key="test-agent-key"):

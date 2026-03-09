@@ -55,8 +55,13 @@ def _apply_cors_headers(request, response) -> None:
     if not origin:
         return
 
-    if allow_origins == ["*"]:
-        response.headers["Access-Control-Allow-Origin"] = "*"
+    if "*" in allow_origins:
+        if allow_credentials:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Vary"] = "Origin"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+        else:
+            response.headers["Access-Control-Allow-Origin"] = "*"
         return
 
     if origin not in allow_origins:
