@@ -5,7 +5,6 @@ import logging
 from time import perf_counter
 from typing import Any, Dict, Optional
 
-from backend.database.operations import db_ops
 from backend.observability.langfuse_client import langfuse_manager
 
 logger = logging.getLogger(__name__)
@@ -15,6 +14,7 @@ def increment_counter(key: str, amount: int = 1) -> None:
     """Increment runtime counter without allowing observability failures to break requests."""
 
     try:
+        from backend.database.operations import db_ops
         value = db_ops.increment_runtime_counter(key=key, amount=amount)
         logger.debug(
             "Counter incremented",
