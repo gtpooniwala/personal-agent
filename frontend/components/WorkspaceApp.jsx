@@ -36,6 +36,13 @@ class RunTransportTimeoutError extends Error {
   }
 }
 
+function ensureError(error, fallbackMessage) {
+  if (error instanceof Error) {
+    return error;
+  }
+  return new Error(fallbackMessage);
+}
+
 function localId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
@@ -537,9 +544,9 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
                 latestEvent: mergedEvents[mergedEvents.length - 1] || previousRunState.latestEvent || null,
               };
             });
-          } catch {
+          } catch (error) {
             if (attempt === RUN_POLL_MAX_ATTEMPTS - 1) {
-              throw new RunTransportTimeoutError("Run status polling failed before terminal state");
+              throw ensureError(error, "Run status polling failed");
             }
             await sleep(RUN_POLL_INTERVAL_MS);
             continue;

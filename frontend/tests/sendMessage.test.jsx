@@ -305,6 +305,7 @@ describe('sendMessage SSE vs fallback paths', () => {
   });
 
   afterEach(() => {
+    jest.clearAllTimers();
     jest.useRealTimers();
   });
 
@@ -389,7 +390,7 @@ describe('sendMessage SSE vs fallback paths', () => {
     expect(screen.getAllByText('Running').length).toBeGreaterThan(0);
   });
 
-  test('repeated polling failures exhaust into the same soft timeout path', async () => {
+  test('repeated polling failures still surface as a hard failure', async () => {
     jest.useFakeTimers();
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
 
@@ -415,12 +416,12 @@ describe('sendMessage SSE vs fallback paths', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText(RUN_TRANSPORT_TIMEOUT_MESSAGE)).toBeInTheDocument();
+      expect(screen.getByText('Failed to send message.')).toBeInTheDocument();
     });
 
-    expect(screen.queryByText('[Error: Failed to send message]')).not.toBeInTheDocument();
-    expect(screen.getByText(/Thinking/)).toBeInTheDocument();
-    expect(screen.queryByText('Failed')).not.toBeInTheDocument();
-    expect(screen.getAllByText('Queued').length).toBeGreaterThan(0);
+    expect(screen.getByText('[Error: Failed to send message]')).toBeInTheDocument();
+    expect(screen.queryByText(RUN_TRANSPORT_TIMEOUT_MESSAGE)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Thinking/)).not.toBeInTheDocument();
+    expect(screen.getAllByText('Failed').length).toBeGreaterThan(0);
   });
 });

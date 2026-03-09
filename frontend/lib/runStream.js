@@ -67,7 +67,7 @@ export function subscribeToRunStream(
 
   es.addEventListener("run_complete", (event) => {
     if (closed) return;
-    resetWatchdog();
+    clearWatchdog();
     let data;
     try {
       data = JSON.parse(event.data);
