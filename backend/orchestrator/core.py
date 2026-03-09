@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import re
+from dataclasses import dataclass
 from typing import Dict, Any, Optional, List
 
 from langgraph.prebuilt import create_react_agent
@@ -34,6 +35,19 @@ DOCUMENT_INTENT_PATTERN = re.compile(
 )
 
 
+@dataclass(frozen=True)
+class OrchestratorRunContext:
+    """Request-scoped execution state for a single foreground orchestration run."""
+
+    user_request: str
+    conversation_id: str
+    selected_documents: List[str]
+    condensed_history: List[Dict[str, Any]]
+    llm: Any
+    run_registry: ToolRegistry
+    run_agent: Any
+
+
 class CoreOrchestrator:
     """
     Core orchestrator that manages the overall system flow and delegates tasks to specialized tools/agents.
@@ -52,6 +66,7 @@ class CoreOrchestrator:
         self.user_id = user_id
         self.llm = None
         # Shared per-user registry for static tools, tool listing, and background summarisation.
+        # Foreground runs clone request-specific tool state from this baseline.
         self.tool_registry = ToolRegistry(user_id)
     
     def _setup_llm(self):
@@ -65,8 +80,15 @@ class CoreOrchestrator:
     def _ensure_llm(self):
         if self.llm is None:
             self.llm = self._setup_llm()
-    
-    def _build_orchestrator_agent(self, conversation_id: str, tool_registry: ToolRegistry):
+        return self.llm
+
+    def _build_orchestrator_agent(
+        self,
+        conversation_id: str,
+        tool_registry: ToolRegistry,
+        *,
+        llm: Any = None,
+    ):
         """
         Build and return a fresh LangGraph ReAct agent for a single run.
 
@@ -76,13 +98,64 @@ class CoreOrchestrator:
         available_tools = tool_registry.get_available_tools()
         document_context = self._get_document_context(tool_registry)
         system_prompt = build_orchestrator_system_prompt(self._format_document_status(document_context))
-        self._ensure_llm()
+        llm = llm or self._ensure_llm()
         return create_react_agent(
-            model=self.llm,
+            model=llm,
             tools=available_tools,
             prompt=system_prompt,
             checkpointer=MemorySaver(),
         )
+
+    def _build_run_context(
+        self,
+        *,
+        user_request: str,
+        conversation_id: str,
+        selected_documents: Optional[List[str]] = None,
+    ) -> OrchestratorRunContext:
+        """Assemble all request-scoped state needed for one foreground run."""
+        selected_documents = list(selected_documents or [])
+        llm = self._ensure_llm()
+        run_registry = self.tool_registry.clone_with_selected_documents(selected_documents)
+        condensed_history = self.get_condensed_conversation_history(conversation_id)
+        run_agent = self._build_orchestrator_agent(
+            conversation_id,
+            run_registry,
+            llm=llm,
+        )
+        return OrchestratorRunContext(
+            user_request=user_request,
+            conversation_id=conversation_id,
+            selected_documents=selected_documents,
+            condensed_history=condensed_history,
+            llm=llm,
+            run_registry=run_registry,
+            run_agent=run_agent,
+        )
+
+    def _compose_response(
+        self,
+        *,
+        context: OrchestratorRunContext,
+        agent_result: Optional[Dict[str, Any]],
+        orchestration_actions: List[Dict[str, Any]],
+    ) -> str:
+        response_agent_tool = context.run_registry.get_tool("response_agent")
+        if response_agent_tool:
+            return response_agent_tool._run(
+                user_query=context.user_request,
+                tool_results=orchestration_actions,
+                conversation_history=context.condensed_history,
+            )
+
+        if agent_result and "messages" in agent_result:
+            ai_messages = [
+                msg for msg in agent_result["messages"] if isinstance(msg, AIMessage)
+            ]
+            if ai_messages:
+                return ai_messages[-1].content
+
+        return "I apologize, but I couldn't process your request properly."
     
     def get_condensed_conversation_history(self, conversation_id: str) -> list:
         """
@@ -180,20 +253,18 @@ class CoreOrchestrator:
             metadata={"component": "orchestrator"},
         ) as operation_observation:
             try:
-                self._ensure_llm()
-                # Clone static tools and rebuild only document-scoped state per run
-                # so concurrent requests do not share mutable document context.
-                run_registry = self.tool_registry.clone_with_selected_documents(selected_documents)
-                run_agent = self._build_orchestrator_agent(conversation_id, run_registry)
-
                 # Save user message to database
                 db_ops.save_message(conversation_id, "user", user_request)
 
-                # Use condensed conversation history for agent context
-                condensed_history = self.get_condensed_conversation_history(conversation_id)
-                messages = self._build_langgraph_messages(condensed_history)
+                context = self._build_run_context(
+                    user_request=user_request,
+                    conversation_id=conversation_id,
+                    selected_documents=selected_documents,
+                )
+                messages = self._build_langgraph_messages(context.condensed_history)
                 token_usage = None
                 fallback_used = False
+                orchestration_actions: List[Dict[str, Any]] = []
                 try:
                     with observe_operation(
                         name="orchestrator.langgraph.invoke",
@@ -204,28 +275,17 @@ class CoreOrchestrator:
                         metadata={"component": "orchestrator"},
                     ) as invoke_observation:
                         config = {"configurable": {"thread_id": conversation_id}}
-                        result = run_agent.invoke({"messages": messages}, config=config)
+                        result = context.run_agent.invoke({"messages": messages}, config=config)
                         orchestration_actions = (
                             self._extract_langgraph_actions(result["messages"])
                             if result and "messages" in result
                             else []
                         ) or []
-                        tool_results = orchestration_actions
-                        response_agent_tool = run_registry.get_tool("response_agent")
-                        if response_agent_tool:
-                            # Use condensed history for response agent as well
-                            conversation_history = self.get_condensed_conversation_history(conversation_id)
-                            response = response_agent_tool._run(
-                                user_query=user_request,
-                                tool_results=tool_results,
-                                conversation_history=conversation_history
-                            )
-                        else:
-                            ai_messages = [msg for msg in result["messages"] if isinstance(msg, AIMessage)]
-                            if ai_messages:
-                                response = ai_messages[-1].content
-                            else:
-                                response = "I apologize, but I couldn't process your request properly."
+                        response = self._compose_response(
+                            context=context,
+                            agent_result=result,
+                            orchestration_actions=orchestration_actions,
+                        )
 
                         if result and "messages" in result:
                             usage = self._extract_usage_metadata(result["messages"])
@@ -242,10 +302,10 @@ class CoreOrchestrator:
                     # second handwritten routing policy. Retry behavior is tracked
                     # separately from this ownership cleanup.
                     response = await self._generate_direct_response(
+                        llm=context.llm,
                         user_request=user_request,
-                        conversation_history=condensed_history,
+                        conversation_history=context.condensed_history,
                     )
-                    orchestration_actions = []
 
                 for action in orchestration_actions or []:
                     tool_name = action.get("tool", "unknown")
@@ -257,7 +317,7 @@ class CoreOrchestrator:
                 response = self._enforce_capability_boundaries(
                     response=response,
                     user_request=user_request,
-                    tool_registry=run_registry,
+                    tool_registry=context.run_registry,
                     orchestration_actions=orchestration_actions,
                 )
 
@@ -399,15 +459,17 @@ class CoreOrchestrator:
     async def _generate_direct_response(
         self,
         *,
+        llm: Any = None,
         user_request: str,
         conversation_history: Optional[List[Dict[str, Any]]] = None,
     ) -> str:
         """Fallback direct response when the graph cannot complete and no tool route applies."""
+        llm = llm or self._ensure_llm()
         prompt = build_direct_response_prompt(
             user_request=user_request,
             conversation_history=conversation_history,
         )
-        return await predict_text(self.llm, prompt)
+        return await predict_text(llm, prompt)
 
     def _has_document_intent(self, query: str) -> bool:
         return DOCUMENT_INTENT_PATTERN.search((query or "").lower()) is not None

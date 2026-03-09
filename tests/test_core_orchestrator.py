@@ -146,6 +146,51 @@ class TestCoreOrchestrator(unittest.TestCase):
         self.assertIsInstance(messages[0], HumanMessage)
         self.assertEqual(messages[0].content, "Hello")
 
+    def test_build_run_context_keeps_request_state_local(self):
+        """Foreground execution context should carry request state instead of writing it to self."""
+        mock_agent = Mock()
+        mock_registry = Mock()
+        mock_registry.selected_documents = ["doc-1"]
+
+        with patch.object(
+            self.orchestrator.tool_registry,
+            "clone_with_selected_documents",
+            return_value=mock_registry,
+        ) as mock_clone, patch.object(
+            self.orchestrator,
+            "_build_orchestrator_agent",
+            return_value=mock_agent,
+        ) as mock_build, patch.object(
+            self.orchestrator,
+            "_ensure_llm",
+            return_value="fake-llm",
+        ), patch.object(
+            self.orchestrator,
+            "get_condensed_conversation_history",
+            return_value=[{"role": "user", "content": "Hello"}],
+        ):
+            context = self.orchestrator._build_run_context(
+                user_request="Hi there",
+                conversation_id="conv-ctx",
+                selected_documents=["doc-1"],
+            )
+
+        mock_clone.assert_called_once_with(["doc-1"])
+        mock_build.assert_called_once_with(
+            "conv-ctx",
+            mock_registry,
+            llm="fake-llm",
+        )
+        self.assertEqual(context.user_request, "Hi there")
+        self.assertEqual(context.conversation_id, "conv-ctx")
+        self.assertEqual(context.selected_documents, ["doc-1"])
+        self.assertEqual(context.condensed_history, [{"role": "user", "content": "Hello"}])
+        self.assertIs(context.run_registry, mock_registry)
+        self.assertIs(context.run_agent, mock_agent)
+        self.assertEqual(context.llm, "fake-llm")
+        self.assertFalse(hasattr(self.orchestrator, "selected_documents"))
+        self.assertFalse(hasattr(self.orchestrator, "run_agent"))
+
     def test_generate_direct_response_uses_structured_fallback_prompt(self):
         """Direct fallback responses should use the shared honesty-first prompt contract."""
         self.orchestrator.llm = Mock()
@@ -307,7 +352,7 @@ class TestCoreOrchestrator(unittest.TestCase):
         capture_lock = threading.Lock()
         overlap_barrier = threading.Barrier(2, timeout=5)
 
-        def capturing_build(conversation_id, tool_registry):
+        def capturing_build(conversation_id, tool_registry, **kwargs):
             with capture_lock:
                 captured_registries[conversation_id] = tool_registry
 

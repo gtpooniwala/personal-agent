@@ -1,6 +1,6 @@
 # Workboard
 
-Last updated: March 8, 2026
+Last updated: March 9, 2026
 
 ## How To Use This File
 This is the execution board an agent should follow.
@@ -17,6 +17,7 @@ Important rule:
 ## Current Status
 - Core async runtime is in place: durable `runs`, `run_events`, and `leases`; async `POST /chat` and `POST /runs`; polling via `GET /runs/{id}/status` and `GET /runs/{id}/events`.
 - Blocking orchestration work has already been moved off the FastAPI event loop into a bounded worker pool as the `#51` migration step.
+- Foreground orchestration now builds explicit request-scoped execution context, so per-run state no longer lives implicitly on the long-lived orchestrator instance.
 - Runtime support services are in place: orphan recovery heartbeat, scheduled task loop, scheduled task CRUD/API, and runtime shutdown wiring.
 - Frontend migration, Gmail Docker readiness, conversation naming, config validation, and runtime eval harness work are already landed.
 - The architecture still has important follow-up debt: mixed LLM plus rule-based tool routing, in-process follow-up tasks, no final lifecycle policy for in-flight/background work, no SSE stream, and true end-to-end async execution is still future work.
@@ -28,7 +29,6 @@ Important rule:
 - [ ] `todo` Define the long-term lifecycle contract for the execution plane, shutdown behavior, and in-flight run handling ([#102](https://github.com/gtpooniwala/personal-agent/issues/102))
 - [ ] `todo` Separate background follow-up budget from foreground run attempts ([#109](https://github.com/gtpooniwala/personal-agent/issues/109))
 - [ ] `todo` Persist follow-up work such as summarisation as queued task types instead of `asyncio.create_task(...)` ([#105](https://github.com/gtpooniwala/personal-agent/issues/105))
-- [ ] `todo` Refactor `CoreOrchestrator` toward stateless per-request execution ([#106](https://github.com/gtpooniwala/personal-agent/issues/106))
 - [ ] `todo` Investigate true async orchestration/runtime paths instead of thread or sync islands ([#103](https://github.com/gtpooniwala/personal-agent/issues/103))
 - [ ] `todo` Add SSE streaming on top of the existing run/event store ([#104](https://github.com/gtpooniwala/personal-agent/issues/104))
 
@@ -64,6 +64,7 @@ Keep this compressed. Use Git history and GitHub issues for detail.
 - [x] `done` Async runtime baseline: `#14` to `#19`
 - [x] `done` Event-loop responsiveness migration step with worker-pool orchestration offload: `#51`
 - [x] `done` Per-run orchestrator isolation and runtime correctness follow-ups: `#50`, `#72`, `#73`, `#74`
+- [x] `done` Foreground request-scoped orchestrator execution to remove implicit per-run instance state: `#106`
 - [x] `done` Scheduler-backed recurring task baseline: `#18`, `#89`
 - [x] `done` Planning docs for cloud deployment and event-driven triggers: `#78`
 

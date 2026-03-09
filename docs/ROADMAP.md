@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: March 8, 2026
+Last updated: March 9, 2026
 
 ## Goal
 Turn the repository from a strong local prototype into a durable personal-agent platform that an implementation agent can extend without rediscovering architecture intent each time.
@@ -19,6 +19,7 @@ That means:
 - Polling clients can observe progress through `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events`.
 - Per-conversation serialization, retry behavior, orphan recovery heartbeat, and scheduled task support are already implemented.
 - The `#51` migration step is landed: runtime coordination stays on the event loop while blocking orchestration attempts run on a bounded worker pool.
+- The `#106` follow-up is landed: foreground orchestration now uses explicit request-scoped execution state instead of relying on implicit per-run state on the long-lived orchestrator object.
 - Frontend is on Next.js and the local workflow, eval harness, naming behavior, and Gmail Docker path have all been tightened recently.
 
 ### What Still Matters Most
@@ -41,8 +42,7 @@ Why this first:
 
 ### Phase 2: Make Follow-Up Work Durable
 1. [#105](https://github.com/gtpooniwala/personal-agent/issues/105) Persist summarisation and other follow-up work as queued task types.
-2. [#106](https://github.com/gtpooniwala/personal-agent/issues/106) Refactor `CoreOrchestrator` toward stateless execution.
-3. [#103](https://github.com/gtpooniwala/personal-agent/issues/103) Investigate true async runtime/orchestrator paths.
+2. [#103](https://github.com/gtpooniwala/personal-agent/issues/103) Investigate true async runtime/orchestrator paths.
 
 Why this second:
 - It removes ephemeral behavior that is hard to observe and recover.
@@ -93,5 +93,5 @@ The target shape is a personal agent with:
 ## Compressed Completed Context
 - `#7` to `#13`, `#20`, `#40`: baseline hardening and local workflow quality.
 - `#14` to `#19`: async runtime design, storage, API contract, worker semantics, scheduler, and eval coverage.
-- `#50`, `#51`, `#72`, `#73`, `#74`, `#89`: follow-up runtime isolation, worker-pool responsiveness, naming, validation, and recurring task support.
+- `#50`, `#51`, `#72`, `#73`, `#74`, `#89`, `#106`: follow-up runtime isolation, worker-pool responsiveness, request-scoped orchestration, naming, validation, and recurring task support.
 - `#78`: deployment and trigger planning docs.
