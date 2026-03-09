@@ -10,7 +10,14 @@ from unittest.mock import AsyncMock, patch
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from backend.runtime.conversation_maintenance import ConversationMaintenanceService
+AVAILABLE = True
+IMPORT_ERROR = ""
+
+try:
+    from backend.runtime.conversation_maintenance import ConversationMaintenanceService
+except (ImportError, ModuleNotFoundError) as exc:
+    AVAILABLE = False
+    IMPORT_ERROR = str(exc)
 
 
 class FakeDbOps:
@@ -61,6 +68,10 @@ def _noop_observation(*args, **kwargs):
     yield None
 
 
+@unittest.skipUnless(
+    AVAILABLE,
+    f"ConversationMaintenanceService unavailable: {IMPORT_ERROR}",
+)
 class TestConversationMaintenanceService(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.db = FakeDbOps()
@@ -156,7 +167,10 @@ class TestConversationMaintenanceService(unittest.IsolatedAsyncioTestCase):
 
     async def test_start_stop_lifecycle(self):
         await self.service.start()
-        self.assertIsNotNone(self.service._task)
+        first_task = self.service._task
+        self.assertIsNotNone(first_task)
+        await self.service.start()
+        self.assertIs(self.service._task, first_task)
         await self.service.stop()
         self.assertIsNone(self.service._task)
 

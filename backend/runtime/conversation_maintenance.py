@@ -43,6 +43,8 @@ class ConversationMaintenanceService:
         return db_ops
 
     async def start(self) -> None:
+        if self._task is not None and not self._task.done():
+            return
         logger.info(
             "ConversationMaintenanceService starting",
             extra={"event": "conversation_maintenance.start"},
@@ -75,6 +77,37 @@ class ConversationMaintenanceService:
         self._background_tasks.add(task)
         task.add_done_callback(self._background_tasks.discard)
 
+    def _query_candidates_sync(self) -> tuple[list[dict], list[dict]]:
+        db = self._get_db_ops()
+        title_candidates = db.find_conversations_needing_title(
+            delay_minutes=_NAMING_DELAY_MINUTES,
+            limit=_TITLE_SWEEP_LIMIT,
+        )
+        empty_candidates = db.find_stale_empty_conversations(
+            older_than_days=_EMPTY_CONVERSATION_MAX_AGE_DAYS,
+            limit=_EMPTY_SWEEP_LIMIT,
+        )
+        return title_candidates, empty_candidates
+
+    async def _acquire_lease(
+        self,
+        *,
+        lease_key: str,
+        owner_id: str,
+        ttl_seconds: int,
+    ):
+        db = self._get_db_ops()
+        return await asyncio.to_thread(
+            db.acquire_lease,
+            lease_key,
+            owner_id,
+            ttl_seconds,
+        )
+
+    async def _release_lease(self, *, lease_key: str, owner_id: str) -> None:
+        db = self._get_db_ops()
+        await asyncio.to_thread(db.release_lease, lease_key, owner_id)
+
     async def _loop(self) -> None:
         await self._sweep()
         while True:
@@ -90,15 +123,9 @@ class ConversationMaintenanceService:
                 )
 
     async def _sweep(self) -> None:
-        db = self._get_db_ops()
         try:
-            title_candidates = db.find_conversations_needing_title(
-                delay_minutes=_NAMING_DELAY_MINUTES,
-                limit=_TITLE_SWEEP_LIMIT,
-            )
-            empty_candidates = db.find_stale_empty_conversations(
-                older_than_days=_EMPTY_CONVERSATION_MAX_AGE_DAYS,
-                limit=_EMPTY_SWEEP_LIMIT,
+            title_candidates, empty_candidates = await asyncio.to_thread(
+                self._query_candidates_sync
             )
         except Exception:
             logger.exception(
@@ -114,10 +141,13 @@ class ConversationMaintenanceService:
             await self._schedule_empty_conversation_deletion(str(candidate["id"]))
 
     async def _schedule_title_generation(self, conversation_id: str) -> None:
-        db = self._get_db_ops()
         lease_key = f"conversation-maintenance:title:{conversation_id}"
         owner_id = f"title:{uuid.uuid4()}"
-        lease = db.acquire_lease(lease_key, owner_id, _TITLE_LEASE_TTL_SECONDS)
+        lease = await self._acquire_lease(
+            lease_key=lease_key,
+            owner_id=owner_id,
+            ttl_seconds=_TITLE_LEASE_TTL_SECONDS,
+        )
         if lease is None:
             return
 
@@ -133,10 +163,13 @@ class ConversationMaintenanceService:
         )
 
     async def _schedule_empty_conversation_deletion(self, conversation_id: str) -> None:
-        db = self._get_db_ops()
         lease_key = f"conversation-maintenance:delete:{conversation_id}"
         owner_id = f"delete:{uuid.uuid4()}"
-        lease = db.acquire_lease(lease_key, owner_id, _DELETE_LEASE_TTL_SECONDS)
+        lease = await self._acquire_lease(
+            lease_key=lease_key,
+            owner_id=owner_id,
+            ttl_seconds=_DELETE_LEASE_TTL_SECONDS,
+        )
         if lease is None:
             return
 
@@ -206,7 +239,7 @@ class ConversationMaintenanceService:
                     await asyncio.sleep(_NAMING_RETRY_DELAY_MINUTES * 60)
         finally:
             try:
-                db.release_lease(lease_key, owner_id)
+                await self._release_lease(lease_key=lease_key, owner_id=owner_id)
             except Exception:
                 logger.exception(
                     "Failed to release title maintenance lease",
@@ -256,7 +289,7 @@ class ConversationMaintenanceService:
             )
         finally:
             try:
-                db.release_lease(lease_key, owner_id)
+                await self._release_lease(lease_key=lease_key, owner_id=owner_id)
             except Exception:
                 logger.exception(
                     "Failed to release delete maintenance lease",
