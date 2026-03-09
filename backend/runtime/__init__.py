@@ -22,8 +22,14 @@ from .lifecycle import (
     TERMINAL_RUN_STATUSES as LIFECYCLE_TERMINAL_RUN_STATUSES,
 )
 from .heartbeat import HeartbeatService
-from .conversation_maintenance import ConversationMaintenanceService
 from .scheduler import SchedulerService
+
+
+def __getattr__(name: str):
+    if name == "ConversationMaintenanceService":
+        from .conversation_maintenance import ConversationMaintenanceService
+        return ConversationMaintenanceService
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
     "ConversationMaintenanceService",
