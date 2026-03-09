@@ -1,0 +1,25 @@
+docker-compose.yml
+  4cf49f9c967334f8 42
+docker-compose.override.yml
+  4cf49f9c967334f8 19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "d364fe9ac5e5ac361c38d08489ae041ae2308e8a",
+  "prompts": {
+    "4cf49f9c967334f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "68e4e8f8-29f8-4071-8bfc-f993df15de89",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
