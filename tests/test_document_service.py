@@ -3,9 +3,7 @@
 import asyncio
 import os
 import sys
-import tempfile
 import unittest
-from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 
 # Add project root to path
@@ -161,39 +159,36 @@ class TestDocumentServiceUploadFailureHandling(unittest.TestCase):
         ):
             processor = DocumentProcessor()
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            processor.upload_dir = Path(tmpdir)
+        create_session = Mock()
 
-            create_session = Mock()
+        def _assign_document_id(document):
+            document.id = "doc-123"
 
-            def _assign_document_id(document):
-                document.id = "doc-123"
+        create_session.add.side_effect = _assign_document_id
 
-            create_session.add.side_effect = _assign_document_id
+        failed_document = Mock()
+        update_session = Mock()
+        update_session.query.return_value.filter.return_value.first.return_value = failed_document
 
-            failed_document = Mock()
-            update_session = Mock()
-            update_session.query.return_value.filter.return_value.first.return_value = failed_document
-
-            with patch.object(
-                processor,
-                "_require_processing_models",
-                return_value=None,
-            ), patch.object(
-                processor,
-                "_process_document_content",
-                new=AsyncMock(side_effect=RuntimeError("content failure")),
-            ), patch(
-                "backend.services.document_service.db_ops.get_session",
-                side_effect=[create_session, update_session],
-            ):
-                with self.assertRaisesRegex(RuntimeError, "content failure"):
-                    asyncio.run(
-                        processor.process_pdf_upload(
-                            file_content=b"%PDF-1.4 mock",
-                            filename="sample.pdf",
-                        )
+        with patch.object(
+            processor,
+            "_require_processing_models",
+            return_value=None,
+        ), patch.object(
+            processor,
+            "_process_document_content",
+            new=AsyncMock(side_effect=RuntimeError("content failure")),
+        ), patch(
+            "backend.services.document_service.db_ops.get_session",
+            side_effect=[create_session, update_session],
+        ):
+            with self.assertRaisesRegex(RuntimeError, "content failure"):
+                asyncio.run(
+                    processor.process_pdf_upload(
+                        file_content=b"%PDF-1.4 mock",
+                        filename="sample.pdf",
                     )
+                )
 
         create_session.add.assert_called_once()
         create_session.commit.assert_called_once()

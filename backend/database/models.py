@@ -100,7 +100,10 @@ class Document(Base):
     
     # Document summary for context
     summary = Column(Text, nullable=True)  # AI-generated one-sentence summary
-    
+
+    # Binary content stored in DB (eliminates filesystem dependency for Cloud Run)
+    file_content = Column(LargeBinary, nullable=True)
+
     # Relationship to document chunks
     chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
 
