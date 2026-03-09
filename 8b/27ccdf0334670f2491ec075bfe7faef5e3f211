@@ -1,0 +1,23 @@
+backend/services/document_service.py
+  79073dbf36b12c89 196
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "8b27ccdf0334670f2491ec075bfe7faef5e3f211",
+  "prompts": {
+    "79073dbf36b12c89": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "38a1048b-83f8-4b52-94a7-fc44e91ba15a",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
