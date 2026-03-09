@@ -38,7 +38,7 @@ Important rule:
 - [ ] `todo` Adopt the SSE run stream in the frontend while keeping fallback behavior ([#122](https://github.com/gtpooniwala/personal-agent/issues/122))
 - [ ] `todo` Deduplicate overlapping polling and SSE run-progress transport logic ([#121](https://github.com/gtpooniwala/personal-agent/issues/121))
 - [ ] `todo` Add timeout/watchdog handling for stalled SSE run streams ([#130](https://github.com/gtpooniwala/personal-agent/issues/130))
-- [ ] `todo` Stop conversation list reads from scheduling maintenance work ([#140](https://github.com/gtpooniwala/personal-agent/issues/140))
+- [x] `done` Stop conversation list reads from scheduling maintenance work ([#140](https://github.com/gtpooniwala/personal-agent/issues/140))
 - [ ] `todo` Keep document-search responses scoped to selected documents ([#137](https://github.com/gtpooniwala/personal-agent/issues/137))
 - [ ] `todo` Reassess whether `response_agent` should synthesize every final answer ([#138](https://github.com/gtpooniwala/personal-agent/issues/138))
 - [ ] `todo` Make run timing fields and observability metrics truthful ([#139](https://github.com/gtpooniwala/personal-agent/issues/139))
@@ -78,7 +78,7 @@ Keep this compressed. Use Git history and GitHub issues for detail.
 - [x] `done` Event-loop responsiveness migration step with worker-pool orchestration offload: `#51`
 - [x] `done` Per-run orchestrator isolation, model-owned tool selection, backend SSE stream, and request-scoped orchestration: `#50`, `#72`, `#73`, `#74`, `#101`, `#104`, `#106`
 - [x] `done` Scheduler-backed recurring task baseline: `#18`, `#89`
-- [x] `done` Document workflow clarity groundwork and prompt-architecture groundwork: `#64`, `#68`
+- [x] `done` Conversation list reads are now side-effect-free: `#140`
 - [x] `done` Planning docs for cloud deployment and event-driven triggers: `#78`
 
 ## Backlog

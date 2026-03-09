@@ -142,7 +142,13 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
 
     async def test_submit_run_triggers_background_title_generation(self):
         orchestrator = SuccessfulOrchestrator()
-        orchestrator.generate_conversation_title = AsyncMock(return_value="Generated Title")
+        title_generated = asyncio.Event()
+
+        async def generate_title(conversation_id):
+            title_generated.set()
+            return "Generated Title"
+
+        orchestrator.generate_conversation_title = AsyncMock(side_effect=generate_title)
         service = self._make_service(
             orchestrator=orchestrator,
             orchestrator_factory=build_factory(SuccessfulOrchestrator),
@@ -155,11 +161,7 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         status = await self._wait_for_terminal(service, submitted["run_id"])
         self.assertEqual(status["status"], "succeeded")
 
-        for _ in range(50):
-            if orchestrator.generate_conversation_title.await_count == 1:
-                break
-            await asyncio.sleep(0.01)
-
+        await asyncio.wait_for(title_generated.wait(), timeout=1.0)
         orchestrator.generate_conversation_title.assert_awaited_once_with("conv-1")
 
     async def test_submit_run_transitions_to_failed(self):

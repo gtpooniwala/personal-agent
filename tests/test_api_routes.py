@@ -100,8 +100,15 @@ class TestAPIRoutes(unittest.TestCase):
         self.assertEqual(payload["next_after"], "1")
         self.assertEqual(len(payload["events"]), 1)
 
+    @patch("backend.api.routes.db_ops.delete_conversation")
+    @patch("backend.api.routes.orchestrator.generate_conversation_title", new_callable=AsyncMock)
     @patch("backend.api.routes.orchestrator.get_conversations")
-    def test_get_conversations_endpoint_is_read_only(self, mock_get_conversations):
+    def test_get_conversations_endpoint_is_read_only(
+        self,
+        mock_get_conversations,
+        mock_generate_conversation_title,
+        mock_delete_conversation,
+    ):
         mock_get_conversations.return_value = [
             {
                 "id": "conv-1",
@@ -117,6 +124,8 @@ class TestAPIRoutes(unittest.TestCase):
         self.assertEqual(len(payload), 1)
         self.assertEqual(payload[0]["id"], "conv-1")
         mock_get_conversations.assert_called_once_with()
+        mock_generate_conversation_title.assert_not_awaited()
+        mock_delete_conversation.assert_not_called()
 
     def test_upload_document_rejects_non_pdf(self):
         response = self.client.post(

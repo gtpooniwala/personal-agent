@@ -49,13 +49,12 @@ Why this first:
 - It turns the post-`#51` runtime from "responsive and mostly correct" into "predictable and easier to debug."
 
 ### Phase 2: Fix Product-Correctness Debt On Top Of The New Runtime
-1. [#140](https://github.com/gtpooniwala/personal-agent/issues/140) Stop conversation list reads from scheduling maintenance work.
-2. [#137](https://github.com/gtpooniwala/personal-agent/issues/137) Keep document-search responses scoped to selected documents.
-3. [#138](https://github.com/gtpooniwala/personal-agent/issues/138) Reassess whether `response_agent` should synthesize every final answer.
-4. [#139](https://github.com/gtpooniwala/personal-agent/issues/139) Make run timing fields and observability metrics truthful.
-5. [#134](https://github.com/gtpooniwala/personal-agent/issues/134) Extract non-run app helpers from `CoreOrchestrator`.
-6. [#68](https://github.com/gtpooniwala/personal-agent/issues/68) Continue prompt architecture hardening.
-7. [#64](https://github.com/gtpooniwala/personal-agent/issues/64) Continue document UX and RAG workflow follow-ups.
+1. [#137](https://github.com/gtpooniwala/personal-agent/issues/137) Keep document-search responses scoped to selected documents.
+2. [#138](https://github.com/gtpooniwala/personal-agent/issues/138) Reassess whether `response_agent` should synthesize every final answer.
+3. [#139](https://github.com/gtpooniwala/personal-agent/issues/139) Make run timing fields and observability metrics truthful.
+4. [#134](https://github.com/gtpooniwala/personal-agent/issues/134) Extract non-run app helpers from `CoreOrchestrator`.
+5. [#68](https://github.com/gtpooniwala/personal-agent/issues/68) Continue prompt architecture hardening.
+6. [#64](https://github.com/gtpooniwala/personal-agent/issues/64) Continue document UX and RAG workflow follow-ups.
 
 Why this second:
 - Several of these are now clearer because the runtime and frontend transport foundations are already in place.
@@ -111,5 +110,5 @@ The target shape is a personal agent with:
 - `#14` to `#19`: async runtime design, storage, API contract, worker semantics, scheduler, and eval coverage.
 - `#50`, `#51`, `#72`, `#73`, `#74`, `#89`: follow-up runtime isolation, worker-pool responsiveness, naming, validation, and recurring task support.
 - `#101`, `#104`, `#106`: model-owned normal tool selection, backend SSE run streaming, and request-scoped foreground orchestration.
-- `#64` groundwork and `#68` groundwork: document UX and prompt architecture both have meaningful landed progress, with follow-ups still open.
+- `#140`: conversation list reads are now side-effect-free.
 - `#78`: deployment and trigger planning docs.
