@@ -1,0 +1,33 @@
+backend/runtime/__init__.py
+  adcd1827d0b486b2 25,29
+backend/api/state.py
+  adcd1827d0b486b2 6,21
+backend/runtime/conversation_maintenance.py
+  adcd1827d0b486b2 1-243
+tests/test_conversation_maintenance_service.py
+  adcd1827d0b486b2 1-127
+backend/database/operations.py
+  adcd1827d0b486b2 1,140-202
+backend/main.py
+  adcd1827d0b486b2 48-49,52-53,56,64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "6b1cd61333d582a458b48fc06b4e0bda19de9b14",
+  "prompts": {
+    "adcd1827d0b486b2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019cd07a-b37f-71e0-932b-baf3f7cbceec",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 448,
+      "total_deletions": 2,
+      "accepted_lines": 446,
+      "overriden_lines": 0
+    }
+  }
+}
