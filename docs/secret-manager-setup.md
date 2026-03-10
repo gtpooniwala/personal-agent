@@ -44,9 +44,6 @@ The table below is the single source of truth for secret names. Issue #85 refere
 | `personal-agent-gemini-api-key` | `GEMINI_API_KEY` | Yes | Primary LLM provider |
 | `personal-agent-openai-api-key` | `OPENAI_API_KEY` | No | Fallback LLM provider |
 | `personal-agent-database-url` | `DATABASE_URL` | Yes | Created in #80; skip creation here |
-| `personal-agent-gmail-client-id` | `GMAIL_CLIENT_ID` | No | Planned Gmail OAuth env var; not currently wired — current Gmail integration uses file-based creds (`client_secret.json`, `token.pickle`) via `GMAIL_CREDENTIALS_PATH` / `GMAIL_TOKEN_PATH` |
-| `personal-agent-gmail-client-secret` | `GMAIL_CLIENT_SECRET` | No | Planned Gmail OAuth env var; not currently wired — see `personal-agent-gmail-client-id` note |
-| `personal-agent-gmail-refresh-token` | `GMAIL_REFRESH_TOKEN` | No | Planned Gmail OAuth env var; not currently wired — see `personal-agent-gmail-client-id` note |
 | `personal-agent-langfuse-public-key` | `LANGFUSE_PUBLIC_KEY` | No | Observability (Langfuse) |
 | `personal-agent-langfuse-secret-key` | `LANGFUSE_SECRET_KEY` | No | Observability (Langfuse) |
 | `personal-agent-todoist-api-token` | `TODOIST_API_TOKEN` | No | Todoist task integration (not implemented yet; backend does not read this secret) |
@@ -91,20 +88,6 @@ Only create the secrets below if the corresponding integration is used. Secret M
 
 ```bash
 echo -n "your-openai-api-key" | gcloud secrets create personal-agent-openai-api-key \
-  --project="${PROJECT_ID}" \
-  --replication-policy=automatic \
-  --data-file=-
-```
-
-### GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET
-
-```bash
-echo -n "your-gmail-client-id" | gcloud secrets create personal-agent-gmail-client-id \
-  --project="${PROJECT_ID}" \
-  --replication-policy=automatic \
-  --data-file=-
-
-echo -n "your-gmail-client-secret" | gcloud secrets create personal-agent-gmail-client-secret \
   --project="${PROJECT_ID}" \
   --replication-policy=automatic \
   --data-file=-
