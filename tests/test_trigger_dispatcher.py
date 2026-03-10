@@ -46,8 +46,10 @@ class FakeDbOps:
         self.dispatched_events = []
         self.leases: dict = {}
         self.released = []
+        self.get_trigger_event_call_count = 0
 
     def get_trigger_event(self, trigger_id, external_event_id):
+        self.get_trigger_event_call_count += 1
         return self._existing_event
 
     def acquire_lease(self, lease_key, owner_id, ttl_seconds):
@@ -145,8 +147,8 @@ class TestTriggerDispatcher(unittest.IsolatedAsyncioTestCase):
         result = await dispatcher.dispatch(trigger, message="hello", external_event_id="ext-1", dedup=False)
 
         self.assertEqual(result, "run-new")
-        # get_trigger_event should not have been called
-        self.assertIsNone(db._existing_event)  # still None — was never set by a call
+        # get_trigger_event should not have been called when dedup=False
+        self.assertEqual(db.get_trigger_event_call_count, 0)
         self.assertEqual(len(rt.submitted), 1)
 
     async def test_dispatch_returns_none_when_lease_not_acquired(self):

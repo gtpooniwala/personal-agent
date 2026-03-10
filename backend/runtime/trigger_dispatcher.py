@@ -67,7 +67,11 @@ class TriggerDispatcher:
     ) -> Optional[str]:
         """Dispatch an external event as a normal runtime run.
 
-        Returns the run_id on success, or None if the event was deduplicated.
+        Returns the run_id on successful dispatch. Returns None when no run is
+        started — either because the event was deduplicated (already dispatched),
+        or due to an operational failure such as a lease conflict, a database
+        error, or a submit_run failure. Callers should treat None as "no run
+        started" and rely on structured logging to distinguish specific causes.
 
         Args:
             trigger: Serialized ExternalTrigger dict (from db_ops).
@@ -84,7 +88,8 @@ class TriggerDispatcher:
                 attempt failed; the dispatcher retries it. If False, the
                 application-level check is skipped entirely, but the database
                 unique constraint on (trigger_id, external_event_id) still
-                applies and will raise on a duplicate insert.
+                applies. A duplicate insert is caught internally, logged, and
+                causes the method to return None without dispatching a run.
         """
         db = self._get_db_ops()
         trigger_id = str(trigger["id"])
@@ -127,7 +132,9 @@ class TriggerDispatcher:
             # Re-check dispatch state after acquiring the lease to close the race window
             # between the pre-lease dedup read and the point where we hold the lock.
             # Another worker may have dispatched successfully in that gap.
-            if dedup and existing_event_row:
+            # Run unconditionally when dedup=True: a concurrent worker may have
+            # created AND dispatched a row even if no row existed pre-lease.
+            if dedup:
                 refreshed = db.get_trigger_event(trigger_id, external_event_id)
                 if refreshed and refreshed.get("dispatched"):
                     logger.info(
@@ -192,11 +199,16 @@ class TriggerDispatcher:
                 return None
 
             # Mark the TriggerEvent as dispatched.
+            # If this fails, return None rather than run_id: the dedup row remains
+            # at dispatched=False with no run_id, so a future retry would see the
+            # undispatched row and attempt dispatch again (creating a duplicate run).
+            # Returning None signals an unconfirmed dispatch; the run IS running but
+            # dedup state is uncommitted.
             try:
                 db.mark_trigger_event_dispatched(trigger_event_row["id"], run_id)
             except Exception:
                 logger.exception(
-                    "Failed to mark trigger event dispatched",
+                    "Failed to mark trigger event dispatched — dedup state uncommitted",
                     extra={
                         "event": "trigger.dispatch.mark_error",
                         "trigger_id": trigger_id,
@@ -204,6 +216,7 @@ class TriggerDispatcher:
                         "run_id": run_id,
                     },
                 )
+                return None
 
             return run_id
 
