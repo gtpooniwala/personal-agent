@@ -61,8 +61,6 @@ class Settings(BaseSettings):
     frontend_url: Optional[str] = "http://localhost:3000"
 
     # Optional integration settings
-    gmail_client_id: Optional[str] = None
-    gmail_client_secret: Optional[str] = None
     todoist_api_token: Optional[str] = None
     google_calendar_credentials: Optional[str] = None
 

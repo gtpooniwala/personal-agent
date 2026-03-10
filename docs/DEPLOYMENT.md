@@ -105,7 +105,6 @@ When tackled (#79): add GCS SDK dependency, update file upload/retrieval paths, 
 Secrets to migrate:
 - `OPENAI_API_KEY`
 - `GEMINI_API_KEY`
-- `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`
 - Database connection string
 - `AGENT_API_KEY` (bearer token for auth)
 - Any future API keys
