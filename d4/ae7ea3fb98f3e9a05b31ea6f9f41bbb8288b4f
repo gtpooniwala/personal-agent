@@ -1,0 +1,23 @@
+docs/secret-manager-setup.md
+  3f81699adc5dbf96 47-49,52,88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "d4ae7ea3fb98f3e9a05b31ea6f9f41bbb8288b4f",
+  "prompts": {
+    "3f81699adc5dbf96": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bdb6c354-149c-40f2-a281-f34c890954c6",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 4,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}
