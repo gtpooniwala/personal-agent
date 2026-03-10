@@ -145,8 +145,8 @@ Service URL : https://personal-agent-backend-<hash>-uc.a.run.app
 
 ## 8. Update CORS after Vercel deploy
 
-Once the Vercel URL is known (e.g. `https://personal-agent.vercel.app`), update
-`VERCEL_URL` in `deploy/deploy-backend.sh` and redeploy:
+Once the Vercel URL is known (e.g. `https://personal-agent.vercel.app`), pass it as
+an environment variable and redeploy (no script edits required):
 
 ```bash
 VERCEL_URL="https://personal-agent.vercel.app" \

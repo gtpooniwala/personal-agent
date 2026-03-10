@@ -65,9 +65,10 @@ fi
 
 # Warn when deploying with the placeholder VERCEL_URL before #127 is complete.
 if [[ -z "${VERCEL_URL}" ]]; then
-  echo "WARNING: VERCEL_URL is not set. CORS ALLOWED_ORIGINS will be empty." >&2
-  echo "         Set VERCEL_URL env var or update the default after the first Vercel deploy (#127)." >&2
-  VERCEL_URL="https://personal-agent.vercel.app"  # placeholder; update after #127
+  echo "WARNING: VERCEL_URL is not set; using placeholder origin for CORS ALLOWED_ORIGINS." >&2
+  echo "         Placeholder: https://personal-agent.vercel.app" >&2
+  echo "         Set VERCEL_URL env var after the first Vercel deploy (#127) to avoid unintended CORS configuration." >&2
+  VERCEL_URL="https://personal-agent.vercel.app"  # placeholder origin; update after #127
 fi
 
 # Service account created during one-time setup (see docs/cloud-run-setup.md).
