@@ -112,3 +112,4 @@ The intended next shape of the architecture is:
 - [`SYSTEM_FLOW.md`](SYSTEM_FLOW.md)
 - [`ROADMAP.md`](ROADMAP.md)
 - [`DEPLOYMENT.md`](DEPLOYMENT.md)
+- [`OPENCLAW_COMPARISON.md`](OPENCLAW_COMPARISON.md) — comparison against OpenClaw with explicit port/adapt/defer/reject decisions

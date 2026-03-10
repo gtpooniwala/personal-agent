@@ -46,6 +46,19 @@ Important rule:
 - [ ] `todo` Strengthen prompt architecture and prompting contracts ([#68](https://github.com/gtpooniwala/personal-agent/issues/68))
 - [ ] `todo` Improve document UX and RAG workflow clarity in the frontend ([#64](https://github.com/gtpooniwala/personal-agent/issues/64))
 
+## Long-Running Agent Evolution Track
+
+Decisions from OpenClaw comparison ([#153](https://github.com/gtpooniwala/personal-agent/issues/153)). See [`OPENCLAW_COMPARISON.md`](OPENCLAW_COMPARISON.md) for the full rationale.
+
+Work this track after Phase 2 (product-correctness debt) is stable.
+
+- [x] `done` OpenClaw architecture comparison and decisions ([#153](https://github.com/gtpooniwala/personal-agent/issues/153))
+- [ ] `todo` Markdown-native memory workspace (MEMORY.md + daily logs + pre-compaction flush) ([#154](https://github.com/gtpooniwala/personal-agent/issues/154))
+- [ ] `todo` User-editable agent context files (AGENTS.md / USER.md) ([#156](https://github.com/gtpooniwala/personal-agent/issues/156))
+- [ ] `todo` Isolated execution context for scheduled/cron tasks ([#157](https://github.com/gtpooniwala/personal-agent/issues/157))
+- [ ] `todo` In-chat run abort (stop active run from frontend) ([#158](https://github.com/gtpooniwala/personal-agent/issues/158))
+- [ ] `todo` MCP client integration for external tool extensibility ([#155](https://github.com/gtpooniwala/personal-agent/issues/155))
+
 ## Deployment Track
 Work this track after the core runtime/orchestrator plan above is stable enough.
 

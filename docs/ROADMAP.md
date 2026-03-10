@@ -113,6 +113,34 @@ The target shape is a personal agent with:
 - optional streaming and richer trigger surfaces on top of the same run ledger,
 - a cloud deployment path that stays simple enough for a single-user system.
 
+## Long-Running Agent Evolution Track
+
+Based on the OpenClaw comparison ([#153](https://github.com/gtpooniwala/personal-agent/issues/153)), the following changes were selected for adoption. These build on the runtime and product-correctness phases above.
+
+Decisions documented in [`OPENCLAW_COMPARISON.md`](OPENCLAW_COMPARISON.md).
+
+### Selected adaptations (in recommended order)
+
+1. [#154](https://github.com/gtpooniwala/personal-agent/issues/154) Markdown-native memory workspace (MEMORY.md + daily logs + pre-compaction flush)
+2. [#156](https://github.com/gtpooniwala/personal-agent/issues/156) User-editable agent context files (AGENTS.md / USER.md workspace pattern)
+3. [#157](https://github.com/gtpooniwala/personal-agent/issues/157) Isolated execution context for scheduled/cron tasks
+4. [#158](https://github.com/gtpooniwala/personal-agent/issues/158) In-chat run abort (stop active run from frontend)
+5. [#155](https://github.com/gtpooniwala/personal-agent/issues/155) MCP client integration for external tool extensibility
+
+Why this order:
+- Memory (#154) and workspace context files (#156) deliver the most direct product value: the agent becomes easier to customize and less likely to lose context silently.
+- Isolated task execution (#157) cleans up a scheduler correctness gap that affects background automation quality.
+- Run abort (#158) fills a visible UX gap for long-running tasks.
+- MCP (#155) is the right tool extensibility path long-term but requires more design work.
+
+### Patterns intentionally rejected
+
+- WebSocket gateway / device pairing (not needed for web-UI-first single-user setup)
+- Multi-agent routing and per-agent isolation (PA is single-user by design)
+- Docker sandboxing per agent (single-user, no untrusted-input risk)
+- 20+ channel integrations wholesale (Telegram #92 is sufficient for mobile access)
+- ClawHub public skill registry (local workspace skills are sufficient)
+
 ## Compressed Completed Context
 - `#7` to `#13`, `#20`, `#40`: baseline hardening and local workflow quality.
 - `#14` to `#19`: async runtime design, storage, API contract, worker semantics, scheduler, and eval coverage.
