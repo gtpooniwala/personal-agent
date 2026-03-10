@@ -1,0 +1,27 @@
+docs/cloud-run-setup.md
+  fb21289f56317dec 110,128,140,162,223-225
+deploy/deploy-backend.sh
+  fb21289f56317dec 28,52-54,103
+deploy/cloud-run-backend.yaml
+  fb21289f56317dec 13,31-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "30dce90c104f6c0d97a02d7f5996bab18a3ed45e",
+  "prompts": {
+    "fb21289f56317dec": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "03539515-a87b-4fc2-89e1-bdd2d29f67f4",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 22,
+      "total_deletions": 36,
+      "accepted_lines": 16,
+      "overriden_lines": 0
+    }
+  }
+}
