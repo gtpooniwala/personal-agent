@@ -208,6 +208,8 @@ def delete_trigger(trigger_id: str):
 @trigger_router.get("/{trigger_id}/events", response_model=List[TriggerEventResponse])
 def list_trigger_events(trigger_id: str, limit: int = 100):
     """Return the audit log of TriggerEvent rows for a trigger."""
+    if limit < 1 or limit > 1000:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 1000")
     trigger = db_ops.get_external_trigger(trigger_id)
     if not trigger:
         raise HTTPException(status_code=404, detail="Trigger not found")
