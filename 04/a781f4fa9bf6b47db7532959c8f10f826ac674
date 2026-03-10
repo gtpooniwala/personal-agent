@@ -1,0 +1,23 @@
+docs/cloud-run-setup.md
+  fb21289f56317dec 16-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "04a781f4fa9bf6b47db7532959c8f10f826ac674",
+  "prompts": {
+    "fb21289f56317dec": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "03539515-a87b-4fc2-89e1-bdd2d29f67f4",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 2,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}
