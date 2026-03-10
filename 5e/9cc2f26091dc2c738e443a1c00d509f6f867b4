@@ -1,0 +1,29 @@
+docs/ARCHITECTURE_DIRECTION.md
+  87fbcd31fc46865b 3,95-102,140-147,194,196-203
+docs/ROADMAP.md
+  87fbcd31fc46865b 124-131,134-135,138-143
+docs/OPENCLAW_COMPARISON.md
+  87fbcd31fc46865b 3,93-97,99-101,103,123-127,174-175,243-244,275,277-279
+docs/WORKBOARD.md
+  87fbcd31fc46865b 56-60,62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "5e9cc2f26091dc2c738e443a1c00d509f6f867b4",
+  "prompts": {
+    "87fbcd31fc46865b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aed9037e-4601-4819-b0cf-2e9d34c1b251",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 73,
+      "total_deletions": 44,
+      "accepted_lines": 72,
+      "overriden_lines": 0
+    }
+  }
+}
