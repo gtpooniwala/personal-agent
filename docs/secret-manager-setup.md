@@ -44,11 +44,12 @@ The table below is the single source of truth for secret names. Issue #85 refere
 | `personal-agent-gemini-api-key` | `GEMINI_API_KEY` | Yes | Primary LLM provider |
 | `personal-agent-openai-api-key` | `OPENAI_API_KEY` | No | Fallback LLM provider |
 | `personal-agent-database-url` | `DATABASE_URL` | Yes | Created in #80; skip creation here |
-| `personal-agent-gmail-client-id` | `GMAIL_CLIENT_ID` | No | Gmail OAuth integration |
-| `personal-agent-gmail-client-secret` | `GMAIL_CLIENT_SECRET` | No | Gmail OAuth integration |
+| `personal-agent-gmail-client-id` | `GMAIL_CLIENT_ID` | No | Planned Gmail OAuth env var; not currently wired — current Gmail integration uses file-based creds (`client_secret.json`, `token.pickle`) via `GMAIL_CREDENTIALS_PATH` / `GMAIL_TOKEN_PATH` |
+| `personal-agent-gmail-client-secret` | `GMAIL_CLIENT_SECRET` | No | Planned Gmail OAuth env var; not currently wired — see `personal-agent-gmail-client-id` note |
+| `personal-agent-gmail-refresh-token` | `GMAIL_REFRESH_TOKEN` | No | Planned Gmail OAuth env var; not currently wired — see `personal-agent-gmail-client-id` note |
 | `personal-agent-langfuse-public-key` | `LANGFUSE_PUBLIC_KEY` | No | Observability (Langfuse) |
 | `personal-agent-langfuse-secret-key` | `LANGFUSE_SECRET_KEY` | No | Observability (Langfuse) |
-| `personal-agent-todoist-api-token` | `TODOIST_API_TOKEN` | No | Todoist task integration |
+| `personal-agent-todoist-api-token` | `TODOIST_API_TOKEN` | No | Todoist task integration (not implemented yet; backend does not read this secret) |
 
 ---
 
@@ -84,7 +85,7 @@ echo -n "your-gemini-api-key" | gcloud secrets create personal-agent-gemini-api-
 
 ## 5. Create optional secrets
 
-Only create the secrets below if the corresponding integration is used. Secret Manager does not charge for secrets that are never mounted in Cloud Run.
+Only create the secrets below if the corresponding integration is used. Secret Manager charges are negligible for a small number of secrets (6 active versions are free; $0.06/version/month after that).
 
 ### OPENAI_API_KEY
 
