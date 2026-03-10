@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Literal, Optional, List, Dict, Any
 
 
 class ChatRequest(BaseModel):
@@ -170,7 +170,7 @@ class ScheduledTaskResponse(BaseModel):
 class ExternalTriggerCreate(BaseModel):
     """Request model for registering an external trigger."""
 
-    type: str = Field(..., description="Trigger type: telegram, email, webhook, or generic")
+    type: Literal["telegram", "email", "webhook", "generic"] = Field(..., description="Trigger type")
     name: str = Field(..., description="Unique human-readable label")
     conversation_id: str = Field(..., description="Target conversation ID")
     config: Optional[Dict[str, Any]] = Field(None, description="Trigger-specific configuration (JSON)")
@@ -181,7 +181,7 @@ class ExternalTriggerUpdate(BaseModel):
     """Request model for patching an external trigger."""
 
     name: Optional[str] = Field(None, description="New label")
-    type: Optional[str] = Field(None, description="New trigger type")
+    type: Optional[Literal["telegram", "email", "webhook", "generic"]] = Field(None, description="New trigger type")
     conversation_id: Optional[str] = Field(None, description="New target conversation ID")
     config: Optional[Dict[str, Any]] = Field(None, description="New trigger configuration")
     enabled: Optional[bool] = Field(None, description="Enable or disable the trigger")
@@ -191,7 +191,7 @@ class ExternalTriggerResponse(BaseModel):
     """Response model for an external trigger."""
 
     id: str = Field(..., description="Trigger ID")
-    type: str = Field(..., description="Trigger type")
+    type: Literal["telegram", "email", "webhook", "generic"] = Field(..., description="Trigger type")
     name: str = Field(..., description="Trigger label")
     conversation_id: str = Field(..., description="Target conversation ID")
     config: Optional[Dict[str, Any]] = Field(None, description="Trigger configuration")

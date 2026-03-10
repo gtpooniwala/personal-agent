@@ -82,7 +82,7 @@ Work this track after the core runtime/orchestrator plan above is stable enough.
 Current scheduler primitives already exist. The remaining work is the external trigger layer.
 
 - [x] `done` Scheduled task runner and scheduler-backed recurring runs ([#89](https://github.com/gtpooniwala/personal-agent/issues/89))
-- [x] `done` External trigger framework: models, dispatcher, webhook stubs, CRUD routes ([#88](https://github.com/gtpooniwala/personal-agent/issues/88))
+- [x] `done` External trigger framework: models, dispatcher, webhook stubs, CRUD routes ([#88](https://github.com/gtpooniwala/personal-agent/issues/88)) — Cloud Scheduler GCP job provisioning is still manual; no config checked in yet
 - [ ] `todo` Add `trigger_run` for agent-spawned runs ([#90](https://github.com/gtpooniwala/personal-agent/issues/90))
 - [ ] `todo` Email-triggered task execution ([#91](https://github.com/gtpooniwala/personal-agent/issues/91))
 - [ ] `todo` Telegram bot integration for mobile task monitoring and triggering ([#92](https://github.com/gtpooniwala/personal-agent/issues/92))

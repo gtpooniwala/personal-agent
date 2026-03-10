@@ -178,6 +178,29 @@ class TestTriggerDispatcher(unittest.IsolatedAsyncioTestCase):
         # Lease is always released
         self.assertEqual(len(db.released), 1)
 
+    async def test_dispatch_retries_undispatched_existing_row(self):
+        """An existing TriggerEvent with dispatched=False (prior failure) is retried."""
+        trigger = _make_trigger()
+        undispatched = {
+            "id": "te-1",
+            "trigger_id": "trigger-1",
+            "external_event_id": "ext-1",
+            "run_id": None,
+            "received_at": "2026-01-01T00:00:00+00:00",
+            "dispatched": False,
+        }
+        db = FakeDbOps(existing_event=undispatched)
+        rt = FakeRuntimeService(run_id="run-retry")
+        dispatcher = TriggerDispatcher(runtime_service=rt, db_ops=db)
+
+        result = await dispatcher.dispatch(trigger, message="retry me", external_event_id="ext-1", dedup=True)
+
+        # Should dispatch (not skip) because dispatched=False
+        self.assertEqual(result, "run-retry")
+        # Existing row should be reused, not a new one created
+        self.assertEqual(db.trigger_events_created, [])
+        self.assertEqual(db.dispatched_events, [("te-1", "run-retry")])
+
     async def test_dispatch_injects_correct_conversation(self):
         """The submitted run uses the trigger's conversation_id (stub passthrough)."""
         trigger = _make_trigger(conversation_id="conv-xyz")

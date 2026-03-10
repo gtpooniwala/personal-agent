@@ -73,18 +73,28 @@ class TriggerDispatcher:
             trigger: Serialized ExternalTrigger dict (from db_ops).
             message: Prompt string to inject as the user message.
             external_event_id: Stable ID from the external system for dedup.
+                The (trigger_id, external_event_id) pair must be unique per
+                logical event. Reusing the same value across distinct events
+                will be rejected by the database unique constraint.
             event_metadata: Optional metadata for workflow matching in
                 _resolve_conversation() — not used by the stub.
-            dedup: If True (default), skip dispatch if a TriggerEvent row
-                already exists for this (trigger_id, external_event_id) pair.
+            dedup: If True (default), check for an existing TriggerEvent row.
+                Only skip dispatch if that row has dispatched=True (already
+                succeeded). A row with dispatched=False means a previous
+                attempt failed; the dispatcher retries it. If False, the
+                application-level check is skipped entirely, but the database
+                unique constraint on (trigger_id, external_event_id) still
+                applies and will raise on a duplicate insert.
         """
         db = self._get_db_ops()
         trigger_id = str(trigger["id"])
         meta = event_metadata or {}
 
+        existing_event_row: Optional[Dict[str, Any]] = None
+
         if dedup:
-            existing = db.get_trigger_event(trigger_id, external_event_id)
-            if existing:
+            existing_event_row = db.get_trigger_event(trigger_id, external_event_id)
+            if existing_event_row and existing_event_row.get("dispatched"):
                 logger.info(
                     "Trigger event already dispatched — skipping",
                     extra={
@@ -114,23 +124,26 @@ class TriggerDispatcher:
         run_id: Optional[str] = None
 
         try:
-            # Insert the TriggerEvent row (not yet dispatched) for idempotence.
-            try:
-                trigger_event_row = db.create_trigger_event(
-                    trigger_id=trigger_id,
-                    external_event_id=external_event_id,
-                    dispatched=False,
-                )
-            except Exception:
-                logger.exception(
-                    "Failed to create trigger event row",
-                    extra={
-                        "event": "trigger.dispatch.event_create_error",
-                        "trigger_id": trigger_id,
-                        "external_event_id": external_event_id,
-                    },
-                )
-                return None
+            # Reuse an existing undispatched row (retry path) or create a new one.
+            if existing_event_row:
+                trigger_event_row = existing_event_row
+            else:
+                try:
+                    trigger_event_row = db.create_trigger_event(
+                        trigger_id=trigger_id,
+                        external_event_id=external_event_id,
+                        dispatched=False,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to create trigger event row",
+                        extra={
+                            "event": "trigger.dispatch.event_create_error",
+                            "trigger_id": trigger_id,
+                            "external_event_id": external_event_id,
+                        },
+                    )
+                    return None
 
             conversation_id = self._resolve_conversation(trigger, meta)
 

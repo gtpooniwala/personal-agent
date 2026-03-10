@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import List
+from typing import List, NoReturn
 
 from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy.exc import IntegrityError
@@ -27,7 +27,15 @@ trigger_router = APIRouter(prefix="/triggers", tags=["triggers"])
 
 def _trigger_response(t: dict) -> ExternalTriggerResponse:
     config_raw = t.get("config")
-    config = json.loads(config_raw) if config_raw else None
+    config = None
+    if config_raw:
+        try:
+            config = json.loads(config_raw)
+        except json.JSONDecodeError:
+            logger.warning(
+                "Trigger config is not valid JSON — returning config=None",
+                extra={"event": "trigger.config.decode_error", "trigger_id": t.get("id")},
+            )
     return ExternalTriggerResponse(
         id=t["id"],
         type=t["type"],
@@ -51,7 +59,7 @@ def _event_response(e: dict) -> TriggerEventResponse:
     )
 
 
-def _handle_db_integrity_error(exc: IntegrityError, name: str, verb: str) -> None:
+def _handle_db_integrity_error(exc: IntegrityError, name: str, verb: str) -> NoReturn:
     orig = str(getattr(exc, "orig", exc)).lower()
     if "unique" in orig:
         raise HTTPException(status_code=409, detail=f"A trigger named {name!r} already exists")
@@ -78,9 +86,14 @@ async def telegram_webhook(request: Request):
         payload = await request.json()
     except Exception:
         payload = {}
+    # Log only stable identifiers — avoid emitting message text or user IDs.
     logger.info(
         "Telegram webhook received",
-        extra={"event": "trigger.webhook.telegram", "payload": payload},
+        extra={
+            "event": "trigger.webhook.telegram",
+            "update_id": payload.get("update_id"),
+            "has_message": "message" in payload,
+        },
     )
     return {"status": "ok"}
 
@@ -97,9 +110,15 @@ async def email_webhook(request: Request):
         payload = await request.json()
     except Exception:
         payload = {}
+    # Log only stable identifiers — avoid emitting message content or base64 blobs.
+    message_data = payload.get("message", {}) if isinstance(payload, dict) else {}
     logger.info(
         "Email webhook received",
-        extra={"event": "trigger.webhook.email", "payload": payload},
+        extra={
+            "event": "trigger.webhook.email",
+            "subscription": payload.get("subscription") if isinstance(payload, dict) else None,
+            "message_id": message_data.get("messageId"),
+        },
     )
     return {"status": "ok"}
 
@@ -141,11 +160,11 @@ def create_trigger(body: ExternalTriggerCreate):
             enabled=body.enabled,
         )
     except IntegrityError as exc:
-        _handle_db_integrity_error(exc, body.name, "create")
+        _handle_db_integrity_error(exc, body.name, "create")  # always raises (NoReturn)
     except Exception:
         logger.exception("Failed to create external trigger")
         raise HTTPException(status_code=500, detail="Failed to create external trigger")
-    return _trigger_response(trigger)
+    return _trigger_response(trigger)  # type: ignore[possibly-undefined]  # trigger set in try
 
 
 @trigger_router.get("/{trigger_id}", response_model=ExternalTriggerResponse)
@@ -172,8 +191,8 @@ def update_trigger(trigger_id: str, body: ExternalTriggerUpdate):
         trigger = db_ops.update_external_trigger(trigger_id, **updates)
     except IntegrityError as exc:
         name = updates.get("name", trigger_id)
-        _handle_db_integrity_error(exc, name, "update")
-    if not trigger:
+        _handle_db_integrity_error(exc, name, "update")  # always raises (NoReturn)
+    if not trigger:  # type: ignore[possibly-undefined]  # trigger set in try
         raise HTTPException(status_code=404, detail="Trigger not found")
     return _trigger_response(trigger)
 
