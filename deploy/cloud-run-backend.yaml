@@ -36,7 +36,9 @@ spec:
         run.googleapis.com/execution-environment: gen2
     spec:
       serviceAccountName: ${CR_SA}
-      # Allow enough time for cold start + DB connection before first health check.
+      # Max duration for a single HTTP request (not a cold-start or health-check knob).
+      # Cold-start tolerance is controlled by the startup probe's initialDelaySeconds,
+      # periodSeconds, and failureThreshold below.
       timeoutSeconds: 300
       containerConcurrency: 80
       containers:
