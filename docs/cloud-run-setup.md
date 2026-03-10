@@ -11,9 +11,12 @@ Related issues: #85 (this runbook), #82 (Secret Manager secrets), #80 (Cloud SQL
 
 - `gcloud` CLI authenticated with the target GCP project
 - Cloud SQL instance provisioned and `DATABASE_URL` secret created (#80)
-- Secrets created in Secret Manager (#82): `personal-agent-agent-api-key`,
-  `personal-agent-gemini-api-key`, `personal-agent-database-url`
 - Docker installed locally (for `deploy/deploy-backend.sh`)
+
+> **Ordering note:** `docs/secret-manager-setup.md` (#82) requires the Cloud Run
+> service account to already exist. Complete §1–3 of this runbook first (create the
+> service account + IAM grants), then run the Secret Manager setup, then continue
+> with §4 (Artifact Registry) and §5 (deploy).
 
 ---
 
