@@ -58,7 +58,7 @@ trap 'rm -f "${RENDERED_YAML}"' EXIT
 
 # ── Validation ───────────────────────────────────────────────────────────────
 
-if [[ -z "${PROJECT_ID}" ]]; then
+if [[ -z "${PROJECT_ID}" || "${PROJECT_ID}" == "(unset)" ]]; then
   echo "ERROR: PROJECT_ID is not set. Pass --project or set GOOGLE_CLOUD_PROJECT." >&2
   exit 1
 fi
