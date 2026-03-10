@@ -1,0 +1,23 @@
+deploy/deploy-backend.sh
+  fb21289f56317dec 61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "5d9c85f30d82816304f9f713134238020718e646",
+  "prompts": {
+    "fb21289f56317dec": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "03539515-a87b-4fc2-89e1-bdd2d29f67f4",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
