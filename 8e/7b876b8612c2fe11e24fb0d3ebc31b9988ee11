@@ -1,0 +1,29 @@
+docs/OPENCLAW_COMPARISON.md
+  87fbcd31fc46865b 230,249,293-294
+docs/OPENCLAW_ARCHITECTURE_DEEP_DIVE.md
+  87fbcd31fc46865b 89
+docs/WORKBOARD.md
+  87fbcd31fc46865b 62-63
+docs/ROADMAP.md
+  87fbcd31fc46865b 146-154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "8e7b876b8612c2fe11e24fb0d3ebc31b9988ee11",
+  "prompts": {
+    "87fbcd31fc46865b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aed9037e-4601-4819-b0cf-2e9d34c1b251",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 19,
+      "total_deletions": 13,
+      "accepted_lines": 16,
+      "overriden_lines": 0
+    }
+  }
+}
