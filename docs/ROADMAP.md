@@ -106,13 +106,6 @@ Recommended order:
 Already done:
 - [#89](https://github.com/gtpooniwala/personal-agent/issues/89) Scheduled recurring task runner.
 
-## Vision
-The target shape is a personal agent with:
-- durable runs and explicit background task types,
-- orchestration policy owned primarily by prompt and tool contracts rather than ad hoc routing branches,
-- optional streaming and richer trigger surfaces on top of the same run ledger,
-- a cloud deployment path that stays simple enough for a single-user system.
-
 ## Long-Running Agent Evolution Track
 
 Based on the OpenClaw comparison ([#153](https://github.com/gtpooniwala/personal-agent/issues/153)), the following changes were selected for adoption. These build on the runtime and product-correctness phases above.
@@ -149,6 +142,15 @@ Why this order:
 - Docker sandboxing per agent (single-user, no untrusted-input risk)
 - 20+ channel integrations wholesale (Telegram #92 is sufficient for mobile access)
 - ClawHub public skill registry (local workspace skills are sufficient)
+
+## Vision
+
+The target shape is a personal agent with:
+
+- durable runs and explicit background task types,
+- orchestration policy owned primarily by prompt and tool contracts rather than ad hoc routing branches,
+- optional streaming and richer trigger surfaces on top of the same run ledger,
+- a cloud deployment path that stays simple enough for a single-user system.
 
 ## Compressed Completed Context
 - `#7` to `#13`, `#20`, `#40`: baseline hardening and local workflow quality.

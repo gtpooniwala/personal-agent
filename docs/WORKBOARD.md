@@ -59,7 +59,8 @@ Work this track after Phase 2 (product-correctness debt) is stable.
 - [ ] `todo` Per-run tool assembly and dynamic tool policy layer ([#159](https://github.com/gtpooniwala/personal-agent/issues/159))
 - [ ] `todo` Workflow isolation model — decouple run context from conversation_id; design during #105 ([#157](https://github.com/gtpooniwala/personal-agent/issues/157))
 - [ ] `todo` MCP client integration for external tool extensibility ([#155](https://github.com/gtpooniwala/personal-agent/issues/155))
-- [ ] `todo` Migrate away from LangChain/LangGraph to direct async Anthropic SDK calls — low priority ([#103](https://github.com/gtpooniwala/personal-agent/issues/103))
+
+Note: LangGraph/LangChain migration (#103) is tracked in Core Runtime above; it is the long-term vehicle for true async orchestration and is low priority.
 
 ## Deployment Track
 Work this track after the core runtime/orchestrator plan above is stable enough.

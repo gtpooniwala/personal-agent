@@ -40,7 +40,7 @@ PA's HTTP+SSE control plane is the right fit. The WS gateway pattern is not wort
 ### 2. Execution Model and Durability
 
 **Personal Agent today:**
-PostgreSQL-backed run ledger (`runs`, `run_events`, `leases`). Lifecycle: `queued → running → succeeded/failed/retrying`. `run_events` is the append-only durable event stream. Per-conversation lease serialization prevents concurrent runs on the same conversation. `OrchestrationExecutionPlane` offloads blocking orchestration to a bounded worker pool. `HeartbeatService` sweeps orphaned runs. Some follow-up work (summarization, title generation) still uses `asyncio.create_task` rather than durable queued tasks.
+PostgreSQL-backed run ledger (`runs`, `run_events`, `leases`). Lifecycle: `queued → running → succeeded/failed/retrying`. `run_events` is the append-only durable event stream. Per-conversation lease serialization prevents concurrent runs on the same conversation. `OrchestrationExecutionPlane` offloads blocking orchestration to a bounded worker pool. `HeartbeatService` sweeps orphaned runs. Some follow-up work (summarisation, title generation) still uses `asyncio.create_task` rather than durable queued tasks.
 
 **OpenClaw approach:**
 In-process lane-aware FIFO queue with per-session serialization (one active run per session). No persistent run ledger — runs are transient in-memory. Session transcripts are JSONL on disk. Retry is per-request at the provider/HTTP layer, not per workflow step. The queue supports multiple modes: `steer` (inject into current run), `followup`/`collect` (hold for next turn), `interrupt` (abort and restart). Concurrency is controlled by `maxConcurrent` and lane caps.
@@ -107,7 +107,7 @@ See follow-up: [#154](https://github.com/gtpooniwala/personal-agent/issues/154).
 ### 5. Tool System
 
 **Personal Agent today:**
-`ToolRegistry` with a bound tool set per run: calculator, time, document search (RAG), internet search, scratchpad, user profile, Gmail read, response agent, summarization agent. Document-scoped tool availability (doc-search only activates when documents are selected). Tool selection is model-owned (LangGraph). No per-conversation tool allow/deny. No sandboxed execution. No external tool extensibility standard.
+`ToolRegistry` with a bound tool set per run: calculator, time, document search (RAG), internet search, scratchpad, user profile, Gmail read, response agent, summarisation agent. Document-scoped tool availability (doc-search only activates when documents are selected). Tool selection is model-owned (LangGraph). No per-conversation tool allow/deny. No sandboxed execution. No external tool extensibility standard.
 
 **OpenClaw approach:**
 TypeBox-typed first-class tools. Per-agent tool allow/deny lists. Optional Docker sandbox per agent with configurable scope. Agent-to-agent messaging tool. MCP bridge via `mcporter` for connecting external MCP servers. Plugin API for adding tools without core changes.
@@ -227,7 +227,7 @@ PA's run observability (durable events, SSE stream) is strong and appropriate. T
 3. **In-chat abort** — no `/stop` command to abort a running run mid-stream. This is a real UX gap for long-running tasks.
 
 **Decision:**
-- **Adapt** in-chat run abort: add a `/stop` or abort mechanism for the frontend to cancel an active run. This is a product-correctness issue, not an architecture issue.
+- **Defer** in-chat run abort: the pattern is valid and fills a real UX gap for long-running tasks, but no tracking issue has been created yet. Will be addressed as a separate follow-up outside this comparison.
 - **Defer** doctor/audit tooling: useful for cloud deployment phase, not urgent now.
 - **Reject** device pairing and per-session send policy: out of scope for single-user personal assistant.
 
@@ -246,7 +246,7 @@ PA's run observability (durable events, SSE stream) is strong and appropriate. T
 | Triggers / scheduling | DB-backed scheduler, no hooks, no webhooks | Persistent cron (isolated/main), hooks, webhooks | **adapt** isolated task execution; **defer** hooks/webhooks |
 | Channel surfaces | Next.js web UI only | 20+ channels, mobile apps | **defer** all except Telegram (#92) |
 | Agent isolation / multi-agent | Single-user, single-agent | Per-agent workspace + state + sessions | **reject** — intentionally single-agent |
-| Observability / safety | Durable events, SSE, bearer-token auth | Doctor CLI, audit, /stop, device pairing | **adapt** run abort; **defer** doctor/audit |
+| Observability / safety | Durable events, SSE, bearer-token auth | Doctor CLI, audit, /stop, device pairing | **defer** run abort + doctor/audit; **reject** device pairing |
 
 ---
 
@@ -290,6 +290,8 @@ The following issues should be created from this comparison:
 
 ## Related Docs
 
+- [`OPENCLAW_ARCHITECTURE_DEEP_DIVE.md`](OPENCLAW_ARCHITECTURE_DEEP_DIVE.md) — detailed technical comparison (system boundaries, scheduling, task isolation, tool architecture)
+- [`ARCHITECTURE_DIRECTION.md`](ARCHITECTURE_DIRECTION.md) — synthesis and recommendation: stay with PA's architecture, expand selectively
 - [`ARCHITECTURE.md`](ARCHITECTURE.md)
 - [`ROADMAP.md`](ROADMAP.md)
 - [`WORKBOARD.md`](WORKBOARD.md)

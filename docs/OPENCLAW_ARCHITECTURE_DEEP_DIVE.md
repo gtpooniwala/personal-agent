@@ -86,9 +86,10 @@ memory_store                         ← scratchpad tool backing store
   value            timestamp
 
 documents
-  id (PK)          filename               file_size
-  content_type     processed              total_chunks
-  summary          file_content (BLOB)    upload_date
+  id (PK)          filename               original_filename
+  file_size        content_type           processed
+  total_chunks     summary                file_content (BLOB)
+  upload_date
 
 document_chunks
   id (PK)          document_id (FK)       chunk_index
@@ -260,9 +261,9 @@ in the conversation's message history.
 
 **Background tasks:**
 
-Conversation summarization and title generation still use `asyncio.create_task()` directly
+Conversation summarisation and title generation still use `asyncio.create_task()` directly
 from within the orchestration path. These are fire-and-forget on the event loop and are
-not durable — if the process restarts mid-summarization, the task is silently lost.
+not durable — if the process restarts mid-summarisation, the task is silently lost.
 
 ---
 
@@ -399,7 +400,7 @@ orchestrator instance.
 **Where isolation breaks down today:**
 
 1. Scheduled tasks inject into user conversations (design gap, tracked in #157 / addressed in #105 design).
-2. Background follow-up tasks (summarization, title) are fire-and-forget coroutines that
+2. Background follow-up tasks (summarisation, title) are fire-and-forget coroutines that
    share event loop and executor budget with foreground runs (#109).
 3. The `leases` table provides distributed serialization (one active run per conversation)
    but this is optimistic — a stale lease after a crash can block a conversation until
@@ -498,7 +499,7 @@ OpenClaw's isolation is simpler and more elegant for the single-process always-o
 
 - Full conversation and message history in PostgreSQL
 - Automatic title generation (background, post-run)
-- Automatic conversation summarization (background, post-run)
+- Automatic conversation summarisation (background, post-run)
 - Document upload + RAG (per-conversation document selection)
 
 **Scheduling:**
@@ -526,7 +527,7 @@ OpenClaw's isolation is simpler and more elegant for the single-process always-o
 - In-memory lane queue for serialization
 - LLM agent turn via pi-mono embedded runner
 - Streaming output back to channel (block streaming / preview streaming)
-- Context compaction (automatic summarization + token pruning)
+- Context compaction (automatic summarisation + token pruning)
 - Session pruning and retention policies
 
 **Multi-channel inbox:**
