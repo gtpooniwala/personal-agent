@@ -106,8 +106,47 @@ Recommended order:
 Already done:
 - [#89](https://github.com/gtpooniwala/personal-agent/issues/89) Scheduled recurring task runner.
 
+## Long-Running Agent Evolution Track
+
+Based on the OpenClaw comparison ([#153](https://github.com/gtpooniwala/personal-agent/issues/153)), the following changes were selected for adoption. These build on the runtime and product-correctness phases above.
+
+Decisions documented in [`OPENCLAW_COMPARISON.md`](OPENCLAW_COMPARISON.md).
+
+### Selected adaptations (in recommended order)
+
+Prerequisites for #154 and #156:
+- [#79](https://github.com/gtpooniwala/personal-agent/issues/79) GCS infrastructure — SDK, bucket, credential wiring (shared prerequisite for all GCS-backed features)
+
+Core adaptations:
+1. [#154](https://github.com/gtpooniwala/personal-agent/issues/154) GCS-backed Markdown memory workspace — replaces scratchpad tool; `MEMORY.md` + daily logs + pre-compaction flush
+2. [#156](https://github.com/gtpooniwala/personal-agent/issues/156) User-editable agent context files (`AGENTS.md` / `USER.md`, GCS-backed)
+3. [#159](https://github.com/gtpooniwala/personal-agent/issues/159) Per-run tool assembly and dynamic tool policy layer — `build_tool_set(run_context)` replacing static registry binding
+4. [#157](https://github.com/gtpooniwala/personal-agent/issues/157) Workflow isolation model — decouple run context from `conversation_id`; design resolved during #105
+5. [#155](https://github.com/gtpooniwala/personal-agent/issues/155) MCP client integration for external tool extensibility
+
+Longer-term (requires stable product baseline first):
+6. [#103](https://github.com/gtpooniwala/personal-agent/issues/103) Migrate away from LangChain/LangGraph to direct async Anthropic SDK calls — closes the async I/O gap, eliminates thread pool (low priority)
+
+Why this order:
+- GCS infrastructure (#79) is the prerequisite that unlocks #154 and #156.
+- Memory (#154) and context files (#156) deliver the most direct product value: the agent becomes easier to customize and less likely to lose context silently.
+- Tool policy (#159) is a medium-priority architecture change needed before sub-agents and MCP to avoid tool leakage between run types.
+- Workflow isolation (#157) design is resolved during the queued jobs work (#105), then implemented after.
+- MCP (#155) requires more design and is most valuable once the tool policy layer exists.
+- LangGraph migration (#103) is architecturally important but not urgent — it is a significant orchestrator rewrite with no immediate product impact.
+
+### Patterns intentionally rejected
+
+- WebSocket gateway / device pairing (not needed for web-UI-first single-user setup)
+- Multi-agent routing and per-agent isolation (PA is single-user by design)
+- Docker sandboxing per agent (single-user, no untrusted-input risk)
+- 20+ channel integrations wholesale (Telegram #92 is sufficient for mobile access)
+- ClawHub public skill registry (local workspace skills are sufficient)
+
 ## Vision
+
 The target shape is a personal agent with:
+
 - durable runs and explicit background task types,
 - orchestration policy owned primarily by prompt and tool contracts rather than ad hoc routing branches,
 - optional streaming and richer trigger surfaces on top of the same run ledger,

@@ -46,6 +46,22 @@ Important rule:
 - [ ] `todo` Strengthen prompt architecture and prompting contracts ([#68](https://github.com/gtpooniwala/personal-agent/issues/68))
 - [ ] `todo` Improve document UX and RAG workflow clarity in the frontend ([#64](https://github.com/gtpooniwala/personal-agent/issues/64))
 
+## Long-Running Agent Evolution Track
+
+Decisions from OpenClaw comparison ([#153](https://github.com/gtpooniwala/personal-agent/issues/153)). See [`OPENCLAW_COMPARISON.md`](OPENCLAW_COMPARISON.md) for the full rationale.
+
+Work this track after Phase 2 (product-correctness debt) is stable.
+
+- [x] `done` OpenClaw architecture comparison and decisions ([#153](https://github.com/gtpooniwala/personal-agent/issues/153))
+- [ ] `todo` GCS infrastructure — SDK, bucket, credential wiring; prerequisite for #154/#156 ([#79](https://github.com/gtpooniwala/personal-agent/issues/79))
+- [ ] `todo` GCS-backed Markdown memory workspace — replaces scratchpad tool ([#154](https://github.com/gtpooniwala/personal-agent/issues/154))
+- [ ] `todo` User-editable agent context files (AGENTS.md / USER.md, GCS-backed) ([#156](https://github.com/gtpooniwala/personal-agent/issues/156))
+- [ ] `todo` Per-run tool assembly and dynamic tool policy layer ([#159](https://github.com/gtpooniwala/personal-agent/issues/159))
+- [ ] `todo` Workflow isolation model — decouple run context from conversation_id; design during #105 ([#157](https://github.com/gtpooniwala/personal-agent/issues/157))
+- [ ] `todo` MCP client integration for external tool extensibility ([#155](https://github.com/gtpooniwala/personal-agent/issues/155))
+
+Note: LangGraph/LangChain migration (#103) is tracked in Core Runtime above; it is the long-term vehicle for true async orchestration and is low priority.
+
 ## Deployment Track
 Work this track after the core runtime/orchestrator plan above is stable enough.
 
