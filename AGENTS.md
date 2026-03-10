@@ -23,6 +23,7 @@ Canonical workflow contract for coding agents in this repository.
 4. Branch naming must follow `<agent>/<type>/<issue>-<slug>`:
    - Codex: `codex/<type>/<issue>-<slug>`
    - Claude: `claude/<type>/<issue>-<slug>`
+   - OpenCode: `opencode/<type>/<issue>-<slug>`
 5. Stable managed slots are:
    - `.worktrees/slot-01`
    - `.worktrees/slot-02`
@@ -44,8 +45,8 @@ Canonical workflow contract for coding agents in this repository.
 
 ## Required Commands
 - Slot status: `scripts/agent-status.sh`
-- Claim without launch: `scripts/claim-slot.sh --agent <codex|claude> ...`
-- Start agent in a managed slot: `scripts/start-agent.sh <codex|claude> ...`
+- Claim without launch: `scripts/claim-slot.sh --agent <codex|claude|opencode> ...`
+- Start agent in a managed slot: `scripts/start-agent.sh <codex|claude|opencode> ...`
 - Release a slot: `scripts/release-slot.sh --slot <slot-id> [--keep-branch]`
 - Shortcut cleanup sweep: `scripts/release-slot.sh` runs the same reclaim flow as `scripts/reclaim-stale-slots.sh`
 - Explicit full sweep: `scripts/release-slot.sh --all` or `scripts/reclaim-stale-slots.sh --all`

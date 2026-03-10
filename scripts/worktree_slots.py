@@ -22,10 +22,10 @@ from typing import Any
 DEFAULT_STABLE_SLOTS = 4
 DEFAULT_MAX_SLOTS = int(os.environ.get("WORKTREE_SLOT_MAX", "8"))
 DEFAULT_STALE_HOURS = int(os.environ.get("WORKTREE_SLOT_STALE_HOURS", "72"))
-ALLOWED_AGENTS = {"codex", "claude"}
+ALLOWED_AGENTS = {"codex", "claude", "opencode"}
 ALLOWED_MODES = {"cli", "app"}
 BRANCH_RE = re.compile(
-    r"^(?P<agent>codex|claude)/(?P<type>[a-z0-9][a-z0-9-]*)/(?P<issue>[0-9]+)-(?P<slug>[a-z0-9][a-z0-9-]*)$"
+    r"^(?P<agent>codex|claude|opencode)/(?P<type>[a-z0-9][a-z0-9-]*)/(?P<issue>[0-9]+)-(?P<slug>[a-z0-9][a-z0-9-]*)$"
 )
 SLOT_RE = re.compile(r"^(slot|dyn)-[0-9]{2}$")
 TYPE_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
@@ -440,6 +440,53 @@ def git_status_dirty(path: Path) -> bool:
     return bool(git("-C", str(path), "status", "--porcelain"))
 
 
+def ensure_branch_checked_out(ctx: RepoContext, path: Path, branch: str) -> None:
+    if local_branch_exists(ctx, branch):
+        run("git", "-C", str(path), "checkout", branch)
+    elif remote_branch_exists(ctx, branch):
+        run("git", "-C", str(path), "checkout", "-b", branch, f"origin/{branch}")
+    else:
+        run("git", "-C", str(path), "checkout", "-b", branch, base_ref(ctx))
+    clear_worktree_list_cache(ctx)
+
+
+def switch_slot_to_main(ctx: RepoContext, slot_id: str) -> None:
+    target = slot_path(ctx, slot_id)
+    if not target.exists():
+        return
+
+    checked_out = path_worktree_map(ctx).get(str(target))
+    if checked_out is None:
+        raise SystemExit(
+            f"Release failed for {slot_id}: {target} exists but is not attached to a known managed branch. "
+            "Run scripts/agent-status.sh and inspect the worktree before retrying."
+        )
+
+    try:
+        dirty = git_status_dirty(target)
+    except Exception as exc:
+        raise SystemExit(
+            f"Release failed for {slot_id}: could not determine whether the worktree is dirty ({exc}). "
+            "Inspect the slot manually and discuss with the user before retrying."
+        ) from exc
+
+    if dirty:
+        raise SystemExit(
+            f"Release failed for {slot_id}: the worktree has uncommitted changes. "
+            "Fix those files before releasing the slot. If they are not needed, stash or discard them. "
+            "If they matter, commit them and open or update a PR. If you are unsure, discuss it with the user."
+        )
+
+    if checked_out == "main":
+        return
+
+    if local_branch_exists(ctx, "main"):
+        run("git", "-C", str(target), "checkout", "main")
+    else:
+        run("git", "-C", str(target), "checkout", "-B", "main", base_ref(ctx))
+    clear_worktree_list_cache(ctx)
+
+
 def branch_merged_into_main(ctx: RepoContext, branch: str) -> bool | None:
     if not local_branch_exists(ctx, branch):
         return None
@@ -510,6 +557,11 @@ def observe_slot(ctx: RepoContext, lease: dict[str, Any], stale_hours: int) -> d
         reasons.append(
             f"slot path is attached to {checked_out_branch or 'unknown branch'} instead of {branch or 'no branch'}"
         )
+    if lease["state"] == "free" and slot_dir.exists():
+        if checked_out_branch != "main":
+            reasons.append(f"free slot is attached to {checked_out_branch or 'unknown branch'} instead of main")
+        elif dirty:
+            reasons.append("free slot is on main with uncommitted changes")
     if lease["state"] == "reserved" and last_activity:
         threshold = datetime.now(timezone.utc) - timedelta(hours=stale_hours)
         if last_activity < threshold and dirty is False:
@@ -518,7 +570,9 @@ def observe_slot(ctx: RepoContext, lease: dict[str, Any], stale_hours: int) -> d
 
     safe_to_reclaim = False
     if lease["state"] != "free":
-        if dirty is False and merged is True:
+        if dirty is False and checked_out_branch == "main":
+            safe_to_reclaim = True
+        elif dirty is False and merged is True:
             safe_to_reclaim = True
         elif not slot_dir.exists() and (merged is True or not local_branch_exists(ctx, branch or "")):
             safe_to_reclaim = True
@@ -566,10 +620,32 @@ def create_or_attach_worktree(ctx: RepoContext, slot_id: str, branch: str) -> No
         raise SystemExit(f"Branch {branch} is already checked out at {existing_branch_path}.")
 
     if target.exists():
-        raise SystemExit(
-            f"Slot path {target} already exists but is not available. "
-            "Inspect with scripts/agent-status.sh before reusing it."
-        )
+        checked_out_branch = path_worktree_map(ctx).get(str(target))
+        if checked_out_branch is None:
+            raise SystemExit(
+                f"Slot path {target} already exists but is not attached to a known worktree branch. "
+                "Inspect with scripts/agent-status.sh before reusing it."
+            )
+        try:
+            dirty = git_status_dirty(target)
+        except Exception as exc:
+            raise SystemExit(
+                f"Could not determine whether {target} is clean ({exc}). "
+                "Inspect the slot and discuss with the user before reusing it."
+            ) from exc
+        if dirty:
+            raise SystemExit(
+                f"Slot path {target} is not empty because it has uncommitted changes on "
+                f"{checked_out_branch or 'an unknown branch'}. Release or clean that slot first."
+            )
+        if checked_out_branch != "main":
+            raise SystemExit(
+                f"Slot path {target} is not empty because it is currently on {checked_out_branch}. "
+                f"Run scripts/release-slot.sh --slot {slot_id} first so the slot is parked on main."
+            )
+        ensure_branch_checked_out(ctx, target, branch)
+        link_shared_credentials(ctx, target)
+        return
 
     if local_branch_exists(ctx, branch):
         run("git", "worktree", "add", str(target), branch, cwd=ctx.shared_root)
@@ -745,6 +821,45 @@ def mark_free(ctx: RepoContext, slot_id: str) -> None:
     save_lease(ctx, lease)
 
 
+def release_attention_items(rows: list[dict[str, Any]]) -> list[str]:
+    items: list[str] = []
+    for row in rows:
+        slot_id = row["slot_id"]
+        checked_out_branch = row.get("checked_out_branch")
+        branch = row.get("branch") or checked_out_branch or "-"
+        if row.get("dirty") is True and checked_out_branch == "main":
+            items.append(
+                f"- {slot_id}: worktree is on main but has uncommitted files. "
+                "Discuss this with the user before stashing, discarding, or committing them."
+            )
+        elif row.get("dirty") is True and checked_out_branch not in (None, "main"):
+            items.append(
+                f"- {slot_id}: branch {branch} has uncommitted files. "
+                "Discuss this with the user before stashing, committing, or opening/updating a PR."
+            )
+        elif row.get("state") != "free" and row.get("merged") is True:
+            items.append(
+                f"- {slot_id}: branch {row.get('branch') or branch} appears merged, but the slot is still reserved. "
+                "Discuss with the user whether it should be released now."
+            )
+    return items
+
+
+def print_release_status_summary(ctx: RepoContext, stale_hours: int, stream: Any = sys.stdout) -> None:
+    max_slots = known_max_slots(ctx, DEFAULT_MAX_SLOTS)
+    rows = status_rows(ctx, max_slots, stale_hours)
+    unmanaged = unmanaged_worktrees(ctx, max_slots)
+    print("Current managed slot status:", file=stream)
+    print_status(rows, unmanaged, stream=stream)
+    attention_items = release_attention_items(rows)
+    if attention_items:
+        print("\nSlots needing user attention:", file=stream)
+        for item in attention_items:
+            print(item, file=stream)
+    else:
+        print("\nNo managed slots currently need follow-up.", file=stream)
+
+
 def cmd_release(args: argparse.Namespace) -> int:
     ctx = repo_context()
     ensure_dirs(ctx)
@@ -752,23 +867,44 @@ def cmd_release(args: argparse.Namespace) -> int:
     with state_lock(ctx):
         lease = load_lease(ctx, slot_id)
         if lease["state"] == "free":
-            raise SystemExit(f"Slot {slot_id} is already free.")
+            print(f"Release failed for {slot_id}: the slot is already free.", file=sys.stderr)
+            print("", file=sys.stderr)
+            print_release_status_summary(ctx, args.stale_hours, stream=sys.stderr)
+            return 1
         obs = observe_slot(ctx, lease, args.stale_hours)
         if obs["slot_path_exists"] and obs["dirty"] is not False:
-            raise SystemExit(f"Refusing to release {slot_id}: worktree has uncommitted or unknown changes.")
-        if obs["merged"] is False and not args.keep_branch:
-            raise SystemExit(
-                f"Refusing to release {slot_id}: branch {lease['branch']} is not merged into main. "
-                "Re-run with --keep-branch to park the branch and free the slot."
+            print(
+                f"Release failed for {slot_id}: the worktree has uncommitted or unknown changes. "
+                "Fix those files first. If they are not needed, stash or discard them. If they matter, "
+                "commit them and open or update a PR. If you are unsure, discuss it with the user.",
+                file=sys.stderr,
             )
-        slot_dir = slot_path(ctx, slot_id)
-        if slot_dir.exists():
-            run("git", "worktree", "remove", str(slot_dir), cwd=ctx.shared_root)
-            clear_worktree_list_cache(ctx)
+            print("", file=sys.stderr)
+            print_release_status_summary(ctx, args.stale_hours, stream=sys.stderr)
+            return 1
+        if obs["merged"] is False and not args.keep_branch and obs["checked_out_branch"] != "main":
+            print(
+                f"Release failed for {slot_id}: branch {lease['branch']} is not merged into main. "
+                "Finish or merge that work first, or rerun with --keep-branch to park the branch and "
+                "return the slot to clean main.",
+                file=sys.stderr,
+            )
+            print("", file=sys.stderr)
+            print_release_status_summary(ctx, args.stale_hours, stream=sys.stderr)
+            return 1
+        try:
+            switch_slot_to_main(ctx, slot_id)
+        except SystemExit as exc:
+            print(str(exc), file=sys.stderr)
+            print("", file=sys.stderr)
+            print_release_status_summary(ctx, args.stale_hours, stream=sys.stderr)
+            return 1
         mark_free(ctx, slot_id)
         print(f"Released {slot_id}.")
         if lease.get("branch") and args.keep_branch:
             print(f"Branch kept for later reuse: {lease['branch']}")
+        print("")
+        print_release_status_summary(ctx, args.stale_hours)
     return 0
 
 
@@ -784,12 +920,11 @@ def cmd_reclaim(args: argparse.Namespace) -> int:
                 continue
             obs = observe_slot(ctx, lease, args.stale_hours)
             if obs["safe_to_reclaim"]:
-                actions.append({"slot_id": slot_id, "action": "reclaim", "reason": "clean and merged or missing"})
+                reason = "clean slot already parked on main" if obs["checked_out_branch"] == "main" else "clean and merged or missing"
+                actions.append({"slot_id": slot_id, "action": "reclaim", "reason": reason})
                 if not args.dry_run:
-                    slot_dir = slot_path(ctx, slot_id)
-                    if slot_dir.exists():
-                        run("git", "worktree", "remove", str(slot_dir), cwd=ctx.shared_root)
-                        clear_worktree_list_cache(ctx)
+                    if obs["slot_path_exists"]:
+                        switch_slot_to_main(ctx, slot_id)
                     mark_free(ctx, slot_id)
                 continue
 
@@ -848,13 +983,13 @@ def status_rows(ctx: RepoContext, max_slots: int, stale_hours: int) -> list[dict
     return rows
 
 
-def print_status(rows: list[dict[str, Any]], unmanaged: list[dict[str, str]]) -> None:
+def print_status(rows: list[dict[str, Any]], unmanaged: list[dict[str, str]], stream: Any = sys.stdout) -> None:
     header = (
-        f"{'slot':<8} {'state':<8} {'agent':<6} {'mode':<4} {'dirty':<5} "
+        f"{'slot':<8} {'state':<8} {'agent':<8} {'mode':<4} {'dirty':<5} "
         f"{'merged':<6} {'branch':<42} notes"
     )
-    print(header)
-    print("-" * len(header))
+    print(header, file=stream)
+    print("-" * len(header), file=stream)
     for row in rows:
         notes: list[str] = []
         if row.get("stale_reason"):
@@ -866,15 +1001,16 @@ def print_status(rows: list[dict[str, Any]], unmanaged: list[dict[str, str]]) ->
         dirty = "-" if row["dirty"] is None else ("yes" if row["dirty"] else "no")
         merged = "-" if row["merged"] is None else ("yes" if row["merged"] else "no")
         print(
-            f"{row['slot_id']:<8} {row['state']:<8} {(row.get('agent') or '-'): <6} "
+            f"{row['slot_id']:<8} {row['state']:<8} {(row.get('agent') or '-'): <8} "
             f"{(row.get('mode') or '-'): <4} {dirty:<5} {merged:<6} "
-            f"{(row.get('branch') or '-'): <42} {note_text}"
+            f"{(row.get('branch') or '-'): <42} {note_text}",
+            file=stream,
         )
     if unmanaged:
-        print("\nUnmanaged worktrees")
-        print("-------------------")
+        print("\nUnmanaged worktrees", file=stream)
+        print("-------------------", file=stream)
         for item in unmanaged:
-            print(f"- {item['path']} [{item['branch']}]")
+            print(f"- {item['path']} [{item['branch']}]", file=stream)
 
 
 def cmd_status(args: argparse.Namespace) -> int:

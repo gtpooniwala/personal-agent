@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [ "$#" -lt 1 ]; then
-  echo "Usage: $0 <agent:codex|claude> [--app|--cli] [slot claim args]"
+  echo "Usage: $0 <agent:codex|claude|opencode> [--app|--cli] [slot claim args]"
   exit 1
 fi
 
@@ -34,8 +34,8 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-if [[ "${AGENT}" != "codex" && "${AGENT}" != "claude" ]]; then
-  echo "Agent must be 'codex' or 'claude'."
+if [[ "${AGENT}" != "codex" && "${AGENT}" != "claude" && "${AGENT}" != "opencode" ]]; then
+  echo "Agent must be 'codex', 'claude', or 'opencode'."
   exit 1
 fi
 
@@ -44,10 +44,18 @@ if [[ "${AGENT}" == "claude" && "${MODE}" == "app" ]]; then
   exit 1
 fi
 
+if [[ "${AGENT}" == "opencode" && "${MODE}" == "app" ]]; then
+  echo "OpenCode app mode is not supported by this launcher. Use CLI mode instead."
+  exit 1
+fi
+
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 
-CLAIM_JSON="$("${PYTHON_BIN}" "${ROOT_DIR}/scripts/worktree_slots.py" claim --agent "${AGENT}" --mode "${MODE}" --format json "${FORWARD_ARGS[@]}")"
+if ! CLAIM_JSON="$("${PYTHON_BIN}" "${ROOT_DIR}/scripts/worktree_slots.py" claim --agent "${AGENT}" --mode "${MODE}" --format json "${FORWARD_ARGS[@]}")"; then
+  echo "Failed to prepare a managed slot for ${AGENT}. Review the error above and fix that issue first." >&2
+  exit 1
+fi
 CLAIM_FIELDS=()
 while IFS= read -r line; do
   CLAIM_FIELDS+=("${line}")
@@ -75,6 +83,11 @@ fi
 
 if [[ "${AGENT}" == "codex" && "${MODE}" == "app" ]]; then
   exec codex app "${slot_path}"
+fi
+
+if [[ "${AGENT}" == "opencode" && "${MODE}" == "cli" ]]; then
+  cd "${slot_path}"
+  exec opencode
 fi
 
 cd "${slot_path}"

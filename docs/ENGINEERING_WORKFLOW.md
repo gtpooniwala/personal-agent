@@ -1,6 +1,6 @@
 # Engineering Workflow
 
-Last updated: March 8, 2026
+Last updated: March 10, 2026
 
 ## Goals
 - No direct commits to `main`
@@ -13,16 +13,19 @@ Last updated: March 8, 2026
 - Branch naming:
   - Codex: `codex/<type>/<issue>-<slug>`
   - Claude: `claude/<type>/<issue>-<slug>`
+  - OpenCode: `opencode/<type>/<issue>-<slug>`
 - CI policy rejects PRs whose head branch does not match this contract.
 - Examples:
   - `codex/fix/7-safe-calculator`
   - `claude/feat/16-runtime-worker`
+  - `opencode/chore/59-workflow-hardening`
 
 ## Worktree Rules
 - The shared root checkout is control-plane/admin-only.
 - Use the managed slot workflow for normal work:
   - `scripts/start-agent.sh codex --issue 7 --type fix --label "safe calculator"`
   - `scripts/start-agent.sh codex --app --issue 7 --type fix --label "safe calculator"`
+  - `scripts/start-agent.sh opencode --issue 59 --type chore --label "workflow hardening"`
 - Stable reusable slots live at:
   - `.worktrees/slot-01`
   - `.worktrees/slot-02`
@@ -31,6 +34,7 @@ Last updated: March 8, 2026
 - Overflow slots are created under `.worktrees/dyn-XX` only through the slot manager.
 - Lease metadata is stored under `.worktrees/state/`.
 - The managed slot flow is the single supported path for new work.
+- Releasing a slot parks that worktree back on clean `main`; managed slots are reused instead of deleted.
 
 Inspect / clean up:
 ```bash
@@ -78,6 +82,7 @@ scripts/sync_main.sh
 - Use labels:
   - `agent:codex`
   - `agent:claude`
+  - `agent:opencode`
   - `needs-agent-review`
 
 ## Required CI Checks

@@ -1,6 +1,6 @@
 # Worktree Slot Workflow
 
-Last updated: March 8, 2026
+Last updated: March 10, 2026
 
 This repository uses a script-owned slot/lease system for local coding-agent work.
 
@@ -31,6 +31,7 @@ This repository uses a script-owned slot/lease system for local coding-agent wor
 - Reserved slots stay reserved until a human explicitly releases them or a cleanup script reclaims them when it is clearly safe.
 - Issue/PR status may appear in status output as hints only.
 - Dirty or ambiguous worktrees are never reclaimed automatically.
+- A free slot is expected to be a clean managed worktree already checked out on `main`.
 
 ## Standard Commands
 
@@ -59,6 +60,11 @@ scripts/start-agent.sh codex --app --issue 59 --type chore --label "workflow har
 scripts/start-agent.sh claude --issue 59 --type chore --label "workflow hardening"
 ```
 
+### Start OpenCode in a managed slot
+```bash
+scripts/start-agent.sh opencode --issue 59 --type chore --label "workflow hardening"
+```
+
 ### Resume a parked branch
 ```bash
 scripts/start-agent.sh codex --branch codex/chore/59-workflow-hardening
@@ -68,6 +74,8 @@ scripts/start-agent.sh codex --branch codex/chore/59-workflow-hardening
 ```bash
 scripts/release-slot.sh --slot slot-02
 ```
+
+Releasing a slot now parks that worktree back on clean `main` and marks the lease free. Managed slots are reused instead of removed.
 
 Without a slot argument, `release-slot.sh` falls back to the same conservative reclaim flow as `reclaim-stale-slots.sh`:
 ```bash
@@ -102,10 +110,15 @@ If you prefer to open the app manually:
 1. Claim a slot with `scripts/claim-slot.sh ... --mode app`
 2. Open the reported slot path with `codex app <slot-path>`
 
+## OpenCode Workflow
+1. Start from the shared root checkout.
+2. Run `scripts/start-agent.sh opencode --issue <id> --type <type> --label <label>`.
+3. The launcher claims a slot, creates or reuses the parked slot worktree, checks out the requested branch, updates the lease, and starts OpenCode in that slot.
+
 ## CLI Workflow
 1. Start from the shared root checkout.
 2. Run `scripts/start-agent.sh <agent> ...`.
-3. The launcher claims a slot, creates or reattaches the branch/worktree, updates the lease, and starts the requested agent in that slot.
+3. The launcher claims a slot, creates or reattaches the branch/worktree, or reuses a clean slot already parked on `main`, updates the lease, and starts the requested agent in that slot.
 4. Interact directly with the worker session in that terminal.
 
 ## Capacity Rules
