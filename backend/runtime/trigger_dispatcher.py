@@ -69,9 +69,12 @@ class TriggerDispatcher:
 
         Returns the run_id on successful dispatch. Returns None when no run is
         started — either because the event was deduplicated (already dispatched),
-        or due to an operational failure such as a lease conflict, a database
-        error, or a submit_run failure. Callers should treat None as "no run
-        started" and rely on structured logging to distinguish specific causes.
+        or due to an operational failure such as a lease conflict, a submit_run
+        failure, or a post-lease database error. Pre-lease DB calls
+        (get_trigger_event, acquire_lease) are not wrapped in try/except and
+        will propagate to the caller on transient DB failure. Callers should
+        treat None as "no run started" and rely on structured logging to
+        distinguish specific causes.
 
         Args:
             trigger: Serialized ExternalTrigger dict (from db_ops).
@@ -222,7 +225,16 @@ class TriggerDispatcher:
 
         finally:
             try:
-                db.release_lease(lease_key, owner_id)
+                released = db.release_lease(lease_key, owner_id)
+                if not released:
+                    logger.warning(
+                        "Dispatch lease not released — may have expired and been re-acquired",
+                        extra={
+                            "event": "trigger.dispatch.lease_release_not_owned",
+                            "trigger_id": trigger_id,
+                            "external_event_id": external_event_id,
+                        },
+                    )
             except Exception:
                 logger.exception(
                     "Failed to release trigger dispatch lease",
