@@ -8,11 +8,11 @@
 #   docs/cloud-run-setup.md       — one-time setup steps for this service (#85)
 #
 # Placeholders substituted by deploy-backend.sh at deploy time:
-#   ${REGION}             — Cloud Run region (e.g. us-central1)
-#   ${IMAGE}              — Full image URI from Artifact Registry
-#   ${VPC_CONNECTOR}      — Fully-qualified VPC connector name (embeds project + region)
-#   ${CR_SA}              — Cloud Run service account email (embeds project)
-#   ${VERCEL_URL}         — Vercel frontend origin for CORS (e.g. https://personal-agent.vercel.app)
+#   ${REGION}                    — Cloud Run region (e.g. us-central1)
+#   ${IMAGE}                     — Full image URI from Artifact Registry
+#   ${CLOUDSQL_CONNECTION_NAME}  — Cloud SQL connection name (PROJECT:REGION:INSTANCE)
+#   ${CR_SA}                     — Cloud Run service account email (embeds project)
+#   ${VERCEL_URL}                — Vercel frontend origin for CORS (e.g. https://personal-agent.vercel.app)
 
 apiVersion: serving.knative.dev/v1
 kind: Service
@@ -28,9 +28,9 @@ spec:
         # Cloud Scheduler drives periodic HTTP triggers to wake the container (#88).
         autoscaling.knative.dev/minScale: "0"
         autoscaling.knative.dev/maxScale: "3"
-        # VPC connector for private Cloud SQL access (#80).
-        run.googleapis.com/vpc-access-connector: ${VPC_CONNECTOR}
-        run.googleapis.com/vpc-access-egress: private-ranges-only
+        # Cloud SQL Auth Connector — mounts a unix socket so DATABASE_URL can use
+        # ?host=/cloudsql/<CONNECTION_NAME>. No VPC connector needed (#80).
+        run.googleapis.com/cloudsql-instances: ${CLOUDSQL_CONNECTION_NAME}
         # Second-generation execution environment (better networking, startup).
         run.googleapis.com/execution-environment: gen2
     spec:

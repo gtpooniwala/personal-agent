@@ -35,7 +35,6 @@ Skip any already enabled (Cloud SQL API was enabled in #80).
 gcloud services enable \
   run.googleapis.com \
   artifactregistry.googleapis.com \
-  vpcaccess.googleapis.com \
   --project="${PROJECT_ID}"
 ```
 
@@ -91,24 +90,7 @@ gcloud auth configure-docker "${REGION}-docker.pkg.dev"
 
 ---
 
-## 5. Create the VPC connector
-
-Required for Cloud Run to reach Cloud SQL over private IP (#80).
-
-```bash
-gcloud compute networks vpc-access connectors create personal-agent-connector \
-  --region="${REGION}" \
-  --network=default \
-  --range="10.8.0.0/28" \
-  --project="${PROJECT_ID}"
-```
-
-> The CIDR range `10.8.0.0/28` must not overlap with other subnets in the VPC.
-> Adjust if needed.
-
----
-
-## 6. Deploy the backend
+## 5. Deploy the backend
 
 Run the deploy script from the repository root:
 
@@ -125,7 +107,7 @@ The script:
 
 ---
 
-## 7. Record the service URL
+## 6. Record the service URL
 
 After the first successful deploy, the script prints the service URL:
 
@@ -143,7 +125,7 @@ Service URL : https://personal-agent-backend-<hash>-uc.a.run.app
 
 ---
 
-## 8. Update CORS after Vercel deploy
+## 7. Update CORS after Vercel deploy
 
 Once the Vercel URL is known (e.g. `https://personal-agent.vercel.app`), pass it as
 an environment variable and redeploy (no script edits required):
@@ -155,7 +137,7 @@ VERCEL_URL="https://personal-agent.vercel.app" \
 
 ---
 
-## 9. Verify the deployment
+## 8. Verify the deployment
 
 Check the service is running:
 
@@ -177,7 +159,7 @@ SERVICE_URL="$(gcloud run services describe personal-agent-backend \
   --project="${PROJECT_ID}" \
   --format="value(status.url)")"
 
-curl -sf -H "Authorization: Bearer ${AGENT_API_KEY}" \
+curl -sSf -H "Authorization: Bearer ${AGENT_API_KEY}" \
   "${SERVICE_URL}/api/v1/health" \
   && echo "Health check passed" \
   || { echo "Health check FAILED — check service logs"; false; }
@@ -238,7 +220,9 @@ if traffic increases.
   Cloud Scheduler jobs (#88) send HTTP requests to wake the container for periodic tasks.
 - **Bearer-token auth**: `AGENT_API_KEY` is injected from Secret Manager at startup.
   All routes including `/api/v1/health` require the token. See `DEPLOYMENT.md §5`.
-- **VPC connector**: routes traffic to Cloud SQL private IP; public IP is not exposed.
+- **Cloud SQL Auth Connector**: Cloud Run mounts a unix socket via the
+  `run.googleapis.com/cloudsql-instances` annotation. `DATABASE_URL` uses
+  `?host=/cloudsql/<CONNECTION_NAME>`. No VPC connector needed (#80).
 - **Unauthenticated HTTP**: Cloud Run IAM is open (`allUsers` → `roles/run.invoker`);
   security is enforced entirely by the in-app bearer-token middleware.
 - **Health probes**: TCP socket probes (not HTTP) because `/api/v1/health` requires

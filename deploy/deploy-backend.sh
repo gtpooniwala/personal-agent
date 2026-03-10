@@ -24,8 +24,8 @@ REGION="${CLOUD_RUN_REGION:-us-central1}"
 
 # Service / infra names — must match the values used during one-time setup.
 SERVICE_NAME="personal-agent-backend"
-AR_REPO="personal-agent"                       # Artifact Registry repository name
-VPC_CONNECTOR_NAME="personal-agent-connector"  # VPC connector name (#80)
+AR_REPO="personal-agent"                    # Artifact Registry repository name
+INSTANCE_NAME="personal-agent-db"           # Cloud SQL instance name (#80)
 
 # Vercel frontend origin for CORS. Update after the first Vercel deploy (#127).
 # Example: "https://personal-agent.vercel.app"
@@ -49,7 +49,9 @@ TAG="${TAG:-$(git rev-parse --short HEAD 2>/dev/null || echo latest)}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${SERVICE_NAME}:${TAG}"
-VPC_CONNECTOR="projects/${PROJECT_ID}/locations/${REGION}/connectors/${VPC_CONNECTOR_NAME}"
+# Cloud SQL Auth Connector connection name — used for the cloudsql-instances annotation.
+# DATABASE_URL uses a unix socket: ?host=/cloudsql/${CLOUDSQL_CONNECTION_NAME} (#80).
+CLOUDSQL_CONNECTION_NAME="${PROJECT_ID}:${REGION}:${INSTANCE_NAME}"
 SERVICE_YAML="${REPO_ROOT}/deploy/cloud-run-backend.yaml"
 RENDERED_YAML="$(mktemp /tmp/cloud-run-backend-XXXXXX.yaml)"
 
@@ -98,7 +100,7 @@ echo "==> Rendering service YAML..."
 sed \
   -e "s|\${REGION}|${REGION}|g" \
   -e "s|\${IMAGE}|${IMAGE}|g" \
-  -e "s|\${VPC_CONNECTOR}|${VPC_CONNECTOR}|g" \
+  -e "s|\${CLOUDSQL_CONNECTION_NAME}|${CLOUDSQL_CONNECTION_NAME}|g" \
   -e "s|\${CR_SA}|${CR_SA}|g" \
   -e "s|\${VERCEL_URL}|${VERCEL_URL}|g" \
   "${SERVICE_YAML}" > "${RENDERED_YAML}"
