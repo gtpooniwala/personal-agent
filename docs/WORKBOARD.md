@@ -53,11 +53,13 @@ Decisions from OpenClaw comparison ([#153](https://github.com/gtpooniwala/person
 Work this track after Phase 2 (product-correctness debt) is stable.
 
 - [x] `done` OpenClaw architecture comparison and decisions ([#153](https://github.com/gtpooniwala/personal-agent/issues/153))
-- [ ] `todo` Markdown-native memory workspace (MEMORY.md + daily logs + pre-compaction flush) ([#154](https://github.com/gtpooniwala/personal-agent/issues/154))
-- [ ] `todo` User-editable agent context files (AGENTS.md / USER.md) ([#156](https://github.com/gtpooniwala/personal-agent/issues/156))
-- [ ] `todo` Isolated execution context for scheduled/cron tasks ([#157](https://github.com/gtpooniwala/personal-agent/issues/157))
-- [ ] `todo` In-chat run abort (stop active run from frontend) ([#158](https://github.com/gtpooniwala/personal-agent/issues/158))
+- [ ] `todo` GCS infrastructure — SDK, bucket, credential wiring; prerequisite for #154/#156 ([#79](https://github.com/gtpooniwala/personal-agent/issues/79))
+- [ ] `todo` GCS-backed Markdown memory workspace — replaces scratchpad tool ([#154](https://github.com/gtpooniwala/personal-agent/issues/154))
+- [ ] `todo` User-editable agent context files (AGENTS.md / USER.md, GCS-backed) ([#156](https://github.com/gtpooniwala/personal-agent/issues/156))
+- [ ] `todo` Per-run tool assembly and dynamic tool policy layer ([#159](https://github.com/gtpooniwala/personal-agent/issues/159))
+- [ ] `todo` Workflow isolation model — decouple run context from conversation_id; design during #105 ([#157](https://github.com/gtpooniwala/personal-agent/issues/157))
 - [ ] `todo` MCP client integration for external tool extensibility ([#155](https://github.com/gtpooniwala/personal-agent/issues/155))
+- [ ] `todo` Migrate away from LangChain/LangGraph to direct async Anthropic SDK calls — low priority ([#103](https://github.com/gtpooniwala/personal-agent/issues/103))
 
 ## Deployment Track
 Work this track after the core runtime/orchestrator plan above is stable enough.

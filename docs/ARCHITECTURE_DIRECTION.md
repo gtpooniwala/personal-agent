@@ -1,6 +1,6 @@
 # Architecture Direction: PA vs OpenClaw Model
 
-Last updated: March 10, 2026
+Last updated: March 10, 2026 (revised)
 Based on: [OPENCLAW_ARCHITECTURE_DEEP_DIVE.md](OPENCLAW_ARCHITECTURE_DEEP_DIVE.md)
 
 ## The question
@@ -92,10 +92,14 @@ because all LLM calls, file I/O, and HTTP calls are non-blocking by default. PA'
 (`OrchestrationExecutionPlane`) is a genuine source of complexity: executor lifecycle,
 context var propagation, blocking-in-async risk, concurrency cap tuning.
 
-**Implication for PA:** This is a Python problem, not a PA-specific design choice. Moving to
-a different language to fix it would be a complete rewrite. The right path is issue #103
-(investigate true async paths), which would reduce reliance on the thread pool over time.
-This is a long-term improvement, not a refactor trigger.
+**Implication for PA — updated:** The thread pool exists *because LangGraph is synchronous*.
+PA's roadmap includes migrating away from LangChain/LangGraph to direct async calls using
+the Anthropic Python SDK (#103). Once that migration lands, the thread pool disappears
+entirely. Python with asyncio + httpx is equivalent to Node.js async for I/O-bound LLM
+work — the GIL does not matter for network I/O.
+
+**This gap closes when #103 lands. It is a long-term improvement, not a refactor trigger,
+and it does not require switching languages or rewriting the architecture.**
 
 ### 2. Tool policy pipeline
 
@@ -133,9 +137,14 @@ accessible than PA's DB-backed scratchpad. A user can open a file in a text edit
 change how the agent behaves. They can commit the workspace to git for backup and versioning.
 PA requires either a UI or direct DB access to modify agent behavior.
 
-**Implication for PA:** This is the clearest adaptation worth making immediately. It does
-not require any architectural change — it just adds a filesystem layer that the backend reads
-at session start. The DB scratchpad and workspace files can coexist during transition.
+**Implication for PA — updated:** GCS is the storage backend for PA's version of this pattern.
+Memory files (`MEMORY.md`, `memory/YYYY-MM-DD.md`) and context files (`AGENTS.md`, `USER.md`)
+are stored in GCS rather than the local filesystem (lost on Cloud Run cold start) or
+PostgreSQL (not human-readable). GCS files survive restarts, can be edited outside the app,
+and can be backed up via `gsutil rsync`.
+
+The scratchpad tool is retired as part of this work (#154). Context files are GCS-backed
+from the start (#156). GCS infrastructure is the shared prerequisite (#79).
 
 ---
 
@@ -182,16 +191,16 @@ architecture.
 
 **What to adopt from OpenClaw, and how:**
 
-| OpenClaw pattern | Adopt as | Within current architecture? |
+| OpenClaw pattern | Adopt as | Storage / notes |
 |---|---|---|
-| Markdown memory files | New filesystem layer alongside DB | Yes — backend reads files at session start |
-| User-editable context files | AGENTS.md / USER.md in backend/data | Yes — inject into system prompt at run start |
-| Pre-compaction memory flush | Prompt injection before context limit | Yes — LangGraph hook |
-| Tool policy pipeline | Policy layer in ToolRegistry / per-run assembly | Yes — extend existing registry |
-| Isolated task execution | System conversation concept or run flag | Yes — schema extension |
-| Sub-agents | sessions_spawn tool + sub-run tracking | Yes — new runtime feature on existing run model |
-| MCP client | Python MCP client registered as tool source | Yes — new tool source, not a new architecture |
-| Run cancellation | Cancellation endpoint + cooperative check in LangGraph | Yes — new endpoint + signal |
+| Markdown memory files | `MEMORY.md` + daily logs, **replace scratchpad** | GCS — survives cold start, human-editable |
+| User-editable context files | `AGENTS.md` / `USER.md` | GCS — loaded at session start, injected into prompt |
+| Pre-compaction memory flush | Prompt injection before context limit | LangGraph hook → custom agent loop hook after #103 |
+| Tool policy pipeline | `build_tool_set(run_context)` per-run assembly | Yes — replaces static ToolRegistry binding (#159) |
+| Isolated task execution | Workflow isolation model, nullable `conversation_id` | Schema extension; design resolved during #105 (#157) |
+| Sub-agents | `sessions_spawn` tool + sub-run tracking | New runtime feature on existing run model (#90) |
+| MCP client | Python MCP client registered as tool source | New tool source, not a new architecture (#155) |
+| Run cancellation | Cancellation endpoint + cooperative check | New endpoint + signal (deferred) |
 
 None of these require a rewrite. None require replacing the database, the transport, or the
 deployment model. They are features to be added to an existing, correctly-shaped system.

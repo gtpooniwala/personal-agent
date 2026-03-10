@@ -1,6 +1,6 @@
 # OpenClaw Architecture Comparison
 
-Last updated: March 10, 2026
+Last updated: March 10, 2026 (revised)
 Addresses: [#153](https://github.com/gtpooniwala/personal-agent/issues/153)
 
 ## Purpose
@@ -90,14 +90,17 @@ This is a meaningful gap. PA's scratchpad is functional but has three weaknesses
 The Markdown-native memory pattern is directly applicable to PA's product goals and is low-effort to adopt.
 
 **Decision: adapt**
-Adopt the Markdown-native memory pattern as a complement to the existing scratchpad:
-- Add a `MEMORY.md` file in the agent workspace that the model can read/write.
-- Add daily memory logs (`memory/YYYY-MM-DD.md`).
-- Expose `memory_get` and `memory_write` tools that operate on these files.
-- Implement a pre-compaction memory flush prompt before context limits are hit.
-- Longer-term: hybrid vector+BM25 search with temporal decay (improves over current pgvector RAG for personal memory).
+Replace the scratchpad tool with a GCS-backed Markdown memory workspace:
 
-See follow-up: [#154](https://github.com/gtpooniwala/personal-agent/issues/154).
+- `MEMORY.md` (curated long-term memory) and `memory/YYYY-MM-DD.md` (daily logs) stored in GCS.
+- GCS is the storage backend — not local filesystem (lost on cold start) and not PostgreSQL (not human-readable). Files survive Cloud Run restarts and can be read/edited outside the app.
+- Expose `memory_get` and `memory_write` tools that operate on these files. Scratchpad tool is retired.
+- Implement a pre-compaction memory flush prompt before context limits are hit.
+- Longer-term: hybrid vector+BM25 search with temporal decay (tracked in #6).
+
+Note: the `user_profile` tool is evaluated separately as part of [#156](https://github.com/gtpooniwala/personal-agent/issues/156).
+
+See follow-up: [#154](https://github.com/gtpooniwala/personal-agent/issues/154). GCS infrastructure prerequisite: [#79](https://github.com/gtpooniwala/personal-agent/issues/79).
 
 ---
 
@@ -116,7 +119,12 @@ Three sub-gaps, each with different priority:
 2. **Sandboxed execution** — Docker isolation for risky tool calls. Not relevant for personal single-user PA.
 3. **MCP integration** — The Model Context Protocol is becoming the standard for connecting external tools and services. PA currently requires custom Python tool implementations for every integration. MCP would allow reusing a growing ecosystem of external tool servers without code changes.
 
-**Decision: defer** per-conversation tool policy and sandboxing (single-user, low priority). **Adapt** MCP integration: explore adding MCP client support so external MCP servers can be registered without writing new Python tools. See follow-up: [#155](https://github.com/gtpooniwala/personal-agent/issues/155).
+**Decision:**
+
+- **Adapt** per-run tool policy pipeline: replace static registry binding with a `build_tool_set(run_context)` function called at the start of each run. Policy controls which tools are available based on run type (interactive, scheduled, triggered, sub-agent), not just selected documents. See [#159](https://github.com/gtpooniwala/personal-agent/issues/159).
+- **Adapt** MCP integration: add MCP client support so external MCP servers can register tools without custom Python implementations. See [#155](https://github.com/gtpooniwala/personal-agent/issues/155).
+- **Defer** sandboxing (single-user, low priority).
+- **Note on LangGraph migration (#103):** moving to a direct async Anthropic SDK loop makes per-run tool assembly straightforward — the tool list is a plain Python argument to each LLM call, not a LangChain binding step.
 
 ---
 
@@ -163,7 +171,8 @@ PA's scheduler is functionally similar to OpenClaw's cron. The meaningful gap is
 3. **Inbound webhooks** — PA has no mechanism to accept external trigger payloads (e.g., Gmail push, Zapier webhook). This maps to the planned trigger framework (#88).
 
 **Decision:**
-- **Adapt** isolated execution for scheduled tasks: each scheduled/cron job should use an isolated run context rather than injecting into an existing conversation. This is a moderate change to the scheduler dispatch path and relates to #105 (durable follow-up work).
+
+- **Adapt** workflow isolation model: design a session/workflow context that decouples runs from `conversation_id`, so any run type (scheduled, triggered, sub-agent) can operate in an isolated context. The design should be resolved as part of the queued jobs architecture (#105). Three candidate approaches are documented in [#157](https://github.com/gtpooniwala/personal-agent/issues/157); final architecture decision deferred until #105 design is underway.
 - **Defer** hooks: useful but not blocking; add after the trigger framework.
 - **Defer** inbound webhooks: mapped to existing #88 (trigger framework), which is already in the roadmap.
 
@@ -231,8 +240,8 @@ PA's run observability (durable events, SSE stream) is strong and appropriate. T
 | Runtime / control plane | HTTP+SSE, REST API, PostgreSQL | WS Gateway daemon, device pairing | **reject** — PA's model is right |
 | Execution model / durability | Durable run ledger (PostgreSQL), worker pool | In-memory FIFO queue, JSONL transcripts | **reject** (port) — PA is ahead here |
 | Session model | Conversation-based, single-user | Multi-channel session routing, lifecycle policies | **defer** — retention policies only when needed |
-| Memory model | Scratchpad (KV), profile (structured), RAG | Markdown-native files, hybrid BM25+vector, temporal decay, pre-compaction flush | **adapt** — adopt Markdown memory + pre-compaction flush |
-| Tool system | ToolRegistry, model-owned selection | Typed tools, per-agent policy, sandbox, MCP | **adapt** MCP; **defer** policy/sandbox |
+| Memory model | Scratchpad (KV), profile (structured), RAG | Markdown-native files, hybrid BM25+vector, temporal decay, pre-compaction flush | **adapt** — GCS-backed Markdown memory, replace scratchpad |
+| Tool system | ToolRegistry, model-owned selection | Typed tools, per-agent policy, sandbox, MCP | **adapt** per-run policy (#159) + MCP (#155); **defer** sandbox |
 | Skills / prompt extensibility | Prompts in code, no user-editable files | Workspace files, SKILL.md, ClawHub | **adapt** — workspace context files + SKILL.md pattern |
 | Triggers / scheduling | DB-backed scheduler, no hooks, no webhooks | Persistent cron (isolated/main), hooks, webhooks | **adapt** isolated task execution; **defer** hooks/webhooks |
 | Channel surfaces | Next.js web UI only | 20+ channels, mobile apps | **defer** all except Telegram (#92) |
@@ -263,11 +272,11 @@ The following issues should be created from this comparison:
 
 | Issue | Title | Decision rationale |
 |---|---|---|
-| [#154](https://github.com/gtpooniwala/personal-agent/issues/154) | Markdown-native memory workspace (MEMORY.md + daily logs + pre-compaction flush) | Adopt OpenClaw memory model — human-readable, versionable, temporally structured, prevents silent context loss |
+| [#154](https://github.com/gtpooniwala/personal-agent/issues/154) | GCS-backed Markdown memory workspace (replaces scratchpad) | Adopt OpenClaw memory model — GCS storage, human-readable, versionable, prevents silent context loss |
 | [#155](https://github.com/gtpooniwala/personal-agent/issues/155) | MCP client integration for external tool extensibility | Adopt MCP as the standard for connecting external tools without custom Python implementations |
-| [#156](https://github.com/gtpooniwala/personal-agent/issues/156) | User-editable agent context files (AGENTS.md / USER.md workspace pattern) | Adopt workspace-native prompt customization so agent behavior is configurable without code changes |
-| [#157](https://github.com/gtpooniwala/personal-agent/issues/157) | Isolated execution context for scheduled/cron tasks | Adapt isolated cron session pattern so scheduled tasks don't inject into conversation history |
-| [#158](https://github.com/gtpooniwala/personal-agent/issues/158) | In-chat run abort (stop active run from frontend) | Adapt OpenClaw's /stop pattern as a frontend UX improvement for long-running tasks |
+| [#156](https://github.com/gtpooniwala/personal-agent/issues/156) | User-editable agent context files (AGENTS.md / USER.md, GCS-backed) | Adopt workspace-native prompt customization so agent behavior is configurable without code changes |
+| [#157](https://github.com/gtpooniwala/personal-agent/issues/157) | Workflow isolation model — decouple run context from conversation_id | Design session/workflow isolation for all run types; final architecture decision deferred to #105 |
+| [#159](https://github.com/gtpooniwala/personal-agent/issues/159) | Per-run tool assembly and dynamic tool policy layer | Replace static tool binding with per-run `build_tool_set(run_context)` for policy-aware tool scoping |
 
 ### Existing issues confirmed by this comparison
 

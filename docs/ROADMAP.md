@@ -121,17 +121,26 @@ Decisions documented in [`OPENCLAW_COMPARISON.md`](OPENCLAW_COMPARISON.md).
 
 ### Selected adaptations (in recommended order)
 
-1. [#154](https://github.com/gtpooniwala/personal-agent/issues/154) Markdown-native memory workspace (MEMORY.md + daily logs + pre-compaction flush)
-2. [#156](https://github.com/gtpooniwala/personal-agent/issues/156) User-editable agent context files (AGENTS.md / USER.md workspace pattern)
-3. [#157](https://github.com/gtpooniwala/personal-agent/issues/157) Isolated execution context for scheduled/cron tasks
-4. [#158](https://github.com/gtpooniwala/personal-agent/issues/158) In-chat run abort (stop active run from frontend)
+Prerequisites for #154 and #156:
+- [#79](https://github.com/gtpooniwala/personal-agent/issues/79) GCS infrastructure — SDK, bucket, credential wiring (shared prerequisite for all GCS-backed features)
+
+Core adaptations:
+1. [#154](https://github.com/gtpooniwala/personal-agent/issues/154) GCS-backed Markdown memory workspace — replaces scratchpad tool; `MEMORY.md` + daily logs + pre-compaction flush
+2. [#156](https://github.com/gtpooniwala/personal-agent/issues/156) User-editable agent context files (`AGENTS.md` / `USER.md`, GCS-backed)
+3. [#159](https://github.com/gtpooniwala/personal-agent/issues/159) Per-run tool assembly and dynamic tool policy layer — `build_tool_set(run_context)` replacing static registry binding
+4. [#157](https://github.com/gtpooniwala/personal-agent/issues/157) Workflow isolation model — decouple run context from `conversation_id`; design resolved during #105
 5. [#155](https://github.com/gtpooniwala/personal-agent/issues/155) MCP client integration for external tool extensibility
 
+Longer-term (requires stable product baseline first):
+6. [#103](https://github.com/gtpooniwala/personal-agent/issues/103) Migrate away from LangChain/LangGraph to direct async Anthropic SDK calls — closes the async I/O gap, eliminates thread pool (low priority)
+
 Why this order:
-- Memory (#154) and workspace context files (#156) deliver the most direct product value: the agent becomes easier to customize and less likely to lose context silently.
-- Isolated task execution (#157) cleans up a scheduler correctness gap that affects background automation quality.
-- Run abort (#158) fills a visible UX gap for long-running tasks.
-- MCP (#155) is the right tool extensibility path long-term but requires more design work.
+- GCS infrastructure (#79) is the prerequisite that unlocks #154 and #156.
+- Memory (#154) and context files (#156) deliver the most direct product value: the agent becomes easier to customize and less likely to lose context silently.
+- Tool policy (#159) is a medium-priority architecture change needed before sub-agents and MCP to avoid tool leakage between run types.
+- Workflow isolation (#157) design is resolved during the queued jobs work (#105), then implemented after.
+- MCP (#155) requires more design and is most valuable once the tool policy layer exists.
+- LangGraph migration (#103) is architecturally important but not urgent — it is a significant orchestrator rewrite with no immediate product impact.
 
 ### Patterns intentionally rejected
 
