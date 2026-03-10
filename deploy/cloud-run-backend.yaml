@@ -1,0 +1,131 @@
+# Cloud Run service definition for the personal-agent FastAPI backend.
+#
+# Usage:
+#   deploy/deploy-backend.sh   — builds, pushes, and deploys
+#
+# Prerequisite docs:
+#   docs/secret-manager-setup.md  — Secret Manager secrets and IAM bindings (#82)
+#   docs/cloud-run-setup.md       — one-time setup steps for this service (#85)
+#
+# Placeholders substituted by deploy-backend.sh at deploy time:
+#   ${REGION}                    — Cloud Run region (e.g. us-central1)
+#   ${IMAGE}                     — Full image URI from Artifact Registry
+#   ${CLOUDSQL_CONNECTION_NAME}  — Cloud SQL connection name (PROJECT:REGION:INSTANCE)
+#   ${CR_SA}                     — Cloud Run service account email (embeds project)
+#   ${VERCEL_URL}                — Vercel frontend origin for CORS (e.g. https://personal-agent.vercel.app)
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: personal-agent-backend
+  labels:
+    cloud.googleapis.com/location: ${REGION}
+spec:
+  template:
+    metadata:
+      annotations:
+        # Scale to zero — cold starts (~2-3 s) are acceptable for personal use.
+        # Cloud Scheduler drives periodic HTTP triggers to wake the container (#88).
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "3"
+        # Cloud SQL Auth Connector — mounts a unix socket so DATABASE_URL can use
+        # ?host=/cloudsql/<CONNECTION_NAME>. No VPC connector needed (#80).
+        run.googleapis.com/cloudsql-instances: ${CLOUDSQL_CONNECTION_NAME}
+        # Second-generation execution environment (better networking, startup).
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      serviceAccountName: ${CR_SA}
+      # Max duration for a single HTTP request (not a cold-start or health-check knob).
+      # Cold-start tolerance is controlled by the startup probe's initialDelaySeconds,
+      # periodSeconds, and failureThreshold below.
+      timeoutSeconds: 300
+      containerConcurrency: 80
+      containers:
+        - image: ${IMAGE}
+          ports:
+            - containerPort: 8000
+          env:
+            # ── Static env vars ──────────────────────────────────────────────
+            - name: ENVIRONMENT
+              value: production
+            - name: PORT
+              value: "8000"
+            - name: LOG_LEVEL
+              value: INFO
+            # ALLOWED_ORIGINS must include the Vercel frontend URL.
+            # Pass VERCEL_URL as an env var to deploy-backend.sh after the first Vercel deploy (#127).
+            - name: ALLOWED_ORIGINS
+              value: ${VERCEL_URL}
+            - name: FRONTEND_URL
+              value: ${VERCEL_URL}
+
+            # Gmail integration requires persistent OAuth credentials (client_secret.json +
+            # token.pickle). Cloud Run has no persistent volume, so the integration is
+            # disabled here until a durable credentials mechanism is implemented (#129).
+            - name: ENABLE_GMAIL_INTEGRATION
+              value: "false"
+
+            # ── Secrets from Secret Manager ──────────────────────────────────
+            # Secret names are canonical; see docs/secret-manager-setup.md (#82).
+            - name: AGENT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: personal-agent-agent-api-key
+                  key: latest
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: personal-agent-gemini-api-key
+                  key: latest
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: personal-agent-database-url
+                  key: latest
+            # Optional: uncomment when the secret exists in Secret Manager.
+            # - name: OPENAI_API_KEY
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: personal-agent-openai-api-key
+            #       key: latest
+            # - name: LANGFUSE_PUBLIC_KEY
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: personal-agent-langfuse-public-key
+            #       key: latest
+            # - name: LANGFUSE_SECRET_KEY
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: personal-agent-langfuse-secret-key
+            #       key: latest
+            # - name: LANGFUSE_ENABLED
+            #   value: "true"
+
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+
+          # Startup probe — waits for the app to be ready before receiving traffic.
+          # /api/v1/health requires a bearer token in auth-enabled environments, so
+          # httpGet probes cannot include the dynamic secret value. TCP socket probe
+          # confirms the port is listening; Cloud Run rejects traffic until it passes.
+          startupProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 12
+            timeoutSeconds: 5
+
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+            periodSeconds: 30
+            failureThreshold: 3
+            timeoutSeconds: 5
+
+  # Route 100 % of traffic to the latest revision.
+  traffic:
+    - percent: 100
+      latestRevision: true
