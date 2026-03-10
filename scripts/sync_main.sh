@@ -4,7 +4,7 @@ set -euo pipefail
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 
 if [ "$BRANCH" = "main" ]; then
-  echo "Do not work directly on main. Switch to a feature branch."
+  echo "Do not work directly on main. Switch to a feature branch on a worktree."
   exit 1
 fi
 
