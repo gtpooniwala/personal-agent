@@ -178,7 +178,9 @@ SERVICE_URL="$(gcloud run services describe personal-agent-backend \
   --format="value(status.url)")"
 
 curl -sf -H "Authorization: Bearer ${AGENT_API_KEY}" \
-  "${SERVICE_URL}/api/v1/health" | python3 -m json.tool
+  "${SERVICE_URL}/api/v1/health" \
+  && echo "Health check passed" \
+  || echo "Health check FAILED — check service logs"
 ```
 
 Expected: `{"status": "ok", ...}` with HTTP 200.
