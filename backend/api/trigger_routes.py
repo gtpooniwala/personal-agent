@@ -159,12 +159,12 @@ def create_trigger(body: ExternalTriggerCreate):
             config=config_json,
             enabled=body.enabled,
         )
+        return _trigger_response(trigger)
     except IntegrityError as exc:
         _handle_db_integrity_error(exc, body.name, "create")  # always raises (NoReturn)
     except Exception:
         logger.exception("Failed to create external trigger")
         raise HTTPException(status_code=500, detail="Failed to create external trigger")
-    return _trigger_response(trigger)  # type: ignore[possibly-undefined]  # trigger set in try
 
 
 @trigger_router.get("/{trigger_id}", response_model=ExternalTriggerResponse)
@@ -188,13 +188,13 @@ def update_trigger(trigger_id: str, body: ExternalTriggerUpdate):
             raise HTTPException(status_code=404, detail="Trigger not found")
         return _trigger_response(trigger)
     try:
-        trigger = db_ops.update_external_trigger(trigger_id, **updates)
+        updated = db_ops.update_external_trigger(trigger_id, **updates)
     except IntegrityError as exc:
         name = updates.get("name", trigger_id)
         _handle_db_integrity_error(exc, name, "update")  # always raises (NoReturn)
-    if not trigger:  # type: ignore[possibly-undefined]  # trigger set in try
+    if not updated:  # type: ignore[possibly-undefined]  # updated set in try; IntegrityError path raises
         raise HTTPException(status_code=404, detail="Trigger not found")
-    return _trigger_response(trigger)
+    return _trigger_response(updated)
 
 
 @trigger_router.delete("/{trigger_id}", status_code=204)
