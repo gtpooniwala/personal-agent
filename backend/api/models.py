@@ -167,6 +167,50 @@ class ScheduledTaskResponse(BaseModel):
     updated_at: str = Field(..., description="Last update timestamp")
 
 
+class ExternalTriggerCreate(BaseModel):
+    """Request model for registering an external trigger."""
+
+    type: str = Field(..., description="Trigger type: telegram, email, webhook, or generic")
+    name: str = Field(..., description="Unique human-readable label")
+    conversation_id: str = Field(..., description="Target conversation ID")
+    config: Optional[Dict[str, Any]] = Field(None, description="Trigger-specific configuration (JSON)")
+    enabled: bool = Field(True, description="Whether the trigger is active")
+
+
+class ExternalTriggerUpdate(BaseModel):
+    """Request model for patching an external trigger."""
+
+    name: Optional[str] = Field(None, description="New label")
+    type: Optional[str] = Field(None, description="New trigger type")
+    conversation_id: Optional[str] = Field(None, description="New target conversation ID")
+    config: Optional[Dict[str, Any]] = Field(None, description="New trigger configuration")
+    enabled: Optional[bool] = Field(None, description="Enable or disable the trigger")
+
+
+class ExternalTriggerResponse(BaseModel):
+    """Response model for an external trigger."""
+
+    id: str = Field(..., description="Trigger ID")
+    type: str = Field(..., description="Trigger type")
+    name: str = Field(..., description="Trigger label")
+    conversation_id: str = Field(..., description="Target conversation ID")
+    config: Optional[Dict[str, Any]] = Field(None, description="Trigger configuration")
+    enabled: bool = Field(..., description="Whether the trigger is active")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
+
+
+class TriggerEventResponse(BaseModel):
+    """Response model for a single trigger event audit log entry."""
+
+    id: str = Field(..., description="Event ID")
+    trigger_id: str = Field(..., description="Parent trigger ID")
+    external_event_id: str = Field(..., description="ID from the external system (dedup key)")
+    run_id: Optional[str] = Field(None, description="Run ID created for this event")
+    received_at: str = Field(..., description="When the event was received")
+    dispatched: bool = Field(..., description="Whether the event was dispatched to a run")
+
+
 class ObservabilityRunSummary(BaseModel):
     """Compact run summary for observability dashboards."""
 

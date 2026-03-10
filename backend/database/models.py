@@ -16,6 +16,8 @@ import uuid
 
 from backend.runtime import RUN_EVENT_TYPES, RUN_STATUSES
 
+EXTERNAL_TRIGGER_TYPES = ("telegram", "email", "webhook", "generic")
+
 Base = declarative_base()
 
 
@@ -235,3 +237,50 @@ class ScheduledTask(Base):
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     conversation = relationship("Conversation")
+
+
+class ExternalTrigger(Base):
+    """Registry of configured external triggers."""
+
+    __tablename__ = "external_triggers"
+    __table_args__ = (
+        CheckConstraint(
+            f"type IN ({_sql_string_literals(EXTERNAL_TRIGGER_TYPES)})",
+            name="ck_external_triggers_type_valid",
+        ),
+    )
+
+    id = Column(String, primary_key=True, default=generate_id)
+    type = Column(String, nullable=False)  # telegram|email|webhook|generic
+    name = Column(String, nullable=False, unique=True)
+    conversation_id = Column(String, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False)
+    config = Column(Text, nullable=True)  # JSON — bot token, sender filter, etc.
+    enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    conversation = relationship("Conversation")
+    events = relationship("TriggerEvent", back_populates="trigger", cascade="all, delete-orphan")
+
+
+class TriggerEvent(Base):
+    """Deduplication log for received trigger events."""
+
+    __tablename__ = "trigger_events"
+    __table_args__ = (
+        Index(
+            "ix_trigger_events_trigger_id_external_event_id",
+            "trigger_id",
+            "external_event_id",
+            unique=True,
+        ),
+    )
+
+    id = Column(String, primary_key=True, default=generate_id)
+    trigger_id = Column(String, ForeignKey("external_triggers.id", ondelete="CASCADE"), nullable=False)
+    external_event_id = Column(String, nullable=False)  # Dedupe key from external system
+    run_id = Column(String, ForeignKey("runs.id", ondelete="SET NULL"), nullable=True)
+    received_at = Column(DateTime(timezone=True), default=utcnow)
+    dispatched = Column(Boolean, nullable=False, default=False)
+
+    trigger = relationship("ExternalTrigger", back_populates="events")
