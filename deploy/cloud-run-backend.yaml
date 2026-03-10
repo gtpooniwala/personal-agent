@@ -53,11 +53,17 @@ spec:
             - name: LOG_LEVEL
               value: INFO
             # ALLOWED_ORIGINS must include the Vercel frontend URL.
-            # Update VERCEL_URL in deploy-backend.sh after the first Vercel deploy (#127).
+            # Pass VERCEL_URL as an env var to deploy-backend.sh after the first Vercel deploy (#127).
             - name: ALLOWED_ORIGINS
               value: ${VERCEL_URL}
             - name: FRONTEND_URL
               value: ${VERCEL_URL}
+
+            # Gmail integration requires persistent OAuth credentials (client_secret.json +
+            # token.pickle). Cloud Run has no persistent volume, so the integration is
+            # disabled here until a durable credentials mechanism is implemented (#129).
+            - name: ENABLE_GMAIL_INTEGRATION
+              value: "false"
 
             # ── Secrets from Secret Manager ──────────────────────────────────
             # Secret names are canonical; see docs/secret-manager-setup.md (#82).

@@ -208,7 +208,7 @@ gcloud logging read \
 Or stream live:
 
 ```bash
-gcloud alpha run services logs tail personal-agent-backend \
+gcloud beta run services logs tail personal-agent-backend \
   --region="${REGION}" \
   --project="${PROJECT_ID}"
 ```
@@ -242,4 +242,8 @@ if traffic increases.
 - **Unauthenticated HTTP**: Cloud Run IAM is open (`allUsers` → `roles/run.invoker`);
   security is enforced entirely by the in-app bearer-token middleware.
 - **Health probes**: TCP socket probes (not HTTP) because `/api/v1/health` requires
-  a bearer token that probe definitions cannot reference dynamically.
+  a bearer token that probe definitions cannot reference dynamically. TCP confirms the
+  port is bound; full app readiness (DB pool, etc.) is not verified by the probe.
+- **Gmail integration**: disabled (`ENABLE_GMAIL_INTEGRATION=false`) in the Cloud Run
+  service definition. Cloud Run has no persistent volume for the OAuth token. Re-enable
+  after a durable credentials mechanism is in place (#129).

@@ -12,8 +12,8 @@
 #   --region   Cloud Run region  (default: us-central1)
 #   --tag      Docker image tag  (default: git SHA)
 #
-# After the first Vercel deploy (#127), set VERCEL_URL below to the actual
-# Vercel origin so the CORS ALLOWED_ORIGINS value is correct.
+# After the first Vercel deploy (#127), pass VERCEL_URL as an env var:
+#   VERCEL_URL="https://your-app.vercel.app" deploy/deploy-backend.sh --project ...
 
 set -euo pipefail
 
@@ -96,7 +96,6 @@ docker push "${IMAGE}"
 
 echo "==> Rendering service YAML..."
 sed \
-  -e "s|\${PROJECT_ID}|${PROJECT_ID}|g" \
   -e "s|\${REGION}|${REGION}|g" \
   -e "s|\${IMAGE}|${IMAGE}|g" \
   -e "s|\${VPC_CONNECTOR}|${VPC_CONNECTOR}|g" \
