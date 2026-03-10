@@ -91,8 +91,8 @@ async def telegram_webhook(request: Request):
         "Telegram webhook received",
         extra={
             "event": "trigger.webhook.telegram",
-            "update_id": payload.get("update_id"),
-            "has_message": "message" in payload,
+            "update_id": payload.get("update_id") if isinstance(payload, dict) else None,
+            "has_message": isinstance(payload, dict) and "message" in payload,
         },
     )
     return {"status": "ok"}
@@ -117,7 +117,7 @@ async def email_webhook(request: Request):
         extra={
             "event": "trigger.webhook.email",
             "subscription": payload.get("subscription") if isinstance(payload, dict) else None,
-            "message_id": message_data.get("messageId"),
+            "message_id": message_data.get("messageId") if isinstance(message_data, dict) else None,
         },
     )
     return {"status": "ok"}

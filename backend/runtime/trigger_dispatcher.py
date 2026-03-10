@@ -124,6 +124,23 @@ class TriggerDispatcher:
         run_id: Optional[str] = None
 
         try:
+            # Re-check dispatch state after acquiring the lease to close the race window
+            # between the pre-lease dedup read and the point where we hold the lock.
+            # Another worker may have dispatched successfully in that gap.
+            if dedup and existing_event_row:
+                refreshed = db.get_trigger_event(trigger_id, external_event_id)
+                if refreshed and refreshed.get("dispatched"):
+                    logger.info(
+                        "Trigger event dispatched by concurrent worker — skipping",
+                        extra={
+                            "event": "trigger.dispatch.deduped_post_lease",
+                            "trigger_id": trigger_id,
+                            "external_event_id": external_event_id,
+                        },
+                    )
+                    return None
+                existing_event_row = refreshed or existing_event_row
+
             # Reuse an existing undispatched row (retry path) or create a new one.
             if existing_event_row:
                 trigger_event_row = existing_event_row
