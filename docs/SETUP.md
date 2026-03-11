@@ -28,6 +28,7 @@ DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5432/p
 DATABASE_URL_DOCKER=postgresql+psycopg://personal_agent:personal_agent@postgres:5433/personal_agent
 TEST_DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5433/personal_agent_test
 EVAL_DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5433/personal_agent_test
+DOCKER_POSTGRES_DATA_DIR=${HOME}/.personal-agent/postgres
 ```
 
 Optional observability:
@@ -82,6 +83,13 @@ These Docker ports come from:
 - `DOCKER_FRONTEND_PORT`
 - `DOCKER_API_PORT`
 - `DOCKER_POSTGRES_PORT`
+
+The Docker Postgres container now uses a shared absolute host path by default:
+- `DOCKER_POSTGRES_DATA_DIR=${HOME}/.personal-agent/postgres`
+
+That keeps user-specific integration credentials, including Gmail OAuth tokens stored in Postgres,
+available across worktrees by default. If you intentionally want an isolated clean-room database for
+one worktree, override `DOCKER_POSTGRES_DATA_DIR` in that worktree's `.env`.
 
 Compose uses those port values directly on both the host and inside each container. There is no
 host-to-container remapping layer anymore, so changing `DOCKER_API_PORT=8010` means the backend
