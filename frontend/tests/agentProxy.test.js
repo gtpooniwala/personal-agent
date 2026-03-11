@@ -201,6 +201,15 @@ describe('agent proxy helpers', () => {
     expect(response.headers.get('location')).toBe('/api/agent/conversations?after=next');
   });
 
+  test('rewrites chat subpath redirects onto the proxy contract', () => {
+    expect(
+      __testOnly__.rewriteLocationHeader(
+        'http://127.0.0.1:8000/chat/session-123?resume=1',
+        'http://127.0.0.1:8000',
+      ),
+    ).toBe('/api/agent/chat/session-123?resume=1');
+  });
+
   test('preserves external redirect targets', () => {
     expect(
       __testOnly__.rewriteLocationHeader(

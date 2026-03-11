@@ -145,7 +145,11 @@ function rewriteLocationHeader(value, apiBaseUrl) {
   let proxyPath = null;
   if (resolvedUrl.pathname.startsWith("/api/v1/")) {
     proxyPath = `/api/agent${resolvedUrl.pathname.slice("/api/v1".length)}`;
-  } else if (resolvedUrl.pathname === "/chat" || resolvedUrl.pathname.startsWith("/runs/")) {
+  } else if (
+    resolvedUrl.pathname === "/chat" ||
+    resolvedUrl.pathname.startsWith("/chat/") ||
+    resolvedUrl.pathname.startsWith("/runs/")
+  ) {
     proxyPath = `/api/agent${resolvedUrl.pathname}`;
   }
 
