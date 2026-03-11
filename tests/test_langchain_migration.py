@@ -77,7 +77,7 @@ class TestLangchainMigrationSource(unittest.TestCase):
             "uvicorn[standard]": "0.41.0",
             "python-dotenv": "1.2.2",
             "aiofiles": "25.1.0",
-            "pypdf": "6.7.5",
+            "pypdf": "6.8.0",
         }
         for package, version in expected_versions.items():
             self.assertIn(package, parsed_pins, f"Missing version pin for {package}")
