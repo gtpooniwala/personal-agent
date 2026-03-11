@@ -977,11 +977,20 @@ def cmd_reclaim(args: argparse.Namespace) -> int:
             obs = observe_slot(ctx, lease, args.stale_hours)
             if obs["safe_to_reclaim"]:
                 reason = f"clean slot already parked at {base_ref(ctx)}" if obs["is_parked"] else "clean and merged or missing"
-                actions.append({"slot_id": slot_id, "action": "reclaim", "reason": reason})
+                action = {"slot_id": slot_id, "action": "reclaim", "reason": reason}
+                actions.append(action)
                 if not args.dry_run:
-                    if obs["slot_path_exists"]:
-                        park_slot_worktree(ctx, slot_id)
-                    mark_free(ctx, slot_id)
+                    try:
+                        if obs["slot_path_exists"]:
+                            park_slot_worktree(ctx, slot_id)
+                        mark_free(ctx, slot_id)
+                    except SystemExit as exc:
+                        action["action"] = "mark-stale"
+                        action["reason"] = f"reclaim blocked: {exc}"
+                        lease["state"] = "stale"
+                        lease["stale_reason"] = str(exc)
+                        lease["last_checked_at"] = now_iso()
+                        save_lease(ctx, lease)
                 continue
 
             if obs["stale_reasons"]:
