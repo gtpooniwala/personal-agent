@@ -68,8 +68,11 @@ Use this skill when the user asks to merge a PR or says a branch is ready to lan
 
 7. Merge.
 - Default path:
-  - `gh pr merge <pr> --squash --delete-branch`
-- If `gh pr merge` fails because the checked-out local branch/worktree cannot be deleted, fall back to the GitHub merge API:
+  - `gh pr merge <pr> --squash`
+- Do not use `--delete-branch` from an active worktree. In this repo, the shared root normally holds `main`, so `gh pr merge --delete-branch` may try to switch the current worktree to `main` before deleting the checked-out branch and fail with a worktree-branch collision.
+- After the merge succeeds, delete the remote head branch separately:
+  - `git push origin --delete <head-branch>`
+- If the normal CLI merge path fails for a GitHub-side reason, fall back to the GitHub merge API:
   - `gh api -X PUT repos/$(gh repo view --json nameWithOwner -q .nameWithOwner)/pulls/<pr>/merge -f merge_method=squash`
 - After the API fallback, delete the remote head branch separately if it still exists:
   - `git push origin --delete <head-branch>`
@@ -78,7 +81,9 @@ Use this skill when the user asks to merge a PR or says a branch is ready to lan
 - Only do this after the merge has succeeded.
 - If the checkout passed the managed-slot path check, run:
   - `scripts/release-slot.sh --slot "$slot_id"`
+- The managed-slot release step will park the current worktree in detached `HEAD` at the main base commit, which is the correct local cleanup for this workflow.
 - If the checkout is not a managed slot, skip release.
+- For non-slot worktrees such as Codex Desktop, do not try to auto-delete the current local branch while it is checked out. If local cleanup is needed later, first switch or detach that worktree, then delete the branch from a safe checkout.
 - If slot release fails, report that separately from the merge result; the PR may already be merged.
 
 ## Output expectations
