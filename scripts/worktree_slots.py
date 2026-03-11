@@ -473,11 +473,6 @@ def park_slot_worktree(ctx: RepoContext, slot_id: str) -> None:
         return
 
     entry = worktree_entry_for_path(ctx, target)
-    checked_out = None
-    if entry is not None:
-        branch_ref = entry.get("branch")
-        if branch_ref and branch_ref.startswith("refs/heads/"):
-            checked_out = branch_ref.removeprefix("refs/heads/")
     if entry is None:
         raise SystemExit(
             f"Release failed for {slot_id}: {target} exists but is not attached to a known managed worktree. "
