@@ -178,7 +178,7 @@ describe('agent proxy helpers', () => {
       new Response(null, {
         status: 307,
         headers: {
-          location: '/api/v1/oauth/callback',
+          location: 'http://127.0.0.1:8000/api/v1/conversations?after=next',
         },
       }),
     );
@@ -198,7 +198,44 @@ describe('agent proxy helpers', () => {
     );
 
     expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe('/api/v1/oauth/callback');
+    expect(response.headers.get('location')).toBe('/api/agent/conversations?after=next');
+  });
+
+  test('preserves external redirect targets', () => {
+    expect(
+      __testOnly__.rewriteLocationHeader(
+        'https://accounts.google.com/o/oauth2/v2/auth?client_id=test',
+        'http://127.0.0.1:8000',
+      ),
+    ).toBe('https://accounts.google.com/o/oauth2/v2/auth?client_id=test');
+  });
+
+  test('drops same-backend redirect targets that do not map onto the proxy contract', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: {
+          location: 'http://127.0.0.1:8000/internal/admin',
+        },
+      }),
+    );
+
+    const response = await proxyAgentRequest(
+      new Request('http://localhost:3000/api/agent/conversations', {
+        method: 'GET',
+      }),
+      ['conversations'],
+      {
+        env: {
+          API_BASE_URL: 'http://127.0.0.1:8000',
+          AGENT_API_KEY: 'server-token',
+        },
+        fetchImpl,
+      },
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBeNull();
   });
 
   test('passes through backend failures and auth headers', async () => {

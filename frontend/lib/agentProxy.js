@@ -123,13 +123,57 @@ function buildUpstreamHeaders(requestHeaders, agentApiKey, { dropContentType = f
   return headers;
 }
 
-function buildResponseHeaders(upstreamHeaders) {
+function rewriteLocationHeader(value, apiBaseUrl) {
+  if (!value) {
+    return null;
+  }
+
+  let backendBaseUrl;
+  let resolvedUrl;
+
+  try {
+    backendBaseUrl = new URL(`${apiBaseUrl}/`);
+    resolvedUrl = new URL(value, backendBaseUrl);
+  } catch {
+    return value;
+  }
+
+  if (resolvedUrl.origin !== backendBaseUrl.origin) {
+    return value;
+  }
+
+  let proxyPath = null;
+  if (resolvedUrl.pathname.startsWith("/api/v1/")) {
+    proxyPath = `/api/agent${resolvedUrl.pathname.slice("/api/v1".length)}`;
+  } else if (resolvedUrl.pathname === "/chat" || resolvedUrl.pathname.startsWith("/runs/")) {
+    proxyPath = `/api/agent${resolvedUrl.pathname}`;
+  }
+
+  if (!proxyPath) {
+    return null;
+  }
+
+  return `${proxyPath}${resolvedUrl.search}${resolvedUrl.hash}`;
+}
+
+function buildResponseHeaders(upstreamHeaders, apiBaseUrl) {
   const headers = new Headers();
 
   for (const [key, value] of upstreamHeaders.entries()) {
-    if (RESPONSE_HEADER_ALLOWLIST.has(key.toLowerCase())) {
-      headers.set(key, value);
+    const normalizedKey = key.toLowerCase();
+    if (!RESPONSE_HEADER_ALLOWLIST.has(normalizedKey)) {
+      continue;
     }
+
+    if (normalizedKey === "location") {
+      const rewrittenLocation = rewriteLocationHeader(value, apiBaseUrl);
+      if (rewrittenLocation) {
+        headers.set(key, rewrittenLocation);
+      }
+      continue;
+    }
+
+    headers.set(key, value);
   }
 
   return headers;
@@ -171,7 +215,7 @@ export async function proxyAgentRequest(request, path, { env = process.env, fetc
   return new Response(upstreamResponse.body, {
     status: upstreamResponse.status,
     statusText: upstreamResponse.statusText,
-    headers: buildResponseHeaders(upstreamResponse.headers),
+    headers: buildResponseHeaders(upstreamResponse.headers, config.apiBaseUrl),
   });
 }
 
@@ -184,4 +228,5 @@ export const __testOnly__ = {
   normalizePathSegments,
   proxyConfig,
   readRequestBody,
+  rewriteLocationHeader,
 };
