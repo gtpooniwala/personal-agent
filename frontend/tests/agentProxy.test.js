@@ -210,6 +210,15 @@ describe('agent proxy helpers', () => {
     ).toBe('/api/agent/chat/session-123?resume=1');
   });
 
+  test('rewrites runs root redirects onto the proxy contract', () => {
+    expect(
+      __testOnly__.rewriteLocationHeader(
+        'http://127.0.0.1:8000/runs?view=recent',
+        'http://127.0.0.1:8000',
+      ),
+    ).toBe('/api/agent/runs?view=recent');
+  });
+
   test('preserves external redirect targets', () => {
     expect(
       __testOnly__.rewriteLocationHeader(
