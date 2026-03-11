@@ -1,19 +1,5 @@
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
-const RUNTIME_API_BASE_FROM_ENV = process.env.NEXT_PUBLIC_RUNTIME_API_BASE_URL?.replace(/\/$/, "");
-
-function deriveRuntimeBase(apiBase) {
-  if (!apiBase) {
-    return undefined;
-  }
-
-  if (apiBase.endsWith("/api/v1")) {
-    return apiBase.slice(0, -7);
-  }
-
-  return apiBase;
-}
-
-export const RUNTIME_API_BASE = RUNTIME_API_BASE_FROM_ENV || deriveRuntimeBase(API_BASE);
+export const API_BASE = "/api/agent";
+export const RUNTIME_API_BASE = API_BASE;
 
 async function parseResponse(response) {
   const contentType = response.headers.get("content-type") || "";
@@ -41,12 +27,16 @@ function extractErrorMessage(response, payload) {
   return `HTTP ${response.status} ${response.statusText}`;
 }
 
-async function callApi(baseUrl, endpoint, options = {}, missingBaseMessage) {
-  if (baseUrl === undefined || baseUrl === null) {
-    throw new Error(missingBaseMessage);
+function normalizeEndpoint(endpoint) {
+  if (typeof endpoint !== "string" || !endpoint) {
+    throw new Error("API endpoint must be a non-empty string.");
   }
 
-  const url = `${baseUrl}${endpoint}`;
+  return endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+}
+
+async function callApi(baseUrl, endpoint, options = {}) {
+  const url = `${baseUrl}${normalizeEndpoint(endpoint)}`;
   const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
   const hasBody = options.body !== undefined && options.body !== null;
   const headers = new Headers(options.headers || {});
@@ -70,16 +60,11 @@ async function callApi(baseUrl, endpoint, options = {}, missingBaseMessage) {
 }
 
 export async function apiCall(endpoint, options = {}) {
-  return callApi(API_BASE, endpoint, options, "NEXT_PUBLIC_API_BASE_URL is not configured.");
+  return callApi(API_BASE, endpoint, options);
 }
 
 export async function runtimeApiCall(endpoint, options = {}) {
-  return callApi(
-    RUNTIME_API_BASE,
-    endpoint,
-    options,
-    "Runtime API base is not configured. Set NEXT_PUBLIC_RUNTIME_API_BASE_URL or NEXT_PUBLIC_API_BASE_URL.",
-  );
+  return callApi(RUNTIME_API_BASE, endpoint, options);
 }
 
 export async function uploadPdf(file) {
