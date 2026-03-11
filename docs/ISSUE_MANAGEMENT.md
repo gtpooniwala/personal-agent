@@ -73,7 +73,7 @@ Use `track:*` labels only for long-running initiatives that cut across multiple 
 Do not create new track labels casually. A track label should represent a durable program, not a temporary theme.
 
 ### Agent Labels
-- `agent:codex`, `agent:claude`, and `needs-agent-review` are primarily PR/review labels.
+- `agent:codex`, `agent:claude`, `agent:opencode`, and `needs-agent-review` are primarily PR/review labels.
 - Do not use them on issues unless the issue itself is explicitly about review ownership.
 
 ## Title Guidance
