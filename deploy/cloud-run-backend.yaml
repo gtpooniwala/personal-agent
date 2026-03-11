@@ -58,13 +58,11 @@ spec:
               value: ${VERCEL_URL}
 
             # Gmail integration stores per-user OAuth tokens encrypted in Postgres.
-            # Leave the feature flag enabled so Cloud Run matches local/default behavior.
-            # The tool only registers when GOOGLE_OAUTH_CLIENT_ID /
-            # GOOGLE_OAUTH_CLIENT_SECRET / GOOGLE_OAUTH_REDIRECT_URI /
-            # CREDENTIALS_MASTER_KEY and Gmail deps are actually present, so
-            # incomplete Gmail setup should degrade availability without crashing startup.
+            # deploy/deploy-backend.sh renders this flag to "true" only when all
+            # Gmail OAuth secrets are present in Secret Manager; otherwise Cloud Run
+            # deploys with Gmail fully disabled in this environment.
             - name: ENABLE_GMAIL_INTEGRATION
-              value: "true"
+              value: "${ENABLE_GMAIL_INTEGRATION}"
 
             # ── Secrets from Secret Manager ──────────────────────────────────
             # Secret names are canonical; see docs/secret-manager-setup.md (#82).

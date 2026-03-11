@@ -112,6 +112,7 @@ sed \
   "${SERVICE_YAML}" > "${RENDERED_YAML}"
 
 GMAIL_SECRET_ENV_BLOCK=""
+ENABLE_GMAIL_INTEGRATION="false"
 all_gmail_secrets_present=true
 for SECRET in "${GMAIL_SECRET_NAMES[@]}"; do
   if ! SECRET_CHECK_ERR="$(gcloud secrets describe "${SECRET}" --project="${PROJECT_ID}" --format='value(name)' 2>&1)"; then
@@ -125,6 +126,7 @@ for SECRET in "${GMAIL_SECRET_NAMES[@]}"; do
 done
 
 if [[ "${all_gmail_secrets_present}" == "true" ]]; then
+  ENABLE_GMAIL_INTEGRATION="true"
   GMAIL_SECRET_ENV_BLOCK="$(cat <<'EOF'
             - name: GOOGLE_OAUTH_CLIENT_ID
               valueFrom:
@@ -153,6 +155,18 @@ else
   GMAIL_SECRET_ENV_BLOCK="            # Gmail OAuth secrets omitted: create the Gmail secrets to enable Gmail integration in this environment."
   echo "    Gmail  : disabled (one or more Gmail OAuth secrets missing)"
 fi
+
+python3 - "${RENDERED_YAML}" "${ENABLE_GMAIL_INTEGRATION}" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+replacement = sys.argv[2]
+path.write_text(
+    path.read_text().replace("${ENABLE_GMAIL_INTEGRATION}", replacement),
+    encoding="utf-8",
+)
+PY
 
 python3 - "${RENDERED_YAML}" "${GMAIL_SECRET_ENV_BLOCK}" <<'PY'
 from pathlib import Path

@@ -5,6 +5,7 @@ import sys
 import os
 import unittest
 from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock
 
 # Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -176,6 +177,32 @@ class TestDatabaseOperations(unittest.TestCase):
         self.assertEqual(history[0]["content"], "First message")
         self.assertEqual(history[1]["content"], "Second message")
         self.assertEqual(history[2]["content"], "Third message")
+
+    def test_consume_integration_oauth_state_uses_row_lock(self):
+        db_ops = DatabaseOperations.__new__(DatabaseOperations)
+        session = MagicMock()
+        db_ops.get_session = MagicMock(return_value=session)
+
+        record = MagicMock()
+        record.state = "state-1"
+        record.user_id = "user-1"
+        record.provider = "gmail"
+        record.return_to = "/settings"
+        record.expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+
+        query = session.query.return_value
+        query.filter.return_value = query
+        query.with_for_update.return_value = query
+        query.first.return_value = record
+
+        payload = db_ops.consume_integration_oauth_state(state="state-1", provider="gmail")
+
+        query.with_for_update.assert_called_once_with()
+        session.delete.assert_called_once_with(record)
+        session.commit.assert_called_once()
+        session.close.assert_called_once()
+        self.assertEqual(payload["state"], "state-1")
+        self.assertEqual(payload["user_id"], "user-1")
 
     def test_runtime_counter_increment_and_query(self):
         """Runtime counters should increment and be retrievable by prefix."""

@@ -282,11 +282,12 @@ def get_connection_status(user_id: str) -> Dict[str, Any]:
             "reasons": ["account_not_connected"],
             "account_label": None,
         }
+    status = record.get("status") or "unknown"
     return {
         "provider": GMAIL_PROVIDER,
-        "connected": record.get("status") == "connected",
+        "connected": status == "connected",
         "ready": True,
-        "reasons": [],
+        "reasons": [] if status == "connected" else [f"credential_{status}"],
         "account_label": record.get("account_label"),
         "expires_at": record.get("expires_at"),
         "scopes": record.get("scopes") or [],

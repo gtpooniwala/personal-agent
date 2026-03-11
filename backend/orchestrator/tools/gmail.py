@@ -10,9 +10,9 @@ from pydantic import BaseModel, Field
 from backend.integrations.credential_store import (
     MissingCredentialDependencyError,
     MissingCredentialEncryptionKeyError,
+    UnreadableCredentialError,
 )
 from backend.integrations.gmail_oauth import (
-    GMAIL_SCOPES,
     get_connection_status,
     gmail_tool_ready,
     load_user_credentials,
@@ -103,11 +103,19 @@ class GmailReadTool(BaseTool):
             reasons = ", ".join(status.get("reasons") or ["unknown"])
             return f"Gmail integration is not configured for this app yet ({reasons})."
 
-        creds = load_user_credentials(self._user_id)
+        try:
+            creds = load_user_credentials(self._user_id)
+        except UnreadableCredentialError as exc:
+            return (
+                f"{exc} From the frontend, visit `/api/agent/gmail/connect` to reconnect Gmail "
+                "(or call `/api/v1/gmail/connect` directly against the backend API)."
+            )
+
         if creds is None:
             return (
-                "Gmail is not connected for this user yet. Visit `/api/v1/gmail/connect` "
-                "to authorize access."
+                "Gmail is not connected for this user yet. From the frontend, visit "
+                "`/api/agent/gmail/connect` to authorize access (or call `/api/v1/gmail/connect` "
+                "directly against the backend API)."
             )
 
         try:

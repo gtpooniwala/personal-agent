@@ -20,10 +20,14 @@ class MissingCredentialDependencyError(CredentialStoreError):
     """Raised when the crypto dependency is unavailable."""
 
 
+class UnreadableCredentialError(CredentialStoreError):
+    """Raised when stored credential ciphertext can no longer be decrypted."""
+
+
 def _load_fernet() -> Any:
     try:
         from cryptography.fernet import Fernet
-    except ModuleNotFoundError as exc:  # pragma: no cover - exercised via runtime guard
+    except ImportError as exc:  # pragma: no cover - exercised via runtime guard
         raise MissingCredentialDependencyError(
             "Encrypted credential storage requires the `cryptography` package."
         ) from exc
@@ -38,8 +42,8 @@ def _load_fernet() -> Any:
         return Fernet(key.encode("utf-8"))
     except Exception as exc:  # pragma: no cover - defensive validation
         raise MissingCredentialEncryptionKeyError(
-            "CREDENTIALS_MASTER_KEY is invalid. Generate one with `python -c "
-            "\"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"`."
+            "CREDENTIALS_MASTER_KEY is invalid. Generate one with `python3 -c "
+            "\"import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())\"`."
         ) from exc
 
 
@@ -97,7 +101,27 @@ class IntegrationCredentialStore:
         )
         if record is None:
             return None
-        payload = self._decrypt(record["ciphertext"])
+        try:
+            payload = self._decrypt(record["ciphertext"])
+        except (MissingCredentialDependencyError, MissingCredentialEncryptionKeyError):
+            raise
+        except Exception as exc:
+            if exc.__class__.__name__ != "InvalidToken" and not isinstance(exc, json.JSONDecodeError):
+                raise
+            db_ops.upsert_integration_credential(
+                user_id=user_id,
+                provider=provider,
+                credential_kind=credential_kind,
+                ciphertext=record["ciphertext"],
+                account_label=record.get("account_label"),
+                scopes=record.get("scopes") or [],
+                status="error",
+                expires_at=record.get("expires_at"),
+                key_version=record.get("key_version") or "v1",
+            )
+            raise UnreadableCredentialError(
+                "Stored integration credentials can no longer be decrypted. Please reconnect the integration."
+            ) from exc
         payload["_metadata"] = {
             "account_label": record.get("account_label"),
             "status": record.get("status"),

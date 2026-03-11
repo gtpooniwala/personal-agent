@@ -28,7 +28,7 @@ DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5432/p
 DATABASE_URL_DOCKER=postgresql+psycopg://personal_agent:personal_agent@postgres:5433/personal_agent
 TEST_DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5433/personal_agent_test
 EVAL_DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5433/personal_agent_test
-DOCKER_POSTGRES_DATA_DIR=${HOME}/.personal-agent/postgres
+# DOCKER_POSTGRES_DATA_DIR=/absolute/path/to/.personal-agent/postgres  # optional override
 ```
 
 Optional observability:
@@ -49,7 +49,7 @@ Optional Gmail setup:
 ```env
 GOOGLE_OAUTH_CLIENT_ID=...
 GOOGLE_OAUTH_CLIENT_SECRET=...
-GOOGLE_OAUTH_REDIRECT_URI=http://localhost:8001/api/v1/gmail/callback
+GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3001/api/agent/gmail/callback
 CREDENTIALS_MASTER_KEY=...
 ```
 
@@ -60,10 +60,10 @@ One-time Google Cloud setup for Gmail:
 4. Configure an OAuth consent screen for an External app.
 5. While the app is still private/internal to your team, keep the consent screen in Testing and add each allowed Gmail user as a test user.
 6. Create one OAuth 2.0 Web application client for the app.
-7. Add the backend callback URI you will actually use:
+7. Add the callback URI you will actually use:
    - local Python: `http://localhost:8000/api/v1/gmail/callback`
-   - local Docker: `http://localhost:8001/api/v1/gmail/callback`
-   - production: `https://<your-backend-host>/api/v1/gmail/callback`
+   - local Docker: `http://localhost:3001/api/agent/gmail/callback`
+   - production: `https://<your-frontend-host>/api/agent/gmail/callback`
 8. Copy the client ID and client secret into `.env` or your secret manager.
 9. Generate `CREDENTIALS_MASTER_KEY` once and keep it stable across deploys.
 
@@ -177,6 +177,6 @@ Gmail support is conditional. Make sure:
 - Gmail dependencies are installed
 - `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `GOOGLE_OAUTH_REDIRECT_URI` are set
 - `CREDENTIALS_MASTER_KEY` is set so per-user tokens can be stored encrypted in Postgres
-- the user has completed `/api/v1/gmail/connect`
+- the user has completed the Gmail connect flow (`/api/agent/gmail/connect` in Docker/prod, or `/api/v1/gmail/connect` for direct-backend local Python)
 - `ENABLE_GMAIL_INTEGRATION` is not disabling it
 - the Google OAuth consent screen is using the correct work-owned project and the user is allowed to authorize it

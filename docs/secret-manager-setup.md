@@ -100,7 +100,7 @@ echo -n "https://<vercel-app>/api/agent/gmail/callback" | gcloud secrets create 
   --replication-policy=automatic \
   --data-file=-
 
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+python3 -c "import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
 # Save the printed value, then:
 echo -n "your-credentials-master-key" | gcloud secrets create personal-agent-credentials-master-key \
   --project="${PROJECT_ID}" \

@@ -37,10 +37,10 @@ The Gmail Tool provides robust integration with Gmail, enabling the agent to sea
   4. Configure the OAuth consent screen for an External app.
   5. If the app is still private, keep the consent screen in Testing and add each allowed Gmail user as a test user.
   6. Create OAuth 2.0 **Web application** credentials.
-  7. Add your backend callback URI:
+  7. Add the callback URI your users will actually hit:
      - local Python: `http://localhost:8000/api/v1/gmail/callback`
-     - local Docker: `http://localhost:8001/api/v1/gmail/callback`
-     - production: `https://<your-backend-host>/api/v1/gmail/callback`
+     - local Docker: `http://localhost:3001/api/agent/gmail/callback`
+     - production: `https://<your-frontend-host>/api/agent/gmail/callback`
   8. Set `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `GOOGLE_OAUTH_REDIRECT_URI` in the app environment.
   9. Set `CREDENTIALS_MASTER_KEY` so the app can store per-user Gmail tokens encrypted in Postgres.
   10. Restart the backend after updating secrets.
@@ -49,15 +49,16 @@ The Gmail Tool provides robust integration with Gmail, enabling the agent to sea
   - Per-user Gmail access tokens and refresh tokens are stored encrypted in Postgres.
   - Users do not need their own Google Cloud project or to enable Gmail API themselves.
 - **User Connect Flow**:
-  - The user visits `/api/v1/gmail/connect`.
-  - Google redirects back to `/api/v1/gmail/callback`.
+  - In Docker/prod, the user visits `/api/agent/gmail/connect`.
+  - In direct-backend local Python, the user visits `/api/v1/gmail/connect`.
+  - Google redirects back to the configured callback URI above.
   - The app stores the user's Gmail token encrypted in Postgres.
 
 ## Troubleshooting
 - **Dependencies Missing**: If you see an error about missing dependencies, run the pip install command above.
 - **App OAuth Config Missing**: Ensure `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `GOOGLE_OAUTH_REDIRECT_URI` are set.
 - **Encrypted Store Not Configured**: Ensure `CREDENTIALS_MASTER_KEY` is set and valid.
-- **Auth Errors**: If authentication fails or tokens expire unexpectedly, disconnect Gmail and reconnect through `/api/v1/gmail/connect`.
+- **Auth Errors**: If authentication fails or tokens expire unexpectedly, disconnect Gmail and reconnect through `/api/agent/gmail/connect` in Docker/prod, or `/api/v1/gmail/connect` for direct-backend local Python.
 
 ## Limitations
 - Only read/search is implemented (no send/compose yet)

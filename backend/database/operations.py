@@ -419,6 +419,7 @@ class DatabaseOperations:
                     IntegrationOAuthState.state == state,
                     IntegrationOAuthState.provider == provider,
                 )
+                .with_for_update()
                 .first()
             )
             if record is None:

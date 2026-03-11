@@ -13,6 +13,7 @@ from backend.config import settings
 from typing import List
 from datetime import datetime
 import logging
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 from backend.api.state import orchestrator
 from backend.database.operations import db_ops
 from backend.observability import observe_operation, update_observation
@@ -54,6 +55,33 @@ def _percentage(numerator: int, denominator: int) -> float | None:
     if denominator <= 0:
         return None
     return round((numerator / denominator) * 100, 1)
+
+
+def _resolve_frontend_redirect_target(return_to: str | None) -> str:
+    target = (return_to or "").strip()
+    frontend_url = (settings.frontend_url or "").strip()
+
+    if not target:
+        return frontend_url or "/"
+
+    parsed = urlsplit(target)
+    if parsed.scheme and parsed.netloc:
+        return target
+
+    if target.startswith("/") and frontend_url:
+        return urljoin(f"{frontend_url.rstrip('/')}/", target.lstrip("/"))
+
+    return target
+
+
+def _append_query_param(url: str, key: str, value: str) -> str:
+    parsed = urlsplit(url)
+    query = parse_qsl(parsed.query, keep_blank_values=True)
+    query.append((key, value))
+    path = parsed.path or "/"
+    return urlunsplit(
+        (parsed.scheme, parsed.netloc, path, urlencode(query), parsed.fragment)
+    )
 
 @router.get("/conversations", response_model=List[ConversationResponse])
 async def get_conversations():
@@ -204,7 +232,12 @@ async def gmail_connect(return_to: str | None = Query(default=None)):
 
 
 @router.get("/gmail/callback")
-async def gmail_callback(state: str, code: str):
+async def gmail_callback(
+    state: str,
+    code: str | None = None,
+    error: str | None = Query(default=None),
+    error_description: str | None = Query(default=None),
+):
     """Handle the Google OAuth callback for Gmail."""
     with observe_operation(
         name="api.gmail.callback",
@@ -213,18 +246,27 @@ async def gmail_callback(state: str, code: str):
         metadata={"component": "api", "endpoint": "/api/v1/gmail/callback"},
     ) as observation:
         try:
+            if error:
+                description = f": {error_description}" if error_description else ""
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Gmail OAuth failed with error `{error}`{description}",
+                )
+            if not code:
+                raise HTTPException(status_code=400, detail="Missing Gmail OAuth authorization code.")
             result = exchange_callback(state=state, code=code)
             orchestrator.tool_registry.refresh_runtime_capabilities(force=True)
             update_observation(
                 observation,
                 output={"connected": True, "account_label": result.get("account_label")},
             )
-            base_redirect = result.get("return_to") or settings.frontend_url or "/"
-            separator = "&" if "?" in base_redirect else "?"
+            base_redirect = _resolve_frontend_redirect_target(result.get("return_to"))
             return RedirectResponse(
-                url=f"{base_redirect}{separator}gmail=connected",
+                url=_append_query_param(base_redirect, "gmail", "connected"),
                 status_code=307,
             )
+        except HTTPException:
+            raise
         except (InvalidGmailOAuthStateError, InvalidRedirectTargetError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except (MissingCredentialDependencyError, MissingCredentialEncryptionKeyError) as exc:

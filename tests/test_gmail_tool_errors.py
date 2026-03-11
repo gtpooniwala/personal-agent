@@ -2,6 +2,7 @@ import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
+from backend.integrations.credential_store import UnreadableCredentialError
 from backend.orchestrator.tools.gmail import GmailReadTool
 
 
@@ -30,6 +31,30 @@ class TestGmailToolErrors(unittest.TestCase):
             patch("backend.orchestrator.tools.gmail.load_user_credentials", return_value=None),
         ):
             result = self.tool._run(query="test")
+        self.assertIn("/api/agent/gmail/connect", result)
+        self.assertIn("/api/v1/gmail/connect", result)
+
+    def test_run_returns_reconnect_message_when_saved_credentials_are_unreadable(self):
+        with (
+            patch(
+                "backend.orchestrator.tools.gmail._gmail_dependencies_installed",
+                return_value=True,
+            ),
+            patch(
+                "backend.orchestrator.tools.gmail.get_connection_status",
+                return_value={"ready": True, "connected": True, "account_label": "user@example.com"},
+            ),
+            patch(
+                "backend.orchestrator.tools.gmail.load_user_credentials",
+                side_effect=UnreadableCredentialError(
+                    "Stored integration credentials can no longer be decrypted."
+                ),
+            ),
+        ):
+            result = self.tool._run(query="test")
+
+        self.assertIn("Stored integration credentials can no longer be decrypted.", result)
+        self.assertIn("/api/agent/gmail/connect", result)
         self.assertIn("/api/v1/gmail/connect", result)
 
     def test_run_handles_refresh_error(self):

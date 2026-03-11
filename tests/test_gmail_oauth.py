@@ -9,6 +9,7 @@ GMAIL_OAUTH_IMPORT_ERROR = ""
 try:
     from backend.integrations.gmail_oauth import (
         InvalidRedirectTargetError,
+        get_connection_status,
         sanitize_return_to,
     )
 except (ImportError, ModuleNotFoundError) as exc:
@@ -42,6 +43,32 @@ class TestSanitizeReturnTo(unittest.TestCase):
     def test_rejects_external_origins(self):
         with self.assertRaises(InvalidRedirectTargetError):
             sanitize_return_to("https://evil.example.com/callback")
+
+
+@unittest.skipUnless(
+    GMAIL_OAUTH_TESTS_AVAILABLE,
+    f"Gmail OAuth test dependencies unavailable: {GMAIL_OAUTH_IMPORT_ERROR}",
+)
+class TestGmailConnectionStatus(unittest.TestCase):
+    @patch("backend.integrations.gmail_oauth.gmail_oauth_ready", return_value=(True, []))
+    @patch("backend.integrations.gmail_oauth.credential_store.get_status")
+    def test_non_connected_credential_status_is_exposed_as_reason(
+        self,
+        mock_get_status,
+        _mock_gmail_ready,
+    ):
+        mock_get_status.return_value = {
+            "account_label": "user@example.com",
+            "status": "expired",
+            "expires_at": None,
+            "scopes": [],
+        }
+
+        status = get_connection_status("default")
+
+        self.assertEqual(status["connected"], False)
+        self.assertEqual(status["reasons"], ["credential_expired"])
+        self.assertEqual(status["account_label"], "user@example.com")
 
 
 if __name__ == "__main__":
