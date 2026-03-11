@@ -67,6 +67,7 @@ class ToolRegistry:
         )
         if gmail_ready:
             self._tools["gmail_read"] = GmailReadTool(self.user_id)
+            self._last_runtime_capability_refresh_at = monotonic()
             return
 
         self._tools.pop("gmail_read", None)

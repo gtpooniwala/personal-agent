@@ -106,6 +106,7 @@ class TestToolRegistry(unittest.TestCase):
              patch("backend.orchestrator.tool_registry.SearchDocumentsTool", return_value=DummyTool("search_documents")):
             registry = ToolRegistry(selected_documents=[])
             registry.get_available_tools()
+            registry.get_available_tools()
 
         self.assertEqual(mock_get_gmail_readiness.call_count, 1)
 
