@@ -114,9 +114,13 @@ sed \
 GMAIL_SECRET_ENV_BLOCK=""
 all_gmail_secrets_present=true
 for SECRET in "${GMAIL_SECRET_NAMES[@]}"; do
-  if ! gcloud secrets describe "${SECRET}" --project="${PROJECT_ID}" >/dev/null 2>&1; then
-    all_gmail_secrets_present=false
-    break
+  if ! SECRET_CHECK_ERR="$(gcloud secrets describe "${SECRET}" --project="${PROJECT_ID}" --format='value(name)' 2>&1)"; then
+    if [[ "${SECRET_CHECK_ERR}" == *"NOT_FOUND"* || "${SECRET_CHECK_ERR}" == *"not found"* ]]; then
+      all_gmail_secrets_present=false
+      break
+    fi
+    echo "ERROR: failed to verify secret ${SECRET}: ${SECRET_CHECK_ERR}" >&2
+    exit 1
   fi
 done
 
