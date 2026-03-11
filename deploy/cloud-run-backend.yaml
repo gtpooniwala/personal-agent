@@ -57,11 +57,11 @@ spec:
             - name: FRONTEND_URL
               value: ${VERCEL_URL}
 
-            # Gmail integration requires persistent OAuth credentials (client_secret.json +
-            # token.pickle). Cloud Run has no persistent volume, so the integration is
-            # disabled here until a durable credentials mechanism is implemented (#129).
+            # Gmail integration stays enabled so Cloud Run matches local/default behavior.
+            # The tool only registers when credentials and dependencies are actually present,
+            # so missing OAuth setup should degrade availability without crashing startup.
             - name: ENABLE_GMAIL_INTEGRATION
-              value: "false"
+              value: "true"
 
             # ── Secrets from Secret Manager ──────────────────────────────────
             # Secret names are canonical; see docs/secret-manager-setup.md (#82).

@@ -251,6 +251,7 @@ if traffic increases.
   token that probe definitions cannot reference dynamically, and Cloud Run does not accept
   TCP liveness probes. The startup probe confirms the port is bound before serving traffic;
   full app readiness (DB pool, etc.) is not verified by the probe.
-- **Gmail integration**: disabled (`ENABLE_GMAIL_INTEGRATION=false`) in the Cloud Run
-  service definition. Cloud Run has no persistent volume for the OAuth token. Re-enable
-  after a durable credentials mechanism is in place (#129).
+- **Gmail integration**: left enabled in the Cloud Run service definition so production
+  matches the app's default feature flags. The Gmail tool still self-disables unless its
+  OAuth credentials and dependencies are available, so incomplete Gmail setup should not
+  block backend startup. Final production Gmail OAuth wiring remains tracked in #129.
