@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Literal, Optional, List, Dict, Any
 
 
 class ChatRequest(BaseModel):
@@ -165,6 +165,50 @@ class ScheduledTaskResponse(BaseModel):
     last_run_id: Optional[str] = Field(None, description="Run ID from last dispatch")
     created_at: str = Field(..., description="Creation timestamp")
     updated_at: str = Field(..., description="Last update timestamp")
+
+
+class ExternalTriggerCreate(BaseModel):
+    """Request model for registering an external trigger."""
+
+    type: Literal["telegram", "email", "webhook", "generic"] = Field(..., description="Trigger type")
+    name: str = Field(..., description="Unique human-readable label")
+    conversation_id: str = Field(..., description="Target conversation ID")
+    config: Optional[Dict[str, Any]] = Field(None, description="Trigger-specific configuration (JSON)")
+    enabled: bool = Field(True, description="Whether the trigger is active")
+
+
+class ExternalTriggerUpdate(BaseModel):
+    """Request model for patching an external trigger."""
+
+    name: Optional[str] = Field(None, description="New label")
+    type: Optional[Literal["telegram", "email", "webhook", "generic"]] = Field(None, description="New trigger type")
+    conversation_id: Optional[str] = Field(None, description="New target conversation ID")
+    config: Optional[Dict[str, Any]] = Field(None, description="New trigger configuration")
+    enabled: Optional[bool] = Field(None, description="Enable or disable the trigger")
+
+
+class ExternalTriggerResponse(BaseModel):
+    """Response model for an external trigger."""
+
+    id: str = Field(..., description="Trigger ID")
+    type: Literal["telegram", "email", "webhook", "generic"] = Field(..., description="Trigger type")
+    name: str = Field(..., description="Trigger label")
+    conversation_id: str = Field(..., description="Target conversation ID")
+    config: Optional[Dict[str, Any]] = Field(None, description="Trigger configuration")
+    enabled: bool = Field(..., description="Whether the trigger is active")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
+
+
+class TriggerEventResponse(BaseModel):
+    """Response model for a single trigger event audit log entry."""
+
+    id: str = Field(..., description="Event ID")
+    trigger_id: str = Field(..., description="Parent trigger ID")
+    external_event_id: str = Field(..., description="ID from the external system (dedup key)")
+    run_id: Optional[str] = Field(None, description="Run ID created for this event")
+    received_at: str = Field(..., description="When the event was received")
+    dispatched: bool = Field(..., description="Whether the event was dispatched to a run")
 
 
 class ObservabilityRunSummary(BaseModel):

@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: March 9, 2026
+Last updated: March 10, 2026
 
 ## Goal
 Turn the repository from a strong local prototype into a durable personal-agent platform that an implementation agent can extend without rediscovering architecture intent each time.
@@ -90,7 +90,7 @@ Recommended order:
 5. [#85](https://github.com/gtpooniwala/personal-agent/issues/85) Cloud Run service definition for the backend (deploy with auth already in image).
 6. [#86](https://github.com/gtpooniwala/personal-agent/issues/86) CI/CD deployment pipeline.
 7. [#129](https://github.com/gtpooniwala/personal-agent/issues/129) Update Gmail OAuth redirect URIs for production domains.
-8. [#88](https://github.com/gtpooniwala/personal-agent/issues/88) Event trigger framework + Cloud Scheduler provisioning (required for scale-to-zero polling).
+8. ~~[#88](https://github.com/gtpooniwala/personal-agent/issues/88) Event trigger framework + Cloud Scheduler provisioning (required for scale-to-zero polling).~~ **Done — trigger framework landed; Cloud Scheduler job provisioning is still manual (no GCP config checked in yet).**
 9. [#79](https://github.com/gtpooniwala/personal-agent/issues/79) GCS-backed document storage (deferred; not a blocker for initial deploy).
 10. [#87](https://github.com/gtpooniwala/personal-agent/issues/87) Cold-start and min-instances tuning (optional; `min-instances=0` is final).
 
@@ -98,13 +98,14 @@ Recommended order:
 The runtime already includes scheduler primitives and scheduled tasks. The remaining work is the external trigger layer and mobile-facing surfaces.
 
 Recommended order:
-1. [#88](https://github.com/gtpooniwala/personal-agent/issues/88) Trigger framework and dispatcher.
+1. ~~[#88](https://github.com/gtpooniwala/personal-agent/issues/88) Trigger framework and dispatcher.~~ **Done — PR #163**
 2. [#90](https://github.com/gtpooniwala/personal-agent/issues/90) `trigger_run` for agent-spawned runs.
 3. [#91](https://github.com/gtpooniwala/personal-agent/issues/91) Email-triggered execution.
 4. [#92](https://github.com/gtpooniwala/personal-agent/issues/92) Telegram bot integration.
 
 Already done:
 - [#89](https://github.com/gtpooniwala/personal-agent/issues/89) Scheduled recurring task runner.
+- [#88](https://github.com/gtpooniwala/personal-agent/issues/88) External trigger framework: `ExternalTrigger` + `TriggerEvent` models, `TriggerDispatcher`, webhook stubs, trigger CRUD routes.
 
 ## Long-Running Agent Evolution Track
 
@@ -162,3 +163,4 @@ The target shape is a personal agent with:
 - `#122`: frontend SSE run-progress client with polling fallback — SSE is now end-to-end.
 - `#78`: deployment and trigger planning docs.
 - `#81`: GCP deployment architecture decisions finalized (Vercel, bearer token, min-instances=0).
+- `#88`: external trigger framework — `ExternalTrigger` + `TriggerEvent` models, `TriggerDispatcher` service, webhook stubs, trigger CRUD routes.

@@ -4,12 +4,14 @@ from backend.database.models import (
     Base,
     Conversation,
     Document,
+    ExternalTrigger,
     MemoryStore,
     Message,
     Run,
     RunEvent,
     RuntimeCounter,
     ScheduledTask,
+    TriggerEvent,
 )
 from backend.config import settings
 from typing import List, Optional, Dict, Any
@@ -912,6 +914,198 @@ class DatabaseOperations:
             )
             session.commit()
             return deleted > 0
+        finally:
+            session.close()
+
+    # -------------------------------------------------------------------------
+    # External trigger operations
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def _serialize_external_trigger(trigger: ExternalTrigger) -> Dict[str, Any]:
+        return {
+            "id": trigger.id,
+            "type": trigger.type,
+            "name": trigger.name,
+            "conversation_id": trigger.conversation_id,
+            "config": trigger.config,
+            "enabled": trigger.enabled,
+            "created_at": DatabaseOperations._to_iso(trigger.created_at),
+            "updated_at": DatabaseOperations._to_iso(trigger.updated_at),
+        }
+
+    @staticmethod
+    def _serialize_trigger_event(event: TriggerEvent) -> Dict[str, Any]:
+        return {
+            "id": event.id,
+            "trigger_id": event.trigger_id,
+            "external_event_id": event.external_event_id,
+            "run_id": event.run_id,
+            "received_at": DatabaseOperations._to_iso(event.received_at),
+            "dispatched": event.dispatched,
+        }
+
+    def create_external_trigger(
+        self,
+        *,
+        type: str,
+        name: str,
+        conversation_id: str,
+        config: Optional[str] = None,
+        enabled: bool = True,
+    ) -> Dict[str, Any]:
+        """Create and return an external trigger record."""
+        session = self.get_session()
+        try:
+            trigger = ExternalTrigger(
+                type=type,
+                name=name,
+                conversation_id=conversation_id,
+                config=config,
+                enabled=enabled,
+            )
+            session.add(trigger)
+            session.commit()
+            session.refresh(trigger)
+            return self._serialize_external_trigger(trigger)
+        finally:
+            session.close()
+
+    def get_external_trigger(self, trigger_id: str) -> Optional[Dict[str, Any]]:
+        """Fetch an external trigger by ID."""
+        session = self.get_session()
+        try:
+            trigger = session.query(ExternalTrigger).filter(ExternalTrigger.id == trigger_id).first()
+            if not trigger:
+                return None
+            return self._serialize_external_trigger(trigger)
+        finally:
+            session.close()
+
+    def list_external_triggers(self, *, enabled_only: bool = False) -> List[Dict[str, Any]]:
+        """List external triggers, optionally filtering to enabled only."""
+        session = self.get_session()
+        try:
+            query = session.query(ExternalTrigger)
+            if enabled_only:
+                query = query.filter(ExternalTrigger.enabled == True)  # noqa: E712
+            triggers = query.order_by(ExternalTrigger.created_at.asc()).all()
+            return [self._serialize_external_trigger(t) for t in triggers]
+        finally:
+            session.close()
+
+    def update_external_trigger(self, trigger_id: str, **kwargs: Any) -> Optional[Dict[str, Any]]:
+        """Patch arbitrary fields on an external trigger."""
+        allowed = {"name", "type", "conversation_id", "config", "enabled"}
+        invalid = set(kwargs) - allowed
+        if invalid:
+            raise ValueError(f"Cannot update fields: {invalid}")
+
+        session = self.get_session()
+        try:
+            trigger = session.query(ExternalTrigger).filter(ExternalTrigger.id == trigger_id).first()
+            if not trigger:
+                return None
+            for field, value in kwargs.items():
+                setattr(trigger, field, value)
+            trigger.updated_at = datetime.now(timezone.utc)
+            session.commit()
+            session.refresh(trigger)
+            return self._serialize_external_trigger(trigger)
+        finally:
+            session.close()
+
+    def delete_external_trigger(self, trigger_id: str) -> bool:
+        """Delete an external trigger. Returns True if it existed."""
+        session = self.get_session()
+        try:
+            deleted = (
+                session.query(ExternalTrigger)
+                .filter(ExternalTrigger.id == trigger_id)
+                .delete()
+            )
+            session.commit()
+            return deleted > 0
+        finally:
+            session.close()
+
+    def get_trigger_event(
+        self, trigger_id: str, external_event_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Look up a trigger event by (trigger_id, external_event_id) for dedup."""
+        session = self.get_session()
+        try:
+            event = (
+                session.query(TriggerEvent)
+                .filter(
+                    TriggerEvent.trigger_id == trigger_id,
+                    TriggerEvent.external_event_id == external_event_id,
+                )
+                .first()
+            )
+            if not event:
+                return None
+            return self._serialize_trigger_event(event)
+        finally:
+            session.close()
+
+    def create_trigger_event(
+        self,
+        *,
+        trigger_id: str,
+        external_event_id: str,
+        run_id: Optional[str] = None,
+        dispatched: bool = False,
+    ) -> Dict[str, Any]:
+        """Insert a new trigger event row and return it."""
+        session = self.get_session()
+        try:
+            event = TriggerEvent(
+                trigger_id=trigger_id,
+                external_event_id=external_event_id,
+                run_id=run_id,
+                dispatched=dispatched,
+            )
+            session.add(event)
+            session.commit()
+            session.refresh(event)
+            return self._serialize_trigger_event(event)
+        finally:
+            session.close()
+
+    def mark_trigger_event_dispatched(
+        self, event_id: str, run_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Mark a trigger event as dispatched and record its run_id."""
+        session = self.get_session()
+        try:
+            event = session.query(TriggerEvent).filter(TriggerEvent.id == event_id).first()
+            if not event:
+                return None
+            event.run_id = run_id
+            event.dispatched = True
+            session.commit()
+            session.refresh(event)
+            return self._serialize_trigger_event(event)
+        finally:
+            session.close()
+
+    def list_trigger_events(
+        self, trigger_id: str, limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """Return recent trigger events for a given trigger, newest first."""
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        session = self.get_session()
+        try:
+            events = (
+                session.query(TriggerEvent)
+                .filter(TriggerEvent.trigger_id == trigger_id)
+                .order_by(TriggerEvent.received_at.desc())
+                .limit(limit)
+                .all()
+            )
+            return [self._serialize_trigger_event(e) for e in events]
         finally:
             session.close()
 

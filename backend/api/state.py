@@ -5,6 +5,7 @@ from backend.runtime.service import RuntimeService
 from backend.runtime.heartbeat import HeartbeatService
 from backend.runtime.conversation_maintenance import ConversationMaintenanceService
 from backend.runtime.scheduler import SchedulerService
+from backend.runtime.trigger_dispatcher import TriggerDispatcher
 
 orchestrator = CoreOrchestrator()
 
@@ -20,3 +21,4 @@ runtime_service = RuntimeService(
 heartbeat_service = HeartbeatService()
 conversation_maintenance_service = ConversationMaintenanceService(orchestrator=orchestrator)
 scheduler_service = SchedulerService(runtime_service=runtime_service)
+trigger_dispatcher = TriggerDispatcher(runtime_service=runtime_service)
