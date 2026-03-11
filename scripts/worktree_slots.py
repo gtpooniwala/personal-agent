@@ -921,6 +921,23 @@ def cmd_release(args: argparse.Namespace) -> int:
             print("", file=sys.stderr)
             print_release_status_summary(ctx, args.stale_hours, stream=sys.stderr)
             return 1
+        if (
+            obs["slot_path_exists"]
+            and not obs["is_parked"]
+            and obs.get("checked_out_branch") != lease.get("branch")
+        ):
+            current_state = obs.get("checked_out_branch")
+            if current_state is None:
+                head_oid = obs.get("head_oid")
+                current_state = f"detached at {head_oid[:12]}" if head_oid else "an unknown revision"
+            print(
+                f"Release failed for {slot_id}: the slot worktree is on {current_state}, not {lease['branch']}. "
+                "Inspect the slot with scripts/agent-status.sh and discuss the next step with the user before retrying.",
+                file=sys.stderr,
+            )
+            print("", file=sys.stderr)
+            print_release_status_summary(ctx, args.stale_hours, stream=sys.stderr)
+            return 1
         if obs["merged"] is False and not args.keep_branch and not obs["is_parked"]:
             print(
                 f"Release failed for {slot_id}: branch {lease['branch']} is not merged into main. "

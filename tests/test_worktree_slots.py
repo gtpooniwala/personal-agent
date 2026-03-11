@@ -412,6 +412,55 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
         self.assertIn("Release failed for slot-01", stderr.getvalue())
         self.assertIn("status-summary", stderr.getvalue())
 
+    def test_cmd_release_reports_mismatched_worktree_before_unmerged_branch(self) -> None:
+        ctx = self.make_ctx("/tmp/repo-release-mismatch")
+        lease = {"slot_id": "slot-01", "state": "reserved", "branch": "codex/fix/59-slot-release"}
+        original_repo_context = worktree_slots.repo_context
+        original_ensure_dirs = worktree_slots.ensure_dirs
+        original_validate_slot_id = worktree_slots.validate_slot_id
+        original_known_max_slots = worktree_slots.known_max_slots
+        original_state_lock = worktree_slots.state_lock
+        original_load_lease = worktree_slots.load_lease
+        original_observe_slot = worktree_slots.observe_slot
+        original_print_release_status_summary = worktree_slots.print_release_status_summary
+        stderr = io.StringIO()
+
+        try:
+            worktree_slots.repo_context = lambda: ctx
+            worktree_slots.ensure_dirs = lambda _ctx: None
+            worktree_slots.validate_slot_id = lambda slot_id, _max_slots: slot_id
+            worktree_slots.known_max_slots = lambda _ctx, _configured_max: 4
+            worktree_slots.state_lock = lambda _ctx: nullcontext()
+            worktree_slots.load_lease = lambda _ctx, _slot_id: dict(lease)
+            worktree_slots.observe_slot = lambda _ctx, _lease, _stale_hours: {
+                "slot_path_exists": True,
+                "dirty": False,
+                "merged": False,
+                "is_parked": False,
+                "checked_out_branch": None,
+                "head_oid": "deadbeefcafebabe",
+            }
+            worktree_slots.print_release_status_summary = lambda _ctx, _stale_hours, stream=None: print(
+                "status-summary", file=stream
+            )
+
+            with patch("sys.stderr", stderr):
+                result = worktree_slots.cmd_release(argparse.Namespace(slot="slot-01", keep_branch=False, stale_hours=72))
+        finally:
+            worktree_slots.repo_context = original_repo_context
+            worktree_slots.ensure_dirs = original_ensure_dirs
+            worktree_slots.validate_slot_id = original_validate_slot_id
+            worktree_slots.known_max_slots = original_known_max_slots
+            worktree_slots.state_lock = original_state_lock
+            worktree_slots.load_lease = original_load_lease
+            worktree_slots.observe_slot = original_observe_slot
+            worktree_slots.print_release_status_summary = original_print_release_status_summary
+
+        self.assertEqual(result, 1)
+        self.assertIn("detached at deadbeefcafe", stderr.getvalue())
+        self.assertNotIn("is not merged into main", stderr.getvalue())
+        self.assertIn("status-summary", stderr.getvalue())
+
     def test_cmd_reclaim_parks_clean_slot_instead_of_removing_worktree(self) -> None:
         ctx = self.make_ctx("/tmp/repo-reclaim")
         lease = {"slot_id": "slot-01", "state": "reserved", "branch": "codex/fix/59-slot-release"}
