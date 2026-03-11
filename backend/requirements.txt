@@ -28,7 +28,7 @@ aiofiles==25.1.0
 python-multipart>=0.0.7
 
 # PDF processing and document search
-pypdf==6.7.5
+pypdf==6.8.0
 numpy==2.4.2
 openai==2.26.0
 requests==2.32.5
