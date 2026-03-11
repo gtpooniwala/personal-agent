@@ -11,7 +11,7 @@ Use these first when you want the current state of the repo.
 - [`SETUP.md`](SETUP.md): local setup paths
 - [`TESTING.md`](TESTING.md): validation commands and expectations
 - [`ENGINEERING_WORKFLOW.md`](ENGINEERING_WORKFLOW.md): worktree, branch, and PR policy
-- [`WORKTREE_SLOTS.md`](WORKTREE_SLOTS.md): managed slot workflow for Codex app and CLI agents
+- [`WORKTREE_SLOTS.md`](WORKTREE_SLOTS.md): managed slot workflow for shared-root / CLI launches, plus the Codex Desktop worktree exception
 - [`ISSUE_MANAGEMENT.md`](ISSUE_MANAGEMENT.md): issue taxonomy, labels, and execution contract
 - [`PROMPT_ARCHITECTURE.md`](PROMPT_ARCHITECTURE.md): prompt surfaces and ownership
 

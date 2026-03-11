@@ -16,6 +16,7 @@ ROOT_CHECKOUT="$(cd "$(dirname "${COMMON_DIR}")" && pwd -P)"
 
 if [ "${TOPLEVEL_REALPATH}" = "${ROOT_CHECKOUT}" ]; then
   echo "Shared root checkout is control-plane only."
-  echo "Use scripts/start-agent.sh or scripts/claim-slot.sh to enter a managed slot before editing or committing."
+  echo "Use scripts/start-agent.sh to enter a managed slot before editing or committing."
+  echo "Humans may use scripts/claim-slot.sh only from the shared root checkout as a control-plane action."
   exit 1
 fi

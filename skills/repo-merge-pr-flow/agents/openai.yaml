@@ -1,4 +1,4 @@
 interface:
   display_name: "Repo Merge PR Flow"
-  short_description: "Squash-merge PRs and release managed slots"
-  default_prompt: "Use $repo-merge-pr-flow to merge a ready PR with squash-and-merge, then release the current managed slot if this checkout is running from one."
+  short_description: "Resolve comments, run cubic, merge, release slot"
+  default_prompt: "Use $repo-merge-pr-flow to merge a ready PR only after the worktree is clean, `cubic review --base main` has no remaining issues, and PR comments are addressed explicitly with $gh-address-comments. Merge with `gh pr merge --squash` without local branch deletion, delete the remote head branch separately, and release the current managed slot only when this checkout root is one of the repo-managed slot paths. If there are in-scope uncommitted changes, switch to $repo-commit-pr-flow and stop for user input."

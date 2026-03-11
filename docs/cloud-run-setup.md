@@ -122,7 +122,7 @@ Service URL : https://personal-agent-backend-<hash>-uc.a.run.app
 
 | Consumer | Where to set it | Issue |
 |----------|----------------|-------|
-| Vercel frontend | `NEXT_PUBLIC_API_BASE_URL = <SERVICE_URL>/api/v1` (private Vercel env var) | #127 |
+| Vercel frontend | `API_BASE_URL = <SERVICE_URL>` and `AGENT_API_KEY = <token>` (private Vercel env vars) | #127 / #132 |
 | Gmail OAuth redirect URIs | Add `<SERVICE_URL>/api/v1/gmail/callback` to Google Cloud Console | #129 |
 | Cloud Scheduler jobs | HTTP target base URL for trigger endpoints | #88 |
 

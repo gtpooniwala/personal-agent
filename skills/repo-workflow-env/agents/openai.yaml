@@ -1,4 +1,4 @@
 interface:
   display_name: "Repo Workflow Env"
-  short_description: "Set up an issue-backed slot/branch + rebase checkpoints"
-  default_prompt: "Set up this task in a compliant managed worktree slot and issue-backed branch, verify workflow guardrails, and report the ready-to-code environment. If the task lacks an issue number, stop and surface that blocker instead of creating a scratch branch."
+  short_description: "Set up isolated checkout + issue-backed branch"
+  default_prompt: "Set up this task in the correct isolated checkout for this repo: managed slot for Codex CLI, Claude, or OpenCode from the shared root checkout, or the app-created worktree for Codex Desktop. Verify the issue-backed branch contract and report the ready-to-code environment. If the task lacks an issue number, stop and surface that blocker instead of creating a scratch branch."

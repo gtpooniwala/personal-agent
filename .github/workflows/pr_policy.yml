@@ -14,16 +14,22 @@ jobs:
     name: enforce-pr-policy
     runs-on: ubuntu-latest
     steps:
+      - name: Skip policy for dependabot
+        if: github.actor == 'dependabot[bot]'
+        run: echo "Dependabot PR — skipping branch-naming and issue-linkage checks."
+
       - name: Validate branch naming contract
+        if: github.actor != 'dependabot[bot]'
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
-          echo "$HEAD_REF" | grep -Eq '^(codex|claude)/[a-z0-9][a-z0-9-]*/[0-9]+-[a-z0-9][a-z0-9-]*$' || {
+          echo "$HEAD_REF" | grep -Eq '^(codex|claude|opencode)/[a-z0-9][a-z0-9-]*/[0-9]+-[a-z0-9][a-z0-9-]*$' || {
             echo "Branch must match: <agent>/<type>/<issue>-<slug> (e.g. codex/fix/7-safe-calculator)."
             exit 1
           }
 
       - name: Validate issue linkage keyword in PR body
+        if: github.actor != 'dependabot[bot]'
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |

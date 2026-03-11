@@ -12,9 +12,11 @@ This frontend is a Next.js App Router migration of the previous static SPA.
 Create `frontend/.env.local`:
 
 ```bash
-NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000/api/v1
+API_BASE_URL=http://127.0.0.1:8000
+AGENT_API_KEY=local-dev-token
 ```
-This value is required.
+Both values are required by the Next.js server-side proxy. The browser always calls the app's
+same-origin `/api/agent/...` routes; it never talks directly to the backend host.
 
 ## Run
 

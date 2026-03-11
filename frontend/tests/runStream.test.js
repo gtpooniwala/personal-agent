@@ -3,10 +3,10 @@ import {
   subscribeToRunStream,
 } from '@/lib/runStream';
 
-const RUNTIME_API_BASE = 'http://localhost:8000';
+const RUNTIME_API_BASE = '/api/agent';
 
 jest.mock('@/lib/api', () => ({
-  RUNTIME_API_BASE: 'http://localhost:8000',
+  RUNTIME_API_BASE: '/api/agent',
 }));
 
 function makeCallbacks(overrides = {}) {
