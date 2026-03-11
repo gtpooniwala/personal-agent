@@ -1,0 +1,33 @@
+docs/DEPLOYMENT.md
+  500507bea723f587 149,152,178
+docs/cloud-run-setup.md
+  500507bea723f587 27,129-140,143,154,184-190,250-252
+deploy/deploy-backend.sh
+  500507bea723f587 137-141
+frontend/README.md
+  500507bea723f587 21-22
+docs/vercel-setup.md
+  500507bea723f587 1-203
+docs/README.md
+  500507bea723f587 25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "d619278d7aa87de60dabcf0729dddcbf1031e734",
+  "prompts": {
+    "500507bea723f587": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019cdce2-9166-7202-9f7a-dfbc5877418c",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 245,
+      "total_deletions": 17,
+      "accepted_lines": 240,
+      "overriden_lines": 0
+    }
+  }
+}
