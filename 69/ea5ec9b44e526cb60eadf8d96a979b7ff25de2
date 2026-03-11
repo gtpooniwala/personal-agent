@@ -1,0 +1,39 @@
+frontend/tests/sendMessage.test.jsx
+  eb2516e0feb9845d 19-20
+docs/DEPLOYMENT.md
+  eb2516e0feb9845d 176,187
+frontend/tests/runStream.test.js
+  eb2516e0feb9845d 6,9
+docs/cloud-run-setup.md
+  eb2516e0feb9845d 125
+frontend/README.md
+  eb2516e0feb9845d 15-16,18-19
+frontend/lib/agentProxy.js
+  eb2516e0feb9845d 1-177
+frontend/tests/agentProxy.test.js
+  eb2516e0feb9845d 1-184
+frontend/lib/api.js
+  eb2516e0feb9845d 1-2,30-32,35-36,38-39,63,67
+frontend/jest.setup.js
+  eb2516e0feb9845d 4,6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "69ea5ec9b44e526cb60eadf8d96a979b7ff25de2",
+  "prompts": {
+    "eb2516e0feb9845d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019cda2c-ffc0-7402-94f6-b77f2a8aecfa",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 387,
+      "total_deletions": 39,
+      "accepted_lines": 386,
+      "overriden_lines": 0
+    }
+  }
+}
