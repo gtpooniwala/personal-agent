@@ -25,7 +25,7 @@ OPENAI_API_KEY=...
 Useful database variables:
 ```env
 DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent
-DATABASE_URL_DOCKER=postgresql+psycopg://personal_agent:personal_agent@postgres:5432/personal_agent
+DATABASE_URL_DOCKER=postgresql+psycopg://personal_agent:personal_agent@postgres:5433/personal_agent
 TEST_DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5433/personal_agent_test
 EVAL_DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5433/personal_agent_test
 ```
@@ -62,11 +62,18 @@ Access:
 These Docker ports come from:
 - `DOCKER_FRONTEND_PORT`
 - `DOCKER_API_PORT`
+- `DOCKER_POSTGRES_PORT`
+
+Compose uses those port values directly on both the host and inside each container. There is no
+host-to-container remapping layer anymore, so changing `DOCKER_API_PORT=8010` means the backend
+listens on `8010` and Docker publishes `8010:8010`.
 
 Auth behavior:
 - If `AGENT_API_KEY` is unset and `ENVIRONMENT=local`, the backend stays open for local development.
 - If `AGENT_API_KEY` is set, send `Authorization: Bearer <AGENT_API_KEY>` to backend endpoints.
 - When local auth is enabled, `/docs` and `/openapi.json` are protected too, so browser-loaded Swagger is not anonymously reachable.
+- The Docker frontend proxy talks to the backend over the internal Compose network using `DOCKER_API_BASE_URL` (default `http://personal-agent:8001`), not host `localhost`.
+- The Docker frontend reuses `AGENT_API_KEY` when you set one; otherwise it falls back to a local-only proxy token so `/api/agent/...` requests still work during unauthenticated local development.
 
 ## Local Debug Path
 Use this when you need local Python or frontend debugging outside containers.
