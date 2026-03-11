@@ -1,0 +1,39 @@
+docker-compose.yml
+  a82ca6825fdb70e0 4,10,15,27,35,37,50,63,65-67,75
+frontend/.env.local.example
+  a82ca6825fdb70e0 1-2
+frontend/README.md
+  a82ca6825fdb70e0 20-22
+docker-compose.override.yml
+  a82ca6825fdb70e0 5-7,27-28
+.env.example
+  a82ca6825fdb70e0 18-19,36-37,41-45,64-65
+frontend/Dockerfile
+  a82ca6825fdb70e0 13
+Dockerfile
+  a82ca6825fdb70e0 26,28
+docs/SETUP.md
+  a82ca6825fdb70e0 28,65,67-69,75-76
+frontend/.env.example
+  a82ca6825fdb70e0 1-2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "38a243d60e04bd2cd9d98c0ef1a3999af3cd1448",
+  "prompts": {
+    "a82ca6825fdb70e0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019cdcec-6402-77e1-94d8-11d0169311d9",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 49,
+      "total_deletions": 33,
+      "accepted_lines": 46,
+      "overriden_lines": 0
+    }
+  }
+}
