@@ -18,6 +18,8 @@ AGENT_API_KEY=local-dev-token
 Both values are required by the Next.js server-side proxy. The browser always calls the app's
 same-origin `/api/agent/...` routes; it never talks directly to the backend host.
 
+For production deployment on Vercel, use the runbook in [`../docs/vercel-setup.md`](../docs/vercel-setup.md). Production uses the same env var names (`API_BASE_URL` and `AGENT_API_KEY`) as private Vercel env vars.
+
 ## Run
 
 ```bash

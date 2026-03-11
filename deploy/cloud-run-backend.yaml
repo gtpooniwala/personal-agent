@@ -48,8 +48,6 @@ spec:
             # ── Static env vars ──────────────────────────────────────────────
             - name: ENVIRONMENT
               value: production
-            - name: PORT
-              value: "8000"
             - name: LOG_LEVEL
               value: INFO
             # ALLOWED_ORIGINS must include the Vercel frontend URL.
@@ -116,13 +114,6 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 5
             failureThreshold: 12
-            timeoutSeconds: 5
-
-          livenessProbe:
-            tcpSocket:
-              port: 8000
-            periodSeconds: 30
-            failureThreshold: 3
             timeoutSeconds: 5
 
   # Route 100 % of traffic to the latest revision.

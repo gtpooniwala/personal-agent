@@ -146,10 +146,10 @@ Tracked in #83.
 - Purpose-built for Next.js; zero code changes required
 - Free for 3–10 DAU indefinitely on the hobby tier
 - Best Next.js developer experience; preview deploys included
-- `API_BASE_URL` stored as a **private** Vercel env var pointing to the Cloud Run `*.run.app` URL; used server-side by the Next.js API proxy route only — not exposed in the browser bundle
+- `API_BASE_URL` stored as a **private** Vercel env var containing the bare Cloud Run `*.run.app` origin (for example `https://personal-agent-backend-<hash>-uc.a.run.app`); used server-side by the Next.js API proxy route only — not exposed in the browser bundle
 - `AGENT_API_KEY` stored as a **private** Vercel env var; injected server-side via the Next.js API proxy route (#132) so the token is never exposed in the browser
 
-Tracked in #127. API proxy route tracked in #132.
+Tracked in #127. API proxy route tracked in #132. See [`vercel-setup.md`](vercel-setup.md) for the operator runbook.
 
 ---
 
@@ -175,6 +175,7 @@ Cloud Scheduler job provisioning is in scope for #88.
 - Custom domain: can attach an owned domain to Cloud Run or Vercel later; not required initially
 - Backend and frontend communicate through the Next.js same-origin `/api/agent/...` proxy; Vercel stores the Cloud Run `*.run.app` URL as private `API_BASE_URL`
 - Cloud SQL: private IP via VPC connector; do not expose public IP
+- After the first Vercel deploy, redeploy Cloud Run with `VERCEL_URL=https://<project>.vercel.app` so the backend CORS allowlist matches the frontend origin
 
 ---
 

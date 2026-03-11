@@ -24,7 +24,7 @@ Related issues: #85 (this runbook), #82 (Secret Manager secrets), #80 (Cloud SQL
 
 ```bash
 PROJECT_ID="your-gcp-project-id"
-REGION="us-central1"
+REGION="your-gcp-region"  # e.g. europe-west2 for London
 CR_SA="personal-agent-backend@${PROJECT_ID}.iam.gserviceaccount.com"
 ```
 
@@ -126,12 +126,23 @@ Service URL : https://personal-agent-backend-<hash>-uc.a.run.app
 | Gmail OAuth redirect URIs | Add `<SERVICE_URL>/api/v1/gmail/callback` to Google Cloud Console | #129 |
 | Cloud Scheduler jobs | HTTP target base URL for trigger endpoints | #88 |
 
+For Vercel, use the bare Cloud Run origin exactly as printed above. Do not append `/api/v1` and do not use a `NEXT_PUBLIC_*` variable for this value. The Next.js app forwards requests through its same-origin `/api/agent/...` proxy.
+
+See [`vercel-setup.md`](vercel-setup.md) for the full frontend deployment flow.
+
 ---
 
-## 7. Update CORS after Vercel deploy
+## 7. Deploy the frontend in Vercel
 
-Once the Vercel URL is known (e.g. `https://personal-agent.vercel.app`), pass it as
-an environment variable and redeploy (no script edits required):
+Use the Cloud Run service URL from §6 as the Vercel `API_BASE_URL`, set the private `AGENT_API_KEY`, and complete the first frontend deploy using [`vercel-setup.md`](vercel-setup.md).
+
+Record the Vercel URL after that first deploy. It is needed for backend CORS and later Gmail OAuth redirect updates.
+
+---
+
+## 8. Update CORS after Vercel deploy
+
+Once the Vercel URL is known (e.g. `https://personal-agent.vercel.app`), pass it as an environment variable and redeploy (no script edits required):
 
 ```bash
 VERCEL_URL="https://personal-agent.vercel.app" \
@@ -140,7 +151,7 @@ VERCEL_URL="https://personal-agent.vercel.app" \
 
 ---
 
-## 8. Verify the deployment
+## 9. Verify the deployment
 
 Check the service is running:
 
@@ -169,6 +180,14 @@ curl -sSf -H "Authorization: Bearer ${AGENT_API_KEY}" \
 ```
 
 Expected: `{"status": "healthy", ...}` with HTTP 200.
+
+Then verify the frontend proxy end to end through the deployed Vercel app:
+
+```bash
+curl -sSf "https://<your-project>.vercel.app/api/agent/health"
+```
+
+If the backend is auth-enabled and Vercel env vars are set correctly, the proxy should return the backend health payload without exposing `AGENT_API_KEY` to the browser.
 
 ---
 
@@ -228,9 +247,10 @@ if traffic increases.
   `?host=/cloudsql/<CONNECTION_NAME>`. No VPC connector needed (#80).
 - **Unauthenticated HTTP**: Cloud Run IAM is open (`allUsers` → `roles/run.invoker`);
   security is enforced entirely by the in-app bearer-token middleware.
-- **Health probes**: TCP socket probes (not HTTP) because `/api/v1/health` requires
-  a bearer token that probe definitions cannot reference dynamically. TCP confirms the
-  port is bound; full app readiness (DB pool, etc.) is not verified by the probe.
+- **Health probes**: use a TCP startup probe only. `/api/v1/health` requires a bearer
+  token that probe definitions cannot reference dynamically, and Cloud Run does not accept
+  TCP liveness probes. The startup probe confirms the port is bound before serving traffic;
+  full app readiness (DB pool, etc.) is not verified by the probe.
 - **Gmail integration**: disabled (`ENABLE_GMAIL_INTEGRATION=false`) in the Cloud Run
   service definition. Cloud Run has no persistent volume for the OAuth token. Re-enable
   after a durable credentials mechanism is in place (#129).
