@@ -22,6 +22,7 @@ These are still useful, but they are supporting references rather than the prima
 - [`SYSTEM_FLOW.md`](SYSTEM_FLOW.md): end-to-end flow diagrams for runtime, scheduler, and follow-up work
 - [`FEATURES_OVERVIEW.md`](FEATURES_OVERVIEW.md): capability inventory by maturity
 - [`DEPLOYMENT.md`](DEPLOYMENT.md): GCP deployment ADR and rollout order
+- [`vercel-setup.md`](vercel-setup.md): Vercel frontend deployment runbook
 - [`EVENT_TRIGGERS.md`](EVENT_TRIGGERS.md): trigger framework and mobile automation design
 - [`DEVELOPMENT_GUIDE.md`](DEVELOPMENT_GUIDE.md): contributor workflow on top of the engineering policy
 

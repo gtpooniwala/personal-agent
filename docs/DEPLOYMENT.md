@@ -80,9 +80,9 @@ Scale to zero. Personal use; occasional cold starts of ~2–3s are acceptable. F
 **Rationale:**
 - Already wired in `docker-compose.yml`; just point `DATABASE_URL` at Cloud SQL
 - Managed backups, patching, and failover
-- Private IP via VPC connector for secure backend access
+- Cloud Run can connect through the Cloud SQL Auth Connector (Unix socket), so no VPC connector is required for the current deployment path
 
-**Action required:** Configure VPC connector so Cloud Run backend reaches Cloud SQL over private IP. Avoid public IP exposure.
+**Action required:** Create the Cloud SQL instance and render `DATABASE_URL` with the Cloud SQL Unix socket host (`?host=/cloudsql/<CONNECTION_NAME>`). No VPC connector is required for the current runbook.
 
 ---
 
@@ -146,10 +146,10 @@ Tracked in #83.
 - Purpose-built for Next.js; zero code changes required
 - Free for 3–10 DAU indefinitely on the hobby tier
 - Best Next.js developer experience; preview deploys included
-- `API_BASE_URL` stored as a **private** Vercel env var pointing to the Cloud Run `*.run.app` URL; used server-side by the Next.js API proxy route only — not exposed in the browser bundle
+- `API_BASE_URL` stored as a **private** Vercel env var containing the bare Cloud Run `*.run.app` origin (for example `https://personal-agent-backend-<hash>-uc.a.run.app`); used server-side by the Next.js API proxy route only — not exposed in the browser bundle
 - `AGENT_API_KEY` stored as a **private** Vercel env var; injected server-side via the Next.js API proxy route (#132) so the token is never exposed in the browser
 
-Tracked in #127. API proxy route tracked in #132.
+Tracked in #127. API proxy route tracked in #132. See [`vercel-setup.md`](vercel-setup.md) for the operator runbook.
 
 ---
 
@@ -174,7 +174,8 @@ Cloud Scheduler job provisioning is in scope for #88.
 - Frontend is Vercel-assigned domain (e.g. `personal-agent.vercel.app`)
 - Custom domain: can attach an owned domain to Cloud Run or Vercel later; not required initially
 - Backend and frontend communicate through the Next.js same-origin `/api/agent/...` proxy; Vercel stores the Cloud Run `*.run.app` URL as private `API_BASE_URL`
-- Cloud SQL: private IP via VPC connector; do not expose public IP
+- Cloud SQL: accessed from Cloud Run through the Cloud SQL Auth Connector (Unix socket); no VPC connector is required in the current setup
+- After the first Vercel deploy, redeploy Cloud Run with `VERCEL_URL=https://<project>.vercel.app` so the backend CORS allowlist matches the frontend origin
 
 ---
 
@@ -183,7 +184,7 @@ Cloud Scheduler job provisioning is in scope for #88.
 1. **Cloud SQL** (#80) — provision instance, migrate schema, update `DATABASE_URL`
 2. **Secret Manager** (#82) — migrate all secrets; add `AGENT_API_KEY`; update Cloud Run service account
 3. **Bearer token auth middleware** (#83) — FastAPI middleware; generate and store token in Secret Manager
-4. **Backend Cloud Run service** (#85) — Cloud Run YAML/config; env vars from Secret Manager; VPC connector; `min-instances=0`; deploy backend with auth middleware already in the image; record `*.run.app` URL
+4. **Backend Cloud Run service** (#85) — Cloud Run YAML/config; env vars from Secret Manager; Cloud SQL Auth Connector socket mount; `min-instances=0`; deploy backend with auth middleware already in the image; record `*.run.app` URL
 5. **Vercel frontend deploy** (#127) — connect repo; set private `API_BASE_URL` + `AGENT_API_KEY`; verify end-to-end through `/api/agent/...`
 6. **Gmail OAuth redirect URIs** (#129) — add Cloud Run and Vercel URLs to Google Cloud Console OAuth credentials; test Gmail OAuth flow
 7. **CI/CD** (#86) — build and deploy backend on merge to `main`
@@ -198,7 +199,7 @@ Cloud Scheduler job provisioning is in scope for #88.
 - **Bearer token** — `AGENT_API_KEY` must be set in both Secret Manager (for Cloud Run) and Vercel env vars before any API calls work end-to-end; without it the backend will reject all requests, and non-local startup should fail immediately
 - **GCS migration is not a blocker** — ephemeral storage is acceptable for the initial deploy; documents will not persist across container restarts until #79 is done
 - **Gmail OAuth redirect URIs** — must be updated in Google Cloud Console to include Cloud Run and Vercel URLs before Gmail polling works in production (#129)
-- **VPC connector** — needed for Cloud SQL private IP access from Cloud Run
+- **Cloud SQL connectivity** — the current production path uses the Cloud SQL Auth Connector socket mount from Cloud Run; no VPC connector is required by the runbooks
 - **Cloud Scheduler jobs** — required for email polling and scheduled task triggers when running at `min-instances=0` (scale to zero); provisioned in #88
 - **Custom domain DNS** — if attaching an owned domain later, update DNS records after Cloud Run domain mapping or Vercel domain config
 - **Cost estimate** — approximately $7–25/month: Cloud SQL $7–20, Cloud Run ~$0–5, Vercel free

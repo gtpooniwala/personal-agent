@@ -46,19 +46,19 @@ gcloud sql instances create "${INSTANCE_NAME}" \
   --project="${PROJECT_ID}" \
   --region="${REGION}" \
   --database-version=POSTGRES_16 \
-  --tier=db-g1-small \
+  --server-ca-mode=GOOGLE_MANAGED_INTERNAL_CA \
+  --edition=ENTERPRISE \
+  --tier=db-custom-1-3840 \
   --storage-type=SSD \
   --storage-size=10GB \
   --storage-auto-increase \
-  --storage-auto-increase-limit=100GB \
   --backup \
   --backup-start-time=03:00 \
   --retained-backups-count=7 \
-  --no-assign-ip \
   --availability-type=ZONAL
 ```
 
-`db-g1-small` supports ~25 connections. SQLAlchemy's default pool (5 + overflow 10) is fine at personal scale.
+`db-custom-1-3840` is a currently valid low-cost Postgres tier for Cloud SQL Enterprise. SQLAlchemy's default pool (5 + overflow 10) is fine at personal scale.
 
 ---
 
@@ -164,6 +164,6 @@ Expect non-null, non-zero values. The application stores file content directly i
 
 ## Notes
 
-- `--no-assign-ip` means the instance has no public IP — access is only via Cloud SQL Auth Connector (socket) or Cloud SQL Proxy.
+- This runbook uses the default public IP path for Cloud SQL because it works cleanly with Cloud Run's Cloud SQL Auth Connector over the mounted Unix socket and does not require VPC setup.
 - PDF binary size is capped at 50 MB in `backend/api/routes.py`; PostgreSQL BYTEA has no practical limit below that.
-- `db-g1-small` is sufficient for personal scale. Upgrade to `db-custom-1-3840` if query latency degrades under load.
+- `db-custom-1-3840` is the baseline instance size in this runbook. Increase CPU or memory later if query latency degrades under load.
