@@ -124,7 +124,7 @@ async def email_webhook(request: Request):
 
 
 @trigger_router.post("/poll")
-async def poll_sweep(request: Request):
+async def poll_sweep(_request: Request):
     """Cloud Scheduler poll sweep endpoint.
 
     Cloud Scheduler calls this endpoint on a regular cadence to wake Cloud Run
