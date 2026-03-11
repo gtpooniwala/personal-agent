@@ -34,7 +34,7 @@ Last updated: March 10, 2026
 - Overflow slots are created under `.worktrees/dyn-XX` only through the slot manager.
 - Lease metadata is stored under `.worktrees/state/`.
 - The managed slot flow is the single supported path for new work.
-- Releasing a slot parks that worktree back on clean `main`; managed slots are reused instead of deleted.
+- Releasing a slot parks that worktree in detached `HEAD` at the current main base commit; managed slots are reused instead of deleted.
 
 Inspect / clean up:
 ```bash

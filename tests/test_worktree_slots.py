@@ -124,11 +124,11 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
             lease["state"] = "reserved"
 
             original_branch_worktree_map = worktree_slots.branch_worktree_map
-            original_path_worktree_map = worktree_slots.path_worktree_map
+            original_worktree_entry_for_path = worktree_slots.worktree_entry_for_path
             original_git_status_dirty = worktree_slots.git_status_dirty
             try:
                 worktree_slots.branch_worktree_map = lambda _ctx: {}
-                worktree_slots.path_worktree_map = lambda _ctx: {}
+                worktree_slots.worktree_entry_for_path = lambda _ctx, _path: None
 
                 def boom(_path):
                     raise RuntimeError("status unavailable")
@@ -137,13 +137,13 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
                 observed = worktree_slots.observe_slot(ctx, lease, stale_hours=72)
             finally:
                 worktree_slots.branch_worktree_map = original_branch_worktree_map
-                worktree_slots.path_worktree_map = original_path_worktree_map
+                worktree_slots.worktree_entry_for_path = original_worktree_entry_for_path
                 worktree_slots.git_status_dirty = original_git_status_dirty
 
             self.assertTrue(observed["slot_path_exists"])
             self.assertTrue(observed["dirty"])
 
-    def test_create_or_attach_worktree_reuses_clean_main_slot(self) -> None:
+    def test_create_or_attach_worktree_reuses_clean_parked_slot(self) -> None:
         with TemporaryDirectory() as tmpdir:
             root = worktree_slots.Path(tmpdir)
             ctx = worktree_slots.RepoContext(
@@ -157,7 +157,8 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
             target.mkdir(parents=True)
 
             original_branch_worktree_map = worktree_slots.branch_worktree_map
-            original_path_worktree_map = worktree_slots.path_worktree_map
+            original_worktree_entry_for_path = worktree_slots.worktree_entry_for_path
+            original_is_parked_entry = worktree_slots.is_parked_entry
             original_git_status_dirty = worktree_slots.git_status_dirty
             original_ensure_branch_checked_out = worktree_slots.ensure_branch_checked_out
             original_link_shared_credentials = worktree_slots.link_shared_credentials
@@ -165,7 +166,12 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
 
             try:
                 worktree_slots.branch_worktree_map = lambda _ctx: {}
-                worktree_slots.path_worktree_map = lambda _ctx: {str(target): "main"}
+                worktree_slots.worktree_entry_for_path = lambda _ctx, _path: {
+                    "worktree": str(target),
+                    "HEAD": "deadbeef",
+                    "detached": "true",
+                }
+                worktree_slots.is_parked_entry = lambda _ctx, _entry: True
                 worktree_slots.git_status_dirty = lambda _path: False
                 worktree_slots.ensure_branch_checked_out = lambda _ctx, path, branch: calls.append((str(path), branch))
                 worktree_slots.link_shared_credentials = lambda _ctx, _path: None
@@ -173,7 +179,8 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
                 worktree_slots.create_or_attach_worktree(ctx, "slot-01", "opencode/chore/59-worktree-slot-manager")
             finally:
                 worktree_slots.branch_worktree_map = original_branch_worktree_map
-                worktree_slots.path_worktree_map = original_path_worktree_map
+                worktree_slots.worktree_entry_for_path = original_worktree_entry_for_path
+                worktree_slots.is_parked_entry = original_is_parked_entry
                 worktree_slots.git_status_dirty = original_git_status_dirty
                 worktree_slots.ensure_branch_checked_out = original_ensure_branch_checked_out
                 worktree_slots.link_shared_credentials = original_link_shared_credentials
@@ -331,11 +338,12 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
 
     def test_release_attention_items_report_expected_anomalies(self) -> None:
         rows = [
-            {"slot_id": "slot-01", "dirty": True, "checked_out_branch": "main", "state": "free", "merged": None, "branch": None},
+            {"slot_id": "slot-01", "dirty": True, "checked_out_branch": None, "is_parked": True, "state": "free", "merged": None, "branch": None},
             {
                 "slot_id": "slot-02",
                 "dirty": True,
                 "checked_out_branch": "opencode/chore/59-worktree-slot-manager",
+                "is_parked": False,
                 "state": "reserved",
                 "merged": False,
                 "branch": "opencode/chore/59-worktree-slot-manager",
@@ -344,6 +352,7 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
                 "slot_id": "slot-03",
                 "dirty": False,
                 "checked_out_branch": "codex/fix/59-slot-release",
+                "is_parked": False,
                 "state": "reserved",
                 "merged": True,
                 "branch": "codex/fix/59-slot-release",
@@ -353,7 +362,7 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
         items = worktree_slots.release_attention_items(rows)
 
         self.assertEqual(len(items), 3)
-        self.assertIn("on main but has uncommitted files", items[0])
+        self.assertIn("parked at main base commit but has uncommitted files", items[0])
         self.assertIn("has uncommitted files", items[1])
         self.assertIn("appears merged, but the slot is still reserved", items[2])
 
@@ -403,7 +412,7 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
         self.assertIn("Release failed for slot-01", stderr.getvalue())
         self.assertIn("status-summary", stderr.getvalue())
 
-    def test_cmd_reclaim_switches_clean_slot_to_main_instead_of_removing_worktree(self) -> None:
+    def test_cmd_reclaim_parks_clean_slot_instead_of_removing_worktree(self) -> None:
         ctx = self.make_ctx("/tmp/repo-reclaim")
         lease = {"slot_id": "slot-01", "state": "reserved", "branch": "codex/fix/59-slot-release"}
         original_repo_context = worktree_slots.repo_context
@@ -413,7 +422,7 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
         original_known_slot_ids = worktree_slots.known_slot_ids
         original_load_lease = worktree_slots.load_lease
         original_observe_slot = worktree_slots.observe_slot
-        original_switch_slot_to_main = worktree_slots.switch_slot_to_main
+        original_park_slot_worktree = worktree_slots.park_slot_worktree
         original_mark_free = worktree_slots.mark_free
         stdout = io.StringIO()
         parked: list[str] = []
@@ -429,10 +438,11 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
             worktree_slots.observe_slot = lambda _ctx, _lease, _stale_hours: {
                 "safe_to_reclaim": True,
                 "checked_out_branch": "codex/fix/59-slot-release",
+                "is_parked": False,
                 "slot_path_exists": True,
                 "stale_reasons": [],
             }
-            worktree_slots.switch_slot_to_main = lambda _ctx, slot_id: parked.append(slot_id)
+            worktree_slots.park_slot_worktree = lambda _ctx, slot_id: parked.append(slot_id)
             worktree_slots.mark_free = lambda _ctx, slot_id: freed.append(slot_id)
 
             with patch("sys.stdout", stdout):
@@ -447,7 +457,7 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
             worktree_slots.known_slot_ids = original_known_slot_ids
             worktree_slots.load_lease = original_load_lease
             worktree_slots.observe_slot = original_observe_slot
-            worktree_slots.switch_slot_to_main = original_switch_slot_to_main
+            worktree_slots.park_slot_worktree = original_park_slot_worktree
             worktree_slots.mark_free = original_mark_free
 
         self.assertEqual(result, 0)

@@ -31,7 +31,7 @@ This repository uses a script-owned slot/lease system for local coding-agent wor
 - Reserved slots stay reserved until a human explicitly releases them or a cleanup script reclaims them when it is clearly safe.
 - Issue/PR status may appear in status output as hints only.
 - Dirty or ambiguous worktrees are never reclaimed automatically.
-- A free slot is expected to be a clean managed worktree already checked out on `main`.
+- A free slot is expected to be a clean managed worktree parked in detached `HEAD` at the current `origin/main` or `main` base commit.
 
 ## Standard Commands
 
@@ -75,7 +75,7 @@ scripts/start-agent.sh codex --branch codex/chore/59-workflow-hardening
 scripts/release-slot.sh --slot slot-02
 ```
 
-Releasing a slot now parks that worktree back on clean `main` and marks the lease free. Managed slots are reused instead of removed.
+Releasing a slot now parks that worktree in detached `HEAD` at the current main base commit and marks the lease free. Managed slots are reused instead of removed.
 
 Without a slot argument, `release-slot.sh` falls back to the same conservative reclaim flow as `reclaim-stale-slots.sh`:
 ```bash
@@ -118,7 +118,7 @@ If you prefer to open the app manually:
 ## CLI Workflow
 1. Start from the shared root checkout.
 2. Run `scripts/start-agent.sh <agent> ...`.
-3. The launcher claims a slot, creates or reattaches the branch/worktree, or reuses a clean slot already parked on `main`, updates the lease, and starts the requested agent in that slot.
+3. The launcher claims a slot, creates or reattaches the branch/worktree, or reuses a clean slot already parked in detached `HEAD` at the main base commit, updates the lease, and starts the requested agent in that slot.
 4. Interact directly with the worker session in that terminal.
 
 ## Capacity Rules
