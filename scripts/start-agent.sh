@@ -2,29 +2,33 @@
 set -euo pipefail
 
 if [ "$#" -lt 1 ]; then
-  echo "Usage: $0 <agent:codex|claude|opencode> [--app|--cli] [slot claim args]"
+  echo "Usage: $0 <agent:codex|claude|opencode> [--cli] [slot claim args]"
   exit 1
 fi
 
 AGENT="$1"
 shift
 
-MODE="cli"
 FORWARD_ARGS=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --app)
-      MODE="app"
+      echo "Codex Desktop should use its own worktree under ~/.codex/worktrees/...."
+      echo "Do not run scripts/start-agent.sh --app. Open the repo in Codex Desktop and create the branch directly there."
+      exit 1
       ;;
     --cli)
-      MODE="cli"
       ;;
-    --mode|--format)
+    --mode|--mode=*)
+      echo "--mode is not supported by scripts/start-agent.sh. This launcher is CLI-only."
+      exit 1
+      ;;
+    --format)
       echo "$1 is managed by scripts/start-agent.sh and cannot be forwarded."
       exit 1
       ;;
-    --mode=*|--format=*)
-      echo "${1%%=*} is managed by scripts/start-agent.sh and cannot be forwarded."
+    --format=*)
+      echo "--format is managed by scripts/start-agent.sh and cannot be forwarded."
       exit 1
       ;;
     *)
@@ -39,20 +43,10 @@ if [[ "${AGENT}" != "codex" && "${AGENT}" != "claude" && "${AGENT}" != "opencode
   exit 1
 fi
 
-if [[ "${AGENT}" == "claude" && "${MODE}" == "app" ]]; then
-  echo "Claude app mode is not supported by this launcher. Use CLI mode instead."
-  exit 1
-fi
-
-if [[ "${AGENT}" == "opencode" && "${MODE}" == "app" ]]; then
-  echo "OpenCode app mode is not supported by this launcher. Use CLI mode instead."
-  exit 1
-fi
-
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 
-if ! CLAIM_JSON="$("${PYTHON_BIN}" "${ROOT_DIR}/scripts/worktree_slots.py" claim --agent "${AGENT}" --mode "${MODE}" --format json "${FORWARD_ARGS[@]}")"; then
+if ! CLAIM_JSON="$("${PYTHON_BIN}" "${ROOT_DIR}/scripts/worktree_slots.py" claim --agent "${AGENT}" --format json "${FORWARD_ARGS[@]}")"; then
   echo "Failed to prepare a managed slot for ${AGENT}. Review the error above and fix that issue first." >&2
   exit 1
 fi
@@ -77,15 +71,11 @@ branch="${CLAIM_FIELDS[2]}"
 
 echo "Claimed ${slot_id} at ${slot_path} on branch ${branch}"
 
-if [[ "${AGENT}" == "codex" && "${MODE}" == "cli" ]]; then
+if [[ "${AGENT}" == "codex" ]]; then
   exec codex -C "${slot_path}"
 fi
 
-if [[ "${AGENT}" == "codex" && "${MODE}" == "app" ]]; then
-  exec codex app "${slot_path}"
-fi
-
-if [[ "${AGENT}" == "opencode" && "${MODE}" == "cli" ]]; then
+if [[ "${AGENT}" == "opencode" ]]; then
   cd "${slot_path}"
   exec opencode
 fi

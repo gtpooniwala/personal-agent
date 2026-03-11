@@ -104,8 +104,8 @@
     "id": "slot_workflow_doc_present",
     "type": "contains",
     "path": "docs/WORKTREE_SLOTS.md",
-    "pattern": "scripts/start-agent.sh codex --app",
-    "description": "Worktree slot documentation covers Codex app launch flow"
+    "pattern": "Codex Desktop worktrees under `~/.codex/worktrees/...` are separate from this slot manager.",
+    "description": "Worktree slot documentation covers the Codex Desktop worktree exception"
   },
   {
     "id": "workflow_skill_requires_issue_backed_branches",

@@ -7,7 +7,7 @@ Canonical workflow contract for coding agents in this repository.
 - If `python3 -c 'from pathlib import Path; import subprocess; top = Path(subprocess.check_output(["git","rev-parse","--show-toplevel"], text=True).strip()).resolve(); common = Path(subprocess.check_output(["git","rev-parse","--git-common-dir"], text=True).strip()).resolve(); print(top == common.parent.resolve())'` prints `True`, stop before editing.
 - From the shared root checkout, only do control-plane actions such as:
   - `scripts/agent-status.sh`
-  - `scripts/claim-slot.sh`
+  - `scripts/claim-slot.sh` (human-only; do not run from an active agent worktree)
   - `scripts/start-agent.sh`
   - `scripts/release-slot.sh`
   - `scripts/reclaim-stale-slots.sh`
@@ -17,9 +17,11 @@ Canonical workflow contract for coding agents in this repository.
 ## Mandatory Contract
 1. Never commit directly to `main`.
 2. Never do active feature work in the shared root checkout.
-3. Use the managed slot workflow for normal agent work:
-   - Preferred launch: `scripts/start-agent.sh <agent> --issue <id> --type <type> --label <label>`
-   - Resume parked work: `scripts/start-agent.sh <agent> --branch <branch>`
+3. Use an isolated checkout for normal agent work:
+   - Shared-root launches, Codex CLI, Claude, and OpenCode should use the managed slot workflow:
+     - Preferred launch: `scripts/start-agent.sh <agent> --issue <id> --type <type> --label <label>`
+     - Resume parked work: `scripts/start-agent.sh <agent> --branch <branch>`
+   - Codex Desktop worktrees under `~/.codex/worktrees/...` already count as isolated checkouts. From inside that app-created worktree, create the branch directly with normal git and do not run `scripts/start-agent.sh` or `scripts/claim-slot.sh`.
 4. Branch naming must follow `<agent>/<type>/<issue>-<slug>`:
    - Codex: `codex/<type>/<issue>-<slug>`
    - Claude: `claude/<type>/<issue>-<slug>`
@@ -46,7 +48,9 @@ Canonical workflow contract for coding agents in this repository.
 ## Required Commands
 - Slot status: `scripts/agent-status.sh`
 - Claim without launch: `scripts/claim-slot.sh --agent <codex|claude|opencode> ...`
+  Human-only control-plane command for shared-root / CLI slot launches. Run it from the shared root checkout only. Codex Desktop must not use `claim-slot.sh`.
 - Start agent in a managed slot: `scripts/start-agent.sh <codex|claude|opencode> ...`
+  Shared-root launcher for Codex CLI, Claude, and OpenCode. Do not run this from inside a Codex Desktop worktree under `~/.codex/worktrees/...`.
 - Release a slot: `scripts/release-slot.sh --slot <slot-id> [--keep-branch]`
 - Shortcut cleanup sweep: `scripts/release-slot.sh` runs the same reclaim flow as `scripts/reclaim-stale-slots.sh`
 - Explicit full sweep: `scripts/release-slot.sh --all` or `scripts/reclaim-stale-slots.sh --all`
@@ -58,3 +62,4 @@ Canonical workflow contract for coding agents in this repository.
 ## Notes
 - Issue and PR status are advisory cleanup hints only; they are not authoritative slot ownership signals.
 - If you are already running inside a managed slot, continue working there instead of claiming a second slot for the same branch.
+- If you are already running inside a Codex Desktop worktree under `~/.codex/worktrees/...`, treat it as the dedicated checkout and create or switch the branch directly with git.

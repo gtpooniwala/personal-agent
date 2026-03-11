@@ -4,7 +4,7 @@ Last updated: March 10, 2026
 
 ## Goals
 - No direct commits to `main`
-- Every feature/change in a dedicated branch and managed worktree slot
+- Every feature/change in a dedicated branch and isolated checkout
 - Granular commits
 - PR-based merges only after review + passing CI
 
@@ -22,10 +22,14 @@ Last updated: March 10, 2026
 
 ## Worktree Rules
 - The shared root checkout is control-plane/admin-only.
-- Use the managed slot workflow for normal work:
+- Codex CLI, Claude, and OpenCode use the managed slot workflow from the shared root checkout:
   - `scripts/start-agent.sh codex --issue 7 --type fix --label "safe calculator"`
-  - `scripts/start-agent.sh codex --app --issue 7 --type fix --label "safe calculator"`
+  - `scripts/start-agent.sh claude --issue 16 --type feat --label "runtime worker"`
   - `scripts/start-agent.sh opencode --issue 59 --type chore --label "workflow hardening"`
+- Codex Desktop uses its own isolated worktrees under `~/.codex/worktrees/...`.
+- From inside a Codex Desktop worktree, create the branch directly with git:
+  - `git switch -c codex/<type>/<issue>-<slug> main`
+- Do not run `scripts/start-agent.sh` or `scripts/claim-slot.sh` from inside a Codex Desktop worktree.
 - Stable reusable slots live at:
   - `.worktrees/slot-01`
   - `.worktrees/slot-02`
@@ -33,7 +37,7 @@ Last updated: March 10, 2026
   - `.worktrees/slot-04`
 - Overflow slots are created under `.worktrees/dyn-XX` only through the slot manager.
 - Lease metadata is stored under `.worktrees/state/`.
-- The managed slot flow is the single supported path for new work.
+- The managed slot flow is the supported shared-root / CLI launch path, not the Codex Desktop app workflow.
 - Releasing a slot parks that worktree in detached `HEAD` at the current main base commit; managed slots are reused instead of deleted.
 
 Inspect / clean up:

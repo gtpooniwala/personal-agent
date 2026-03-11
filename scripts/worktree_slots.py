@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Manage shared worktree slots for CLI and app-based coding agents."""
+"""Manage shared worktree slots for CLI-based coding agents."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ DEFAULT_STABLE_SLOTS = 4
 DEFAULT_MAX_SLOTS = int(os.environ.get("WORKTREE_SLOT_MAX", "8"))
 DEFAULT_STALE_HOURS = int(os.environ.get("WORKTREE_SLOT_STALE_HOURS", "72"))
 ALLOWED_AGENTS = {"codex", "claude", "opencode"}
-ALLOWED_MODES = {"cli", "app"}
+ALLOWED_MODES = {"cli"}
 BRANCH_RE = re.compile(
     r"^(?P<agent>codex|claude|opencode)/(?P<type>[a-z0-9][a-z0-9-]*)/(?P<issue>[0-9]+)-(?P<slug>[a-z0-9][a-z0-9-]*)$"
 )
