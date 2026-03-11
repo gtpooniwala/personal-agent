@@ -16,8 +16,8 @@ jest.mock('@/lib/api', () => ({
   apiCall: jest.fn(),
   runtimeApiCall: jest.fn(),
   uploadPdf: jest.fn(),
-  API_BASE: 'http://localhost:8000/api/v1',
-  RUNTIME_API_BASE: 'http://localhost:8000',
+  API_BASE: '/api/agent',
+  RUNTIME_API_BASE: '/api/agent',
 }));
 
 const CONVERSATIONS = [

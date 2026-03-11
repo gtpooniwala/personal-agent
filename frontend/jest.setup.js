@@ -1,7 +1,9 @@
 import '@testing-library/jest-dom';
 
 beforeEach(() => {
-  window.history.replaceState(null, "", "/");
+  if (typeof window !== 'undefined') {
+    window.history.replaceState(null, "", "/");
+  }
 });
 
 class MockEventSource {

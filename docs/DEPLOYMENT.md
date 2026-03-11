@@ -173,7 +173,7 @@ Cloud Scheduler job provisioning is in scope for #88.
 - Cloud Run provides automatic HTTPS on `*.run.app` — no TLS setup needed
 - Frontend is Vercel-assigned domain (e.g. `personal-agent.vercel.app`)
 - Custom domain: can attach an owned domain to Cloud Run or Vercel later; not required initially
-- Backend and frontend communicate via Cloud Run `*.run.app` URL (set as `NEXT_PUBLIC_API_BASE_URL` in Vercel)
+- Backend and frontend communicate through the Next.js same-origin `/api/agent/...` proxy; Vercel stores the Cloud Run `*.run.app` URL as private `API_BASE_URL`
 - Cloud SQL: private IP via VPC connector; do not expose public IP
 
 ---
@@ -184,7 +184,7 @@ Cloud Scheduler job provisioning is in scope for #88.
 2. **Secret Manager** (#82) — migrate all secrets; add `AGENT_API_KEY`; update Cloud Run service account
 3. **Bearer token auth middleware** (#83) — FastAPI middleware; generate and store token in Secret Manager
 4. **Backend Cloud Run service** (#85) — Cloud Run YAML/config; env vars from Secret Manager; VPC connector; `min-instances=0`; deploy backend with auth middleware already in the image; record `*.run.app` URL
-5. **Vercel frontend deploy** (#127) — connect repo; set `NEXT_PUBLIC_API_BASE_URL` and bearer token handling; verify end-to-end
+5. **Vercel frontend deploy** (#127) — connect repo; set private `API_BASE_URL` + `AGENT_API_KEY`; verify end-to-end through `/api/agent/...`
 6. **Gmail OAuth redirect URIs** (#129) — add Cloud Run and Vercel URLs to Google Cloud Console OAuth credentials; test Gmail OAuth flow
 7. **CI/CD** (#86) — build and deploy backend on merge to `main`
 8. **Event trigger framework + Cloud Scheduler** (#88) — implement trigger dispatcher; provision Cloud Scheduler jobs for polling endpoints
