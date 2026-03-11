@@ -1,0 +1,25 @@
+tests/llm_evals/cases/gmail.json
+  a82ca6825fdb70e0 46-49
+tests/test_tool_registry.py
+  a82ca6825fdb70e0 66-78,80-88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "af83e92bb84e35cbf6b4280a6b32697f25a059f3",
+  "prompts": {
+    "a82ca6825fdb70e0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019cdcec-6402-77e1-94d8-11d0169311d9",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 108,
+      "total_deletions": 14,
+      "accepted_lines": 101,
+      "overriden_lines": 0
+    }
+  }
+}
