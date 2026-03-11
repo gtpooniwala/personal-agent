@@ -57,9 +57,12 @@ spec:
             - name: FRONTEND_URL
               value: ${VERCEL_URL}
 
-            # Gmail integration stays enabled so Cloud Run matches local/default behavior.
-            # The tool only registers when credentials and dependencies are actually present,
-            # so missing OAuth setup should degrade availability without crashing startup.
+            # Gmail integration stores per-user OAuth tokens encrypted in Postgres.
+            # Leave the feature flag enabled so Cloud Run matches local/default behavior.
+            # The tool only registers when GOOGLE_OAUTH_CLIENT_ID /
+            # GOOGLE_OAUTH_CLIENT_SECRET / GOOGLE_OAUTH_REDIRECT_URI /
+            # CREDENTIALS_MASTER_KEY and Gmail deps are actually present, so
+            # incomplete Gmail setup should degrade availability without crashing startup.
             - name: ENABLE_GMAIL_INTEGRATION
               value: "true"
 

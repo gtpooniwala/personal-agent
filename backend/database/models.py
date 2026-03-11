@@ -17,6 +17,7 @@ import uuid
 from backend.runtime import RUN_EVENT_TYPES, RUN_STATUSES
 
 EXTERNAL_TRIGGER_TYPES = ("telegram", "email", "webhook", "generic")
+INTEGRATION_CREDENTIAL_STATUSES = ("connected", "expired", "revoked", "error")
 
 Base = declarative_base()
 
@@ -284,3 +285,53 @@ class TriggerEvent(Base):
     dispatched = Column(Boolean, nullable=False, default=False)
 
     trigger = relationship("ExternalTrigger", back_populates="events")
+
+
+class IntegrationCredential(Base):
+    """Encrypted per-user credentials for external integrations."""
+
+    __tablename__ = "integration_credentials"
+    __table_args__ = (
+        CheckConstraint(
+            f"status IN ({_sql_string_literals(INTEGRATION_CREDENTIAL_STATUSES)})",
+            name="ck_integration_credentials_status_valid",
+        ),
+        Index(
+            "ix_integration_credentials_user_provider_kind",
+            "user_id",
+            "provider",
+            "credential_kind",
+            unique=True,
+        ),
+    )
+
+    id = Column(String, primary_key=True, default=generate_id)
+    user_id = Column(String, nullable=False, default="default")
+    provider = Column(String, nullable=False)
+    credential_kind = Column(String, nullable=False)
+    account_label = Column(String, nullable=True)
+    scopes = Column(Text, nullable=True)  # JSON array
+    status = Column(String, nullable=False, default="connected")
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    ciphertext = Column(Text, nullable=False)
+    key_version = Column(String, nullable=False, default="v1")
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class IntegrationOAuthState(Base):
+    """Short-lived OAuth state records for integration connect flows."""
+
+    __tablename__ = "integration_oauth_states"
+    __table_args__ = (
+        Index("ix_integration_oauth_states_state", "state", unique=True),
+        Index("ix_integration_oauth_states_expires_at", "expires_at"),
+    )
+
+    id = Column(String, primary_key=True, default=generate_id)
+    state = Column(String, nullable=False)
+    user_id = Column(String, nullable=False, default="default")
+    provider = Column(String, nullable=False)
+    return_to = Column(String, nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utcnow)

@@ -42,15 +42,7 @@ class ToolRegistry:
         self._tools["calculator"] = CalculatorTool()
         self._tools["current_time"] = CurrentTimeTool()
         self._tools["scratchpad"] = ScratchpadTool(self.user_id)
-
-        gmail_ready, gmail_reasons = get_gmail_readiness(settings.enable_gmail_integration)
-        if gmail_ready:
-            self._tools["gmail_read"] = GmailReadTool()
-        else:
-            logger.info(
-                "Skipping gmail_read tool registration: %s",
-                ", ".join(gmail_reasons)
-            )
+        self._sync_gmail_tool()
 
         # Response agent tool (for handling responses)
         self._tools["response_agent"] = ResponseAgentTool()
@@ -63,6 +55,25 @@ class ToolRegistry:
         # Summarisation agent (always available)
         self._tools["summarisation_agent"] = SummarisationAgent()
         self._set_search_documents_tool(self.selected_documents)
+
+    def _sync_gmail_tool(self) -> None:
+        gmail_ready, gmail_reasons = get_gmail_readiness(
+            settings.enable_gmail_integration,
+            self.user_id,
+        )
+        if gmail_ready:
+            self._tools["gmail_read"] = GmailReadTool(self.user_id)
+            return
+
+        self._tools.pop("gmail_read", None)
+        logger.info(
+            "Skipping gmail_read tool registration: %s",
+            ", ".join(gmail_reasons),
+        )
+
+    def refresh_runtime_capabilities(self) -> None:
+        """Refresh tools whose availability can change at runtime."""
+        self._sync_gmail_tool()
 
     def _set_search_documents_tool(self, selected_documents: Optional[List[str]]) -> None:
         """Refresh the document-scoped search tool without rebuilding static tools."""
@@ -95,6 +106,7 @@ class ToolRegistry:
         """
         Get list of tools that should be available to the orchestrator.
         """
+        self.refresh_runtime_capabilities()
         # This is capability gating only. The model owns normal tool selection
         # from the tools exposed here.
         available_tools = ["calculator", "current_time", "scratchpad", "internet_search", "user_profile"]

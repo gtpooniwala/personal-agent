@@ -648,8 +648,6 @@ def link_shared_credentials(ctx: RepoContext, target_path: Path) -> None:
         ".npmrc",
         ".pypirc",
         ".netrc",
-        "backend/data/gmail/client_secret.json",
-        "backend/data/gmail/token.pickle",
     ]
     for rel_path in credential_candidates:
         source = ctx.shared_root / rel_path

@@ -11,7 +11,7 @@ from backend.config import llm_config, settings
 
 DEFAULT_PROVIDER = "gemini"
 DEFAULT_CHAT_MODELS: Dict[str, str] = {
-    "gemini": "gemini-2.5-flash",
+    "gemini": "gemini-3-pro-preview",
     "openai": "gpt-4.1-mini",
 }
 DEFAULT_EMBEDDING_MODELS: Dict[str, str] = {

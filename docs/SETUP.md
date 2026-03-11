@@ -44,10 +44,29 @@ AGENT_API_KEY=replace-with-a-long-random-token
 ENVIRONMENT=local
 ```
 
-Optional Gmail in Docker:
-```bash
-mkdir -p data/gmail
+Optional Gmail setup:
+```env
+GOOGLE_OAUTH_CLIENT_ID=...
+GOOGLE_OAUTH_CLIENT_SECRET=...
+GOOGLE_OAUTH_REDIRECT_URI=http://localhost:8001/api/v1/gmail/callback
+CREDENTIALS_MASTER_KEY=...
 ```
+
+One-time Google Cloud setup for Gmail:
+1. Sign in to Google Cloud with the work account that should own the app integration.
+2. Create or select the project that backs this app.
+3. Enable the Gmail API for that project.
+4. Configure an OAuth consent screen for an External app.
+5. While the app is still private/internal to your team, keep the consent screen in Testing and add each allowed Gmail user as a test user.
+6. Create one OAuth 2.0 Web application client for the app.
+7. Add the backend callback URI you will actually use:
+   - local Python: `http://localhost:8000/api/v1/gmail/callback`
+   - local Docker: `http://localhost:8001/api/v1/gmail/callback`
+   - production: `https://<your-backend-host>/api/v1/gmail/callback`
+8. Copy the client ID and client secret into `.env` or your secret manager.
+9. Generate `CREDENTIALS_MASTER_KEY` once and keep it stable across deploys.
+
+Users do not need their own Google Cloud project or Gmail API enablement. You enable Gmail API once in the app's project, then each user connects Gmail through the app's OAuth flow.
 
 Start services:
 ```bash
@@ -147,6 +166,9 @@ The app requires at least one of:
 
 ### Gmail not available
 Gmail support is conditional. Make sure:
-- Gmail credentials are present
-- any required auth files are mounted or available
+- Gmail dependencies are installed
+- `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `GOOGLE_OAUTH_REDIRECT_URI` are set
+- `CREDENTIALS_MASTER_KEY` is set so per-user tokens can be stored encrypted in Postgres
+- the user has completed `/api/v1/gmail/connect`
 - `ENABLE_GMAIL_INTEGRATION` is not disabling it
+- the Google OAuth consent screen is using the correct work-owned project and the user is allowed to authorize it

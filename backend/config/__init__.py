@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     # Optional integration settings
     todoist_api_token: Optional[str] = None
     google_calendar_credentials: Optional[str] = None
+    google_oauth_client_id: Optional[str] = None
+    google_oauth_client_secret: Optional[str] = None
+    google_oauth_redirect_uri: Optional[str] = None
+    credentials_master_key: Optional[str] = None
 
     # Feature flags
     enable_internet_search: bool = True

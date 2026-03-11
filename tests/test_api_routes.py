@@ -111,6 +111,60 @@ class TestAPIRoutes(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload["status"], "healthy")
 
+    @patch("backend.api.routes.orchestrator.tool_registry.refresh_runtime_capabilities")
+    @patch("backend.api.routes.get_connection_status")
+    def test_gmail_status_endpoint_returns_connection_status(
+        self,
+        mock_get_status,
+        mock_refresh_capabilities,
+    ):
+        mock_get_status.return_value = {
+            "provider": "gmail",
+            "connected": False,
+            "ready": True,
+            "reasons": ["account_not_connected"],
+            "account_label": None,
+            "expires_at": None,
+            "scopes": [],
+        }
+        response = self.client.get("/api/v1/gmail/status")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["provider"], "gmail")
+        mock_refresh_capabilities.assert_called_once()
+
+    @patch("backend.api.routes.create_connect_url")
+    def test_gmail_connect_endpoint_redirects_to_google(self, mock_create_connect_url):
+        mock_create_connect_url.return_value = "https://accounts.google.com/o/oauth2/v2/auth?client_id=test"
+        response = self.client.get(
+            "/api/v1/gmail/connect?return_to=http://localhost:3000/settings",
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 307)
+        self.assertEqual(
+            response.headers["location"],
+            "https://accounts.google.com/o/oauth2/v2/auth?client_id=test",
+        )
+
+    @patch("backend.api.routes.orchestrator.tool_registry.refresh_runtime_capabilities")
+    @patch("backend.api.routes.exchange_callback")
+    def test_gmail_callback_redirects_back_to_frontend(
+        self,
+        mock_exchange_callback,
+        mock_refresh_capabilities,
+    ):
+        mock_exchange_callback.return_value = {
+            "user_id": "default",
+            "return_to": "http://localhost:3000/settings",
+            "account_label": "user@example.com",
+        }
+        response = self.client.get(
+            "/api/v1/gmail/callback?state=test-state&code=test-code",
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 307)
+        self.assertEqual(response.headers["location"], "http://localhost:3000/settings?gmail=connected")
+        mock_refresh_capabilities.assert_called_once()
+
     @patch("backend.api.runtime_routes.runtime_service.submit_run", new_callable=AsyncMock)
     def test_runtime_chat_submit_endpoint_requires_bearer_token(self, mock_submit_run):
         mock_submit_run.return_value = {
