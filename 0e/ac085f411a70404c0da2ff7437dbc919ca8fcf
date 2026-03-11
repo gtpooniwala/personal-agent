@@ -1,0 +1,25 @@
+docs/cloud-run-setup.md
+  a82ca6825fdb70e0 126,257-260
+docs/secret-manager-setup.md
+  a82ca6825fdb70e0 49,98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "0eac085f411a70404c0da2ff7437dbc919ca8fcf",
+  "prompts": {
+    "a82ca6825fdb70e0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019cdcec-6402-77e1-94d8-11d0169311d9",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 6,
+      "accepted_lines": 7,
+      "overriden_lines": 0
+    }
+  }
+}
