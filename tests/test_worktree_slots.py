@@ -187,6 +187,36 @@ class WorktreeSlotHelpersTest(unittest.TestCase):
 
             self.assertEqual(calls, [(str(target), "opencode/chore/59-worktree-slot-manager")])
 
+    def test_is_parked_entry_accepts_detached_commit_already_merged_into_base_ref(self) -> None:
+        ctx = self.make_ctx("/tmp/repo-parked-ancestor")
+        original_run = worktree_slots.run
+        original_base_ref_oid = worktree_slots.base_ref_oid
+        original_base_ref = worktree_slots.base_ref
+
+        def fake_run(*args, **kwargs):
+            self.assertEqual(args[:4], ("git", "merge-base", "--is-ancestor", "old-main-sha"))
+            self.assertEqual(args[4], "origin/main")
+            return subprocess.CompletedProcess(args, 0, "", "")
+
+        try:
+            worktree_slots.run = fake_run
+            worktree_slots.base_ref_oid = lambda _ctx: "new-main-sha"
+            worktree_slots.base_ref = lambda _ctx: "origin/main"
+
+            self.assertTrue(
+                worktree_slots.is_parked_entry(
+                    ctx,
+                    {
+                        "HEAD": "old-main-sha",
+                        "detached": "true",
+                    },
+                )
+            )
+        finally:
+            worktree_slots.run = original_run
+            worktree_slots.base_ref_oid = original_base_ref_oid
+            worktree_slots.base_ref = original_base_ref
+
     def test_clear_worktree_list_cache_invalidates_cached_entries(self) -> None:
         original_git = worktree_slots.git
         calls = []

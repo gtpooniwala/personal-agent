@@ -148,6 +148,7 @@ function rewriteLocationHeader(value, apiBaseUrl) {
   } else if (
     resolvedUrl.pathname === "/chat" ||
     resolvedUrl.pathname.startsWith("/chat/") ||
+    resolvedUrl.pathname === "/runs" ||
     resolvedUrl.pathname.startsWith("/runs/")
   ) {
     proxyPath = `/api/agent${resolvedUrl.pathname}`;

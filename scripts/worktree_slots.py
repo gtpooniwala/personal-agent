@@ -447,10 +447,29 @@ def base_ref_oid(ctx: RepoContext) -> str:
     return git("rev-parse", base_ref(ctx), cwd=ctx.shared_root)
 
 
+def commit_reachable_from_base_ref(ctx: RepoContext, commit_oid: str | None) -> bool:
+    if not commit_oid:
+        return False
+    if commit_oid == base_ref_oid(ctx):
+        return True
+    return (
+        run(
+            "git",
+            "merge-base",
+            "--is-ancestor",
+            commit_oid,
+            base_ref(ctx),
+            cwd=ctx.shared_root,
+            check=False,
+        ).returncode
+        == 0
+    )
+
+
 def is_parked_entry(ctx: RepoContext, entry: dict[str, str] | None) -> bool:
     if not entry or entry.get("detached") != "true":
         return False
-    return entry.get("HEAD") == base_ref_oid(ctx)
+    return commit_reachable_from_base_ref(ctx, entry.get("HEAD"))
 
 
 def git_status_dirty(path: Path) -> bool:
