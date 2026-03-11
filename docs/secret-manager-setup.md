@@ -44,6 +44,10 @@ The table below is the single source of truth for secret names. Issue #85 refere
 | `personal-agent-gemini-api-key` | `GEMINI_API_KEY` | Yes | Primary LLM provider |
 | `personal-agent-openai-api-key` | `OPENAI_API_KEY` | No | Fallback LLM provider |
 | `personal-agent-database-url` | `DATABASE_URL` | Yes | Created in #80; skip creation here |
+| `personal-agent-google-oauth-client-id` | `GOOGLE_OAUTH_CLIENT_ID` | Yes for Gmail | Google OAuth web client ID |
+| `personal-agent-google-oauth-client-secret` | `GOOGLE_OAUTH_CLIENT_SECRET` | Yes for Gmail | Google OAuth web client secret |
+| `personal-agent-google-oauth-redirect-uri` | `GOOGLE_OAUTH_REDIRECT_URI` | Yes for Gmail | Cloud Run callback URL, e.g. `https://<run-app>/api/v1/gmail/callback` |
+| `personal-agent-credentials-master-key` | `CREDENTIALS_MASTER_KEY` | Yes for Gmail | Fernet key used to encrypt per-user integration credentials in Postgres |
 | `personal-agent-langfuse-public-key` | `LANGFUSE_PUBLIC_KEY` | No | Observability (Langfuse) |
 | `personal-agent-langfuse-secret-key` | `LANGFUSE_SECRET_KEY` | No | Observability (Langfuse) |
 | `personal-agent-todoist-api-token` | `TODOIST_API_TOKEN` | No | Todoist task integration (not implemented yet; backend does not read this secret) |
@@ -73,6 +77,32 @@ echo -n "${AGENT_API_KEY_VALUE}" | gcloud secrets create personal-agent-agent-ap
 
 ```bash
 echo -n "your-gemini-api-key" | gcloud secrets create personal-agent-gemini-api-key \
+  --project="${PROJECT_ID}" \
+  --replication-policy=automatic \
+  --data-file=-
+```
+
+### Gmail / Google OAuth secrets
+
+```bash
+echo -n "your-google-oauth-client-id" | gcloud secrets create personal-agent-google-oauth-client-id \
+  --project="${PROJECT_ID}" \
+  --replication-policy=automatic \
+  --data-file=-
+
+echo -n "your-google-oauth-client-secret" | gcloud secrets create personal-agent-google-oauth-client-secret \
+  --project="${PROJECT_ID}" \
+  --replication-policy=automatic \
+  --data-file=-
+
+echo -n "https://<cloud-run-service>/api/v1/gmail/callback" | gcloud secrets create personal-agent-google-oauth-redirect-uri \
+  --project="${PROJECT_ID}" \
+  --replication-policy=automatic \
+  --data-file=-
+
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Save the printed value, then:
+echo -n "your-credentials-master-key" | gcloud secrets create personal-agent-credentials-master-key \
   --project="${PROJECT_ID}" \
   --replication-policy=automatic \
   --data-file=-
@@ -126,7 +156,11 @@ Run this for every secret that the Cloud Run backend will mount. Required secret
 for SECRET in \
   personal-agent-agent-api-key \
   personal-agent-gemini-api-key \
-  personal-agent-database-url; do
+  personal-agent-database-url \
+  personal-agent-google-oauth-client-id \
+  personal-agent-google-oauth-client-secret \
+  personal-agent-google-oauth-redirect-uri \
+  personal-agent-credentials-master-key; do
   gcloud secrets add-iam-policy-binding "${SECRET}" \
     --project="${PROJECT_ID}" \
     --member="serviceAccount:${CR_SA}" \
