@@ -1,0 +1,25 @@
+skills/repo-merge-pr-flow/SKILL.md
+  718742a0ab201440 71-75,84,86
+skills/repo-merge-pr-flow/agents/openai.yaml
+  718742a0ab201440 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "22f31b873ff53e4c04ef7a3e840e8ea69f18e051",
+  "prompts": {
+    "718742a0ab201440": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019cd9f3-572a-76f1-89f5-a6a28cca803f",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 3,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    }
+  }
+}
