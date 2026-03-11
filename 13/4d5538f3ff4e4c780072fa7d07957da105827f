@@ -1,0 +1,45 @@
+tests/test_trigger_dispatcher.py
+  2295c730334404c1 1-184
+backend/database/operations.py
+  2295c730334404c1 7,14,920-1111
+backend/api/models.py
+  2295c730334404c1 170-213
+backend/api/state.py
+  2295c730334404c1 8,24
+docs/FEATURES_OVERVIEW.md
+  2295c730334404c1 36,43-44,47-50
+docs/ROADMAP.md
+  2295c730334404c1 3,93,108,166
+docs/EVENT_TRIGGERS.md
+  2295c730334404c1 3,94-146
+backend/main.py
+  2295c730334404c1 20,222
+docs/WORKBOARD.md
+  2295c730334404c1 3,24,85
+backend/runtime/trigger_dispatcher.py
+  2295c730334404c1 1-191
+backend/database/models.py
+  2295c730334404c1 19-20,240-286
+backend/api/trigger_routes.py
+  2295c730334404c1 1-196
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "134d5538f3ff4e4c780072fa7d07957da105827f",
+  "prompts": {
+    "2295c730334404c1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "df022ed0-c0c1-4c79-89df-9f89ff07cffb",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 930,
+      "total_deletions": 10,
+      "accepted_lines": 930,
+      "overriden_lines": 0
+    }
+  }
+}
