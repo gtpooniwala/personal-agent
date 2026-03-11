@@ -49,8 +49,9 @@ class TestModelFactoryRouting(unittest.TestCase):
 
     @patch.object(provider.settings, "gemini_api_key", None)
     def test_create_chat_model_requires_gemini_key_when_gemini_selected(self):
-        with self.assertRaises(MissingProviderKeyError):
-            create_chat_model("orchestrator", model_override="gemini-3-pro-preview")
+        with patch.object(provider, "_load_gemini_chat_class"):
+            with self.assertRaises(MissingProviderKeyError):
+                create_chat_model("orchestrator", model_override="gemini-3-pro-preview")
 
     @patch.object(provider.settings, "gemini_api_key", "test-gemini-key")
     @patch.object(provider, "_load_gemini_chat_class")
