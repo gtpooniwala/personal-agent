@@ -186,7 +186,7 @@ Cloud Scheduler job provisioning is in scope for #88.
 3. **Bearer token auth middleware** (#83) — FastAPI middleware; generate and store token in Secret Manager
 4. **Backend Cloud Run service** (#85) — Cloud Run YAML/config; env vars from Secret Manager; Cloud SQL Auth Connector socket mount; `min-instances=0`; deploy backend with auth middleware already in the image; record `*.run.app` URL
 5. **Vercel frontend deploy** (#127) — connect repo; set private `API_BASE_URL` + `AGENT_API_KEY`; verify end-to-end through `/api/agent/...`
-6. **Gmail OAuth redirect URIs** (#129) — add `<CLOUD_RUN_URL>/api/v1/gmail/callback` to Google Cloud Console OAuth redirect URIs, and add the Vercel origin under Authorized JavaScript origins only if the OAuth client needs it; test Gmail OAuth flow
+6. **Gmail OAuth redirect URIs** (#129) — add Cloud Run and Vercel URLs to Google Cloud Console OAuth credentials; test Gmail OAuth flow
 7. **CI/CD** (#86) — build and deploy backend on merge to `main`
 8. **Event trigger framework + Cloud Scheduler** (#88) — implement trigger dispatcher; provision Cloud Scheduler jobs for polling endpoints
 9. **GCS document storage** (#79) — when durable document persistence is needed
@@ -198,7 +198,7 @@ Cloud Scheduler job provisioning is in scope for #88.
 
 - **Bearer token** — `AGENT_API_KEY` must be set in both Secret Manager (for Cloud Run) and Vercel env vars before any API calls work end-to-end; without it the backend will reject all requests, and non-local startup should fail immediately
 - **GCS migration is not a blocker** — ephemeral storage is acceptable for the initial deploy; documents will not persist across container restarts until #79 is done
-- **Gmail OAuth redirect URIs** — the backend callback URI must be `<CLOUD_RUN_URL>/api/v1/gmail/callback`; add the Vercel origin under Authorized JavaScript origins only if the chosen OAuth client needs it (#129)
+- **Gmail OAuth redirect URIs** — must be updated in Google Cloud Console to include Cloud Run and Vercel URLs before Gmail polling works in production (#129)
 - **Cloud SQL connectivity** — the current production path uses the Cloud SQL Auth Connector socket mount from Cloud Run; no VPC connector is required by the runbooks
 - **Cloud Scheduler jobs** — required for email polling and scheduled task triggers when running at `min-instances=0` (scale to zero); provisioned in #88
 - **Custom domain DNS** — if attaching an owned domain later, update DNS records after Cloud Run domain mapping or Vercel domain config
