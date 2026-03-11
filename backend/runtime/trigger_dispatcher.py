@@ -4,6 +4,8 @@ import logging
 import uuid
 from typing import Any, Dict, Optional
 
+from sqlalchemy.exc import IntegrityError
+
 logger = logging.getLogger(__name__)
 
 
@@ -161,6 +163,19 @@ class TriggerDispatcher:
                         external_event_id=external_event_id,
                         dispatched=False,
                     )
+                except IntegrityError:
+                    # Duplicate-key collision in the race window — another worker
+                    # created this row between our post-lease re-check and now.
+                    # Log at warning (no stack trace needed; this is expected).
+                    logger.warning(
+                        "Trigger event row already exists — concurrent insert race",
+                        extra={
+                            "event": "trigger.dispatch.event_create_duplicate",
+                            "trigger_id": trigger_id,
+                            "external_event_id": external_event_id,
+                        },
+                    )
+                    return None
                 except Exception:
                     logger.exception(
                         "Failed to create trigger event row",

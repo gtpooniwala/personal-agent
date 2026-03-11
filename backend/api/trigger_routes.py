@@ -179,9 +179,11 @@ def get_trigger(trigger_id: str):
 @trigger_router.patch("/{trigger_id}", response_model=ExternalTriggerResponse)
 def update_trigger(trigger_id: str, body: ExternalTriggerUpdate):
     """Enable/disable or update a trigger."""
-    updates = body.model_dump(exclude_none=True)
+    # exclude_unset=True (not exclude_none=True) so clients can explicitly send
+    # config=null to clear the field; exclude_none would silently drop it.
+    updates = body.model_dump(exclude_unset=True)
     if "config" in updates:
-        updates["config"] = json.dumps(updates["config"])
+        updates["config"] = json.dumps(updates["config"]) if updates["config"] is not None else None
     if not updates:
         trigger = db_ops.get_external_trigger(trigger_id)
         if not trigger:
