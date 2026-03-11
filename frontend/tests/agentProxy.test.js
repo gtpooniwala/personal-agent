@@ -269,4 +269,86 @@ describe('agent proxy helpers', () => {
     expect(response.headers.get('www-authenticate')).toBe('Bearer');
     await expect(response.json()).resolves.toEqual({ detail: 'Unauthorized' });
   });
+
+  test('returns a stable 502 when the backend cannot be reached', async () => {
+    const fetchImpl = jest.fn().mockRejectedValue(new Error('connect ECONNREFUSED'));
+
+    const response = await proxyAgentRequest(
+      new Request('http://localhost:3000/api/agent/chat', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ message: 'hello' }),
+      }),
+      ['chat'],
+      {
+        env: {
+          API_BASE_URL: 'http://127.0.0.1:8000',
+          AGENT_API_KEY: 'server-token',
+        },
+        fetchImpl,
+      },
+    );
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      detail: 'Agent proxy could not reach the backend service.',
+    });
+  });
+
+  test('returns a stable 504 when upstream aborts before the client signal is aborted', async () => {
+    const abortError = new Error('timed out');
+    abortError.name = 'AbortError';
+    const fetchImpl = jest.fn().mockRejectedValue(abortError);
+
+    const response = await proxyAgentRequest(
+      new Request('http://localhost:3000/api/agent/chat', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ message: 'hello' }),
+      }),
+      ['chat'],
+      {
+        env: {
+          API_BASE_URL: 'http://127.0.0.1:8000',
+          AGENT_API_KEY: 'server-token',
+        },
+        fetchImpl,
+      },
+    );
+
+    expect(response.status).toBe(504);
+    await expect(response.json()).resolves.toEqual({
+      detail: 'Agent proxy upstream request timed out.',
+    });
+  });
+
+  test('returns a stable 499 when the client request has already been aborted', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const abortError = new Error('aborted');
+    abortError.name = 'AbortError';
+    const fetchImpl = jest.fn().mockRejectedValue(abortError);
+
+    const response = await proxyAgentRequest(
+      new Request('http://localhost:3000/api/agent/chat', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ message: 'hello' }),
+        signal: controller.signal,
+      }),
+      ['chat'],
+      {
+        env: {
+          API_BASE_URL: 'http://127.0.0.1:8000',
+          AGENT_API_KEY: 'server-token',
+        },
+        fetchImpl,
+      },
+    );
+
+    expect(response.status).toBe(499);
+    await expect(response.json()).resolves.toEqual({
+      detail: 'Agent proxy request was cancelled.',
+    });
+  });
 });

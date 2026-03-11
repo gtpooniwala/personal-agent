@@ -185,6 +185,10 @@ function buildBackendUrl(apiBaseUrl, backendPath, requestUrl) {
   return url;
 }
 
+function isAbortError(error) {
+  return error instanceof Error && error.name === "AbortError";
+}
+
 export async function proxyAgentRequest(request, path, { env = process.env, fetchImpl = fetch } = {}) {
   const config = proxyConfig(env);
   if (config.error) {
@@ -203,14 +207,26 @@ export async function proxyAgentRequest(request, path, { env = process.env, fetc
   const targetUrl = buildBackendUrl(config.apiBaseUrl, backendPath, request.url);
   const { body, dropContentType } = await readRequestBody(request);
   const headers = buildUpstreamHeaders(request.headers, config.agentApiKey, { dropContentType });
-  const upstreamResponse = await fetchImpl(targetUrl, {
-    method: request.method,
-    headers,
-    body,
-    cache: "no-store",
-    redirect: "manual",
-    signal: request.signal,
-  });
+  let upstreamResponse;
+  try {
+    upstreamResponse = await fetchImpl(targetUrl, {
+      method: request.method,
+      headers,
+      body,
+      cache: "no-store",
+      redirect: "manual",
+      signal: request.signal,
+    });
+  } catch (error) {
+    if (isAbortError(error)) {
+      if (request.signal.aborted) {
+        return Response.json({ detail: "Agent proxy request was cancelled." }, { status: 499 });
+      }
+      return Response.json({ detail: "Agent proxy upstream request timed out." }, { status: 504 });
+    }
+
+    return Response.json({ detail: "Agent proxy could not reach the backend service." }, { status: 502 });
+  }
 
   return new Response(upstreamResponse.body, {
     status: upstreamResponse.status,
@@ -225,6 +241,7 @@ export const __testOnly__ = {
   buildResponseHeaders,
   buildUpstreamHeaders,
   hasUnsafePathSegments,
+  isAbortError,
   normalizePathSegments,
   proxyConfig,
   readRequestBody,
