@@ -25,4 +25,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD python -c "import os, urllib.request; port = os.environ.get('PORT', '8000').strip(); token = os.environ.get('AGENT_API_KEY', '').strip(); request = urllib.request.Request(f'http://127.0.0.1:{port}/api/v1/health', headers={'Authorization': f'Bearer {token}'} if token else {}); urllib.request.urlopen(request, timeout=5)" || exit 1
 
-CMD ["sh", "-lc", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-lc", "exec uvicorn backend.main:app --host 0.0.0.0 --port ${PORT}"]

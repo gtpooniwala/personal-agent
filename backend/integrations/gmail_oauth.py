@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from importlib.util import find_spec
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlsplit, urlunsplit
 
 from backend.config import settings
 from backend.database.operations import db_ops
@@ -23,6 +24,10 @@ class GmailOAuthConfigurationError(RuntimeError):
 
 class InvalidGmailOAuthStateError(ValueError):
     """Raised when the OAuth callback state is missing, invalid, or expired."""
+
+
+class InvalidRedirectTargetError(ValueError):
+    """Raised when a post-auth redirect target is unsafe."""
 
 
 def _gmail_dependencies_installed() -> bool:
@@ -106,6 +111,38 @@ def _build_flow(*, state: Optional[str] = None):
     return flow
 
 
+def _allowed_return_to_origins() -> List[str]:
+    origins: List[str] = []
+    for candidate in [settings.frontend_url, *(settings.allowed_origins or "").split(",")]:
+        if not candidate:
+            continue
+        parsed = urlsplit(candidate.strip())
+        if parsed.scheme in {"http", "https"} and parsed.netloc:
+            origins.append(f"{parsed.scheme}://{parsed.netloc}")
+    return list(dict.fromkeys(origins))
+
+
+def sanitize_return_to(return_to: Optional[str]) -> Optional[str]:
+    if return_to is None:
+        return None
+
+    value = return_to.strip()
+    if not value:
+        return None
+
+    parsed = urlsplit(value)
+    if not parsed.scheme and not parsed.netloc:
+        if not value.startswith("/"):
+            raise InvalidRedirectTargetError("return_to must be a relative path or an allowed frontend URL.")
+        return urlunsplit(("", "", parsed.path or "/", parsed.query, parsed.fragment))
+
+    origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else ""
+    if parsed.scheme not in {"http", "https"} or origin not in _allowed_return_to_origins():
+        raise InvalidRedirectTargetError("return_to must target the configured frontend origin.")
+
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path or "/", parsed.query, parsed.fragment))
+
+
 def create_connect_url(*, user_id: str, return_to: Optional[str]) -> str:
     ready, reasons = gmail_oauth_ready()
     if not ready:
@@ -113,11 +150,12 @@ def create_connect_url(*, user_id: str, return_to: Optional[str]) -> str:
             f"Gmail OAuth is not configured for this app yet ({', '.join(reasons)})."
         )
 
+    sanitized_return_to = sanitize_return_to(return_to)
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
     state = db_ops.create_integration_oauth_state(
         user_id=user_id,
         provider=GMAIL_PROVIDER,
-        return_to=return_to,
+        return_to=sanitized_return_to,
         expires_at=expires_at,
     )
     flow = _build_flow(state=state)
@@ -187,7 +225,7 @@ def exchange_callback(*, state: str, code: str) -> Dict[str, Any]:
 
     return {
         "user_id": state_payload["user_id"],
-        "return_to": state_payload.get("return_to"),
+        "return_to": sanitize_return_to(state_payload.get("return_to")),
         "account_label": account_label,
     }
 

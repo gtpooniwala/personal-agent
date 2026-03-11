@@ -26,6 +26,7 @@ from backend.integrations.gmail_oauth import (
     GMAIL_PROVIDER,
     GmailOAuthConfigurationError,
     InvalidGmailOAuthStateError,
+    InvalidRedirectTargetError,
     create_connect_url,
     exchange_callback,
     get_connection_status,
@@ -193,8 +194,10 @@ async def gmail_connect(return_to: str | None = Query(default=None)):
             MissingCredentialDependencyError,
             MissingCredentialEncryptionKeyError,
             GmailOAuthConfigurationError,
+            InvalidRedirectTargetError,
         ) as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
+            status = 400 if isinstance(exc, InvalidRedirectTargetError) else 503
+            raise HTTPException(status_code=status, detail=str(exc)) from exc
         except Exception as exc:
             logger.error("Error starting Gmail connect flow: %s", exc)
             raise HTTPException(status_code=500, detail="Failed to start Gmail connect flow") from exc
@@ -222,7 +225,7 @@ async def gmail_callback(state: str, code: str):
                 url=f"{base_redirect}{separator}gmail=connected",
                 status_code=307,
             )
-        except InvalidGmailOAuthStateError as exc:
+        except (InvalidGmailOAuthStateError, InvalidRedirectTargetError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except (MissingCredentialDependencyError, MissingCredentialEncryptionKeyError) as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc

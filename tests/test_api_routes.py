@@ -22,6 +22,7 @@ try:
     from backend.integrations.gmail_oauth import (
         GmailOAuthConfigurationError,
         InvalidGmailOAuthStateError,
+        InvalidRedirectTargetError,
     )
 except Exception as exc:
     API_TESTS_AVAILABLE = False
@@ -158,6 +159,15 @@ class TestAPIRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json(), {"detail": "oauth not configured"})
 
+    @patch(
+        "backend.api.routes.create_connect_url",
+        side_effect=InvalidRedirectTargetError("return_to must target the configured frontend origin."),
+    )
+    def test_gmail_connect_endpoint_rejects_unsafe_return_to(self, _mock_create_connect_url):
+        response = self.client.get("/api/v1/gmail/connect?return_to=https://evil.example.com", follow_redirects=False)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"detail": "return_to must target the configured frontend origin."})
+
     @patch("backend.api.routes.orchestrator.tool_registry.refresh_runtime_capabilities")
     @patch("backend.api.routes.exchange_callback")
     def test_gmail_callback_redirects_back_to_frontend(
@@ -189,6 +199,18 @@ class TestAPIRoutes(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), {"detail": "Invalid or expired Gmail OAuth state."})
+
+    @patch(
+        "backend.api.routes.exchange_callback",
+        side_effect=InvalidRedirectTargetError("return_to must target the configured frontend origin."),
+    )
+    def test_gmail_callback_rejects_unsafe_persisted_return_to(self, _mock_exchange_callback):
+        response = self.client.get(
+            "/api/v1/gmail/callback?state=test-state&code=test-code",
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"detail": "return_to must target the configured frontend origin."})
 
     @patch("backend.api.runtime_routes.runtime_service.submit_run", new_callable=AsyncMock)
     def test_runtime_chat_submit_endpoint_requires_bearer_token(self, mock_submit_run):
