@@ -1,0 +1,23 @@
+backend/api/trigger_routes.py
+  2295c730334404c1 127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "540a08d044a68ec68c8d4612fae00978f2cda4bc",
+  "prompts": {
+    "2295c730334404c1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "df022ed0-c0c1-4c79-89df-9f89ff07cffb",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

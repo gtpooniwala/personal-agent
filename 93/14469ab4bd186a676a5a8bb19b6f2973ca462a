@@ -1,0 +1,23 @@
+backend/runtime/trigger_dispatcher.py
+  2295c730334404c1 72-76,228-236
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "9314469ab4bd186a676a5a8bb19b6f2973ca462a",
+  "prompts": {
+    "2295c730334404c1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "df022ed0-c0c1-4c79-89df-9f89ff07cffb",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 16,
+      "total_deletions": 4,
+      "accepted_lines": 14,
+      "overriden_lines": 0
+    }
+  }
+}

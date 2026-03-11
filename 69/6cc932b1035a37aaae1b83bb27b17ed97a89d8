@@ -1,0 +1,33 @@
+backend/api/trigger_routes.py
+  2295c730334404c1 5,30-38,62,89,94-95,113-114,119-120,163,167,194-195
+docs/ROADMAP.md
+  2295c730334404c1 93,101
+backend/api/models.py
+  2295c730334404c1 2,173,184,194
+docs/WORKBOARD.md
+  2295c730334404c1 85
+backend/runtime/trigger_dispatcher.py
+  2295c730334404c1 76-78,81-87,93-94,96-97,127-130
+tests/test_trigger_dispatcher.py
+  2295c730334404c1 181-203
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "696cc932b1035a37aaae1b83bb27b17ed97a89d8",
+  "prompts": {
+    "2295c730334404c1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "df022ed0-c0c1-4c79-89df-9f89ff07cffb",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 92,
+      "total_deletions": 37,
+      "accepted_lines": 70,
+      "overriden_lines": 0
+    }
+  }
+}
