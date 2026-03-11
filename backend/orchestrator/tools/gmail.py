@@ -143,7 +143,7 @@ class GmailReadTool(BaseTool):
         except Exception as exc:
             return f"Failed to build Gmail service: {exc}."
 
-        effective_label_ids = label_ids or ["INBOX"]
+        effective_label_ids = ["INBOX"] if label_ids is None else label_ids
 
         try:
             results = (
@@ -207,9 +207,10 @@ class GmailReadTool(BaseTool):
             extra={
                 "event": "gmail.tool.executed",
                 "user_id": self._user_id,
-                "query": query or "",
                 "max_results": max_results,
-                "label_ids": effective_label_ids,
+                "query_present": bool(query),
+                "query_length": len(query) if query else 0,
+                "label_ids_count": len(effective_label_ids),
             },
         )
         return "\n".join(output)

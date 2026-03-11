@@ -34,6 +34,14 @@ class TestExtractText(unittest.TestCase):
         response = _FakeResponse("plain text")
         self.assertEqual(extract_text(response), "plain text")
 
+    def test_extract_text_stringifies_non_serializable_blocks(self):
+        class _Block:
+            def __str__(self):
+                return "non-serializable-block"
+
+        response = _FakeResponse([_Block()])
+        self.assertEqual(extract_text(response), '["non-serializable-block"]')
+
 
 class TestModelFactoryRouting(unittest.TestCase):
     @patch.object(provider.settings, "openai_api_key", "test-openai-key")

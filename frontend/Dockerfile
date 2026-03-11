@@ -10,7 +10,7 @@ COPY . .
 ENV NODE_ENV=development
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
-CMD ["sh", "-lc", "npm run dev -- --hostname 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-lc", "exec npm run dev -- --hostname 0.0.0.0 --port \"${PORT}\""]
 
 FROM node:20-alpine AS builder
 WORKDIR /app

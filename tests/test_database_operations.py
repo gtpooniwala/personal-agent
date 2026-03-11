@@ -353,6 +353,97 @@ class TestDatabaseOperations(unittest.TestCase):
         self.assertIsNotNone(stolen)
         self.assertEqual(stolen["owner_id"], "worker-b")
 
+    def test_integration_credential_round_trip_update_and_delete(self):
+        record = self.db_ops.upsert_integration_credential(
+            user_id=self.test_user_id,
+            provider="gmail",
+            credential_kind="oauth_token",
+            ciphertext="ciphertext-v1",
+            account_label="user@example.com",
+            scopes=["scope:a"],
+            status="connected",
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        )
+
+        self.assertEqual(record["user_id"], self.test_user_id)
+        self.assertEqual(record["provider"], "gmail")
+        self.assertEqual(record["credential_kind"], "oauth_token")
+        self.assertEqual(record["scopes"], ["scope:a"])
+
+        fetched = self.db_ops.get_integration_credential(
+            user_id=self.test_user_id,
+            provider="gmail",
+            credential_kind="oauth_token",
+        )
+        self.assertEqual(fetched["ciphertext"], "ciphertext-v1")
+        self.assertEqual(fetched["account_label"], "user@example.com")
+
+        updated = self.db_ops.upsert_integration_credential(
+            user_id=self.test_user_id,
+            provider="gmail",
+            credential_kind="oauth_token",
+            ciphertext="ciphertext-v2",
+            account_label="updated@example.com",
+            scopes=["scope:a", "scope:b"],
+            status="expired",
+            expires_at=None,
+            key_version="v2",
+        )
+        self.assertEqual(updated["ciphertext"], "ciphertext-v2")
+        self.assertEqual(updated["account_label"], "updated@example.com")
+        self.assertEqual(updated["scopes"], ["scope:a", "scope:b"])
+        self.assertEqual(updated["status"], "expired")
+        self.assertEqual(updated["key_version"], "v2")
+
+        self.assertTrue(
+            self.db_ops.delete_integration_credential(
+                user_id=self.test_user_id,
+                provider="gmail",
+                credential_kind="oauth_token",
+            )
+        )
+        self.assertIsNone(
+            self.db_ops.get_integration_credential(
+                user_id=self.test_user_id,
+                provider="gmail",
+                credential_kind="oauth_token",
+            )
+        )
+
+    def test_integration_oauth_state_consumes_once_and_rejects_expired_state(self):
+        valid_state = self.db_ops.create_integration_oauth_state(
+            user_id=self.test_user_id,
+            provider="gmail",
+            return_to="/settings",
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+        )
+
+        payload = self.db_ops.consume_integration_oauth_state(
+            state=valid_state,
+            provider="gmail",
+        )
+        self.assertEqual(payload["user_id"], self.test_user_id)
+        self.assertEqual(payload["return_to"], "/settings")
+        self.assertIsNone(
+            self.db_ops.consume_integration_oauth_state(
+                state=valid_state,
+                provider="gmail",
+            )
+        )
+
+        expired_state = self.db_ops.create_integration_oauth_state(
+            user_id=self.test_user_id,
+            provider="gmail",
+            return_to="/expired",
+            expires_at=datetime.now(timezone.utc) - timedelta(minutes=1),
+        )
+        self.assertIsNone(
+            self.db_ops.consume_integration_oauth_state(
+                state=expired_state,
+                provider="gmail",
+            )
+        )
+
 
 class TestLazyDatabaseOperations(unittest.TestCase):
     def test_getattr_raises_attribute_error_for_unknown_names(self):

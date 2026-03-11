@@ -46,7 +46,7 @@ The table below is the single source of truth for secret names. Issue #85 refere
 | `personal-agent-database-url` | `DATABASE_URL` | Yes | Created in #80; skip creation here |
 | `personal-agent-google-oauth-client-id` | `GOOGLE_OAUTH_CLIENT_ID` | Yes for Gmail | Google OAuth web client ID |
 | `personal-agent-google-oauth-client-secret` | `GOOGLE_OAUTH_CLIENT_SECRET` | Yes for Gmail | Google OAuth web client secret |
-| `personal-agent-google-oauth-redirect-uri` | `GOOGLE_OAUTH_REDIRECT_URI` | Yes for Gmail | Cloud Run callback URL, e.g. `https://<run-app>/api/v1/gmail/callback` |
+| `personal-agent-google-oauth-redirect-uri` | `GOOGLE_OAUTH_REDIRECT_URI` | Yes for Gmail | Production should use the frontend proxy callback, e.g. `https://<vercel-app>/api/agent/gmail/callback` |
 | `personal-agent-credentials-master-key` | `CREDENTIALS_MASTER_KEY` | Yes for Gmail | Fernet key used to encrypt per-user integration credentials in Postgres |
 | `personal-agent-langfuse-public-key` | `LANGFUSE_PUBLIC_KEY` | No | Observability (Langfuse) |
 | `personal-agent-langfuse-secret-key` | `LANGFUSE_SECRET_KEY` | No | Observability (Langfuse) |
@@ -95,7 +95,7 @@ echo -n "your-google-oauth-client-secret" | gcloud secrets create personal-agent
   --replication-policy=automatic \
   --data-file=-
 
-echo -n "https://<cloud-run-service>/api/v1/gmail/callback" | gcloud secrets create personal-agent-google-oauth-redirect-uri \
+echo -n "https://<vercel-app>/api/agent/gmail/callback" | gcloud secrets create personal-agent-google-oauth-redirect-uri \
   --project="${PROJECT_ID}" \
   --replication-policy=automatic \
   --data-file=-
@@ -150,17 +150,13 @@ echo -n "your-todoist-api-token" | gcloud secrets create personal-agent-todoist-
 
 ## 6. Grant Cloud Run service account access
 
-Run this for every secret that the Cloud Run backend will mount. Required secrets first, then optional ones as needed.
+Run this for the required secrets that every Cloud Run backend revision mounts.
 
 ```bash
 for SECRET in \
   personal-agent-agent-api-key \
   personal-agent-gemini-api-key \
-  personal-agent-database-url \
-  personal-agent-google-oauth-client-id \
-  personal-agent-google-oauth-client-secret \
-  personal-agent-google-oauth-redirect-uri \
-  personal-agent-credentials-master-key; do
+  personal-agent-database-url; do
   gcloud secrets add-iam-policy-binding "${SECRET}" \
     --project="${PROJECT_ID}" \
     --member="serviceAccount:${CR_SA}" \
@@ -176,6 +172,21 @@ gcloud secrets add-iam-policy-binding personal-agent-openai-api-key \
   --project="${PROJECT_ID}" \
   --member="serviceAccount:${CR_SA}" \
   --role="roles/secretmanager.secretAccessor"
+```
+
+If you are enabling Gmail, grant access to the Gmail-specific secrets too:
+
+```bash
+for SECRET in \
+  personal-agent-google-oauth-client-id \
+  personal-agent-google-oauth-client-secret \
+  personal-agent-google-oauth-redirect-uri \
+  personal-agent-credentials-master-key; do
+  gcloud secrets add-iam-policy-binding "${SECRET}" \
+    --project="${PROJECT_ID}" \
+    --member="serviceAccount:${CR_SA}" \
+    --role="roles/secretmanager.secretAccessor"
+done
 ```
 
 ---

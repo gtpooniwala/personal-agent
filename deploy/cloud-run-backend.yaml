@@ -83,26 +83,7 @@ spec:
                 secretKeyRef:
                   name: personal-agent-database-url
                   key: latest
-            - name: GOOGLE_OAUTH_CLIENT_ID
-              valueFrom:
-                secretKeyRef:
-                  name: personal-agent-google-oauth-client-id
-                  key: latest
-            - name: GOOGLE_OAUTH_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: personal-agent-google-oauth-client-secret
-                  key: latest
-            - name: GOOGLE_OAUTH_REDIRECT_URI
-              valueFrom:
-                secretKeyRef:
-                  name: personal-agent-google-oauth-redirect-uri
-                  key: latest
-            - name: CREDENTIALS_MASTER_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: personal-agent-credentials-master-key
-                  key: latest
+${GMAIL_SECRET_ENV_BLOCK}
             # Optional: uncomment when the secret exists in Secret Manager.
             # - name: OPENAI_API_KEY
             #   valueFrom:

@@ -167,11 +167,12 @@ class ToolRegistry:
     
     def get_tool_info(self) -> List[Dict[str, str]]:
         """Get information about all registered tools."""
+        active_tool_names = {tool.name for tool in self.get_available_tools()}
         return [
             {
                 "name": name,
                 "description": getattr(tool, 'description', 'No description available'),
-                "active": name in [t.name for t in self.get_available_tools()]
+                "active": name in active_tool_names,
             }
-            for name, tool in self._tools.items()
+            for name, tool in list(self._tools.items())
         ]

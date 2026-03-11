@@ -98,6 +98,86 @@ class TestGmailToolErrors(unittest.TestCase):
             result = self.tool._run(query="test")
         self.assertIn("Gmail API error during message search", result)
 
+    def test_run_keeps_explicit_empty_label_filter(self):
+        mock_creds = MagicMock()
+        mock_creds.valid = True
+
+        mock_messages = MagicMock()
+        mock_messages.list.return_value.execute.return_value = {"messages": []}
+        mock_service = MagicMock()
+        mock_service.users.return_value.messages.return_value = mock_messages
+
+        modules = {
+            "google.auth.transport.requests": MagicMock(Request=MagicMock()),
+            "google.auth.exceptions": MagicMock(RefreshError=Exception),
+            "googleapiclient.discovery": MagicMock(build=MagicMock(return_value=mock_service)),
+            "googleapiclient.errors": MagicMock(HttpError=Exception),
+        }
+
+        with (
+            patch.dict(sys.modules, modules),
+            patch(
+                "backend.orchestrator.tools.gmail._gmail_dependencies_installed",
+                return_value=True,
+            ),
+            patch(
+                "backend.orchestrator.tools.gmail.get_connection_status",
+                return_value={"ready": True, "connected": True, "account_label": "user@example.com"},
+            ),
+            patch("backend.orchestrator.tools.gmail.load_user_credentials", return_value=mock_creds),
+        ):
+            self.tool._run(query="test", label_ids=[])
+
+        mock_messages.list.assert_called_once_with(
+            userId="me",
+            maxResults=5,
+            labelIds=[],
+            q="test",
+        )
+
+    def test_run_logs_safe_query_metadata_only(self):
+        mock_creds = MagicMock()
+        mock_creds.valid = True
+
+        mock_message = {
+            "payload": {"headers": []},
+            "snippet": "snippet",
+        }
+        mock_messages = MagicMock()
+        mock_messages.list.return_value.execute.return_value = {"messages": [{"id": "abc"}]}
+        mock_messages.get.return_value.execute.return_value = mock_message
+        mock_service = MagicMock()
+        mock_service.users.return_value.messages.return_value = mock_messages
+
+        modules = {
+            "google.auth.transport.requests": MagicMock(Request=MagicMock()),
+            "google.auth.exceptions": MagicMock(RefreshError=Exception),
+            "googleapiclient.discovery": MagicMock(build=MagicMock(return_value=mock_service)),
+            "googleapiclient.errors": MagicMock(HttpError=Exception),
+        }
+
+        with (
+            patch.dict(sys.modules, modules),
+            patch(
+                "backend.orchestrator.tools.gmail._gmail_dependencies_installed",
+                return_value=True,
+            ),
+            patch(
+                "backend.orchestrator.tools.gmail.get_connection_status",
+                return_value={"ready": True, "connected": True, "account_label": "user@example.com"},
+            ),
+            patch("backend.orchestrator.tools.gmail.load_user_credentials", return_value=mock_creds),
+            patch("backend.orchestrator.tools.gmail.logger.info") as mock_logger_info,
+        ):
+            self.tool._run(query="subject:payroll", label_ids=["INBOX", "UNREAD"])
+
+        _, kwargs = mock_logger_info.call_args
+        self.assertEqual(kwargs["extra"]["query_present"], True)
+        self.assertEqual(kwargs["extra"]["query_length"], len("subject:payroll"))
+        self.assertEqual(kwargs["extra"]["label_ids_count"], 2)
+        self.assertNotIn("query", kwargs["extra"])
+        self.assertNotIn("label_ids", kwargs["extra"])
+
 
 if __name__ == "__main__":
     unittest.main()

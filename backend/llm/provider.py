@@ -199,6 +199,12 @@ def create_embeddings_model():
 
 def _extract_text_from_content(content: Any) -> str:
     """Best-effort plain-text extraction from provider-specific content payloads."""
+    def _dump_json_fallback(value: Any) -> str:
+        try:
+            return json.dumps(value, ensure_ascii=False, default=str)
+        except TypeError:
+            return str(value)
+
     if isinstance(content, str):
         return content
     if isinstance(content, list):
@@ -214,12 +220,12 @@ def _extract_text_from_content(content: Any) -> str:
                     continue
         if parts:
             return "\n".join(part.strip() for part in parts if part.strip())
-        return json.dumps(content, ensure_ascii=False)
+        return _dump_json_fallback(content)
     if isinstance(content, dict):
         text = content.get("text")
         if isinstance(text, str):
             return text
-        return json.dumps(content, ensure_ascii=False)
+        return _dump_json_fallback(content)
     return str(content)
 
 

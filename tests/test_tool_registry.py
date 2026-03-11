@@ -135,6 +135,19 @@ class TestToolRegistry(unittest.TestCase):
         self.assertIs(clone.get_tool("response_agent"), registry.get_tool("response_agent"))
         self.assertIsNone(registry.get_tool("search_documents"))
 
+    def test_get_tool_info_uses_runtime_snapshot_without_mutating_mid_iteration(self):
+        registry = self._build_registry(selected_documents=[], gmail_ready=True)
+
+        with patch.object(
+            registry,
+            "get_available_tools",
+            wraps=registry.get_available_tools,
+        ) as mock_get_available_tools:
+            tool_info = registry.get_tool_info()
+
+        self.assertEqual(mock_get_available_tools.call_count, 1)
+        self.assertIn("gmail_read", {item["name"] for item in tool_info})
+
 
 if __name__ == "__main__":
     unittest.main()
