@@ -12,6 +12,28 @@ describe('agent proxy helpers', () => {
     expect(__testOnly__.backendPathForSegments(['scheduler', 'tasks'])).toBeNull();
   });
 
+  test('rejects unsafe dot-segments before building an upstream path', async () => {
+    const fetchImpl = jest.fn();
+
+    const response = await proxyAgentRequest(
+      new Request('http://localhost:3000/api/agent/conversations/../admin', { method: 'GET' }),
+      ['conversations', '..', 'admin'],
+      {
+        env: {
+          API_BASE_URL: 'http://127.0.0.1:8000',
+          AGENT_API_KEY: 'server-token',
+        },
+        fetchImpl,
+      },
+    );
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      detail: 'Unsafe agent proxy route.',
+    });
+  });
+
   test('returns a clear error when API_BASE_URL is missing', async () => {
     const response = await proxyAgentRequest(
       new Request('http://localhost:3000/api/agent/chat', { method: 'POST', body: '{}' }),
@@ -72,6 +94,7 @@ describe('agent proxy helpers', () => {
     expect(options.headers.get('Authorization')).toBe('Bearer server-token');
     expect(options.headers.get('Accept')).toBe('application/json');
     expect(options.body).toBeUndefined();
+    expect(options.signal).toBe(request.signal);
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('application/json');
     expect(response.headers.get('x-request-id')).toBe('req-123');
@@ -148,6 +171,34 @@ describe('agent proxy helpers', () => {
     expect(response.headers.get('cache-control')).toBe('no-cache');
     expect(response.headers.get('connection')).toBeNull();
     await expect(response.text()).resolves.toContain('event: heartbeat');
+  });
+
+  test('passes through redirect targets when using manual redirect mode', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(
+      new Response(null, {
+        status: 307,
+        headers: {
+          location: '/api/v1/oauth/callback',
+        },
+      }),
+    );
+
+    const response = await proxyAgentRequest(
+      new Request('http://localhost:3000/api/agent/conversations', {
+        method: 'GET',
+      }),
+      ['conversations'],
+      {
+        env: {
+          API_BASE_URL: 'http://127.0.0.1:8000',
+          AGENT_API_KEY: 'server-token',
+        },
+        fetchImpl,
+      },
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('/api/v1/oauth/callback');
   });
 
   test('passes through backend failures and auth headers', async () => {

@@ -14,6 +14,7 @@ const BLOCKED_REQUEST_HEADERS = new Set([
 const RESPONSE_HEADER_ALLOWLIST = new Set([
   "cache-control",
   "content-type",
+  "location",
   "vary",
   "www-authenticate",
   "x-request-id",
@@ -33,6 +34,10 @@ function normalizePathSegments(path) {
   }
 
   return path.split("/").filter(Boolean);
+}
+
+function hasUnsafePathSegments(pathSegments) {
+  return pathSegments.some((segment) => segment === "." || segment === "..");
 }
 
 function backendPathForSegments(pathSegments) {
@@ -143,6 +148,9 @@ export async function proxyAgentRequest(request, path, { env = process.env, fetc
   }
 
   const pathSegments = normalizePathSegments(path);
+  if (hasUnsafePathSegments(pathSegments)) {
+    return Response.json({ detail: "Unsafe agent proxy route." }, { status: 400 });
+  }
   const backendPath = backendPathForSegments(pathSegments);
   if (!backendPath) {
     return Response.json({ detail: "Unknown agent proxy route." }, { status: 404 });
@@ -157,6 +165,7 @@ export async function proxyAgentRequest(request, path, { env = process.env, fetc
     body,
     cache: "no-store",
     redirect: "manual",
+    signal: request.signal,
   });
 
   return new Response(upstreamResponse.body, {
@@ -171,6 +180,7 @@ export const __testOnly__ = {
   buildBackendUrl,
   buildResponseHeaders,
   buildUpstreamHeaders,
+  hasUnsafePathSegments,
   normalizePathSegments,
   proxyConfig,
   readRequestBody,
