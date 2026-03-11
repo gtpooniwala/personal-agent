@@ -77,7 +77,7 @@ Use this skill when the user asks to merge a PR or says a branch is ready to lan
 - Only do this after the merge has succeeded.
 - If the checkout passed the managed-slot path check, run:
   - `scripts/release-slot.sh --slot "$slot_id"`
-- If the agent is running in a sandboxed session, run the release command outside the sandbox. The release flow updates shared slot state under `.worktrees/state/`, so sandboxed sessions may fail with a lock-file permission error even when the release logic itself is correct.
+- If the agent is running in a sandboxed session, run the release command outside the sandbox, but still from within a checkout of this repo (either the shared root or that slot's worktree). Do not run `scripts/release-slot.sh` from an arbitrary directory, since it uses `git rev-parse` to discover paths and will fail or act on the wrong repository. The release flow updates shared slot state under `.worktrees/state/`, so sandboxed sessions may fail with a lock-file permission error even when the release logic itself is correct.
 - The managed-slot release step will park the current worktree in detached `HEAD` at the main base commit, which is the correct local cleanup for this workflow.
 - If the checkout is not a managed slot, skip release.
 - For non-slot worktrees such as Codex Desktop, do not try to auto-delete the current local branch while it is checked out. If local cleanup is needed later, first switch or detach that worktree, then delete the branch from a safe checkout.
