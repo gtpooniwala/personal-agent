@@ -1,0 +1,31 @@
+docker-compose.yml
+  a82ca6825fdb70e0 37-40
+backend/orchestrator/prompts.py
+  a82ca6825fdb70e0 77
+docs/features/GMAIL_TOOL.md
+  a82ca6825fdb70e0 34-54,58-60,64-65
+backend/orchestrator/tools/gmail.py
+  a82ca6825fdb70e0 1-2,4-5,8,10-12,14-19,22,28,40-41,44,47-48,50-58,60-63,74-77,79-90,97-104,106-107,109-110,118-119,121-122,125-128,130-134,136-139,143-144,146,154-156,160-163,168,184-187,199,205-214,219-223
+docker-compose.override.yml
+  a82ca6825fdb70e0 13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "0b7824b745b237f01928e56af2d8ecb100393fde",
+  "prompts": {
+    "a82ca6825fdb70e0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019cdcec-6402-77e1-94d8-11d0169311d9",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 164,
+      "total_deletions": 148,
+      "accepted_lines": 150,
+      "overriden_lines": 0
+    }
+  }
+}
