@@ -24,6 +24,8 @@ from backend.integrations.credential_store import (
 from backend.integrations.gmail_oauth import (
     GMAIL_CREDENTIAL_KIND,
     GMAIL_PROVIDER,
+    GmailOAuthConfigurationError,
+    InvalidGmailOAuthStateError,
     create_connect_url,
     exchange_callback,
     get_connection_status,
@@ -159,7 +161,7 @@ async def gmail_connection_status():
     ) as observation:
         try:
             status = get_connection_status(user_id)
-            orchestrator.tool_registry.refresh_runtime_capabilities()
+            orchestrator.tool_registry.refresh_runtime_capabilities(force=True)
             update_observation(
                 observation,
                 output={"connected": status.get("connected", False)},
@@ -187,7 +189,11 @@ async def gmail_connect(return_to: str | None = Query(default=None)):
             authorization_url = create_connect_url(user_id=user_id, return_to=return_to)
             update_observation(observation, output={"redirect": True})
             return RedirectResponse(url=authorization_url, status_code=307)
-        except (MissingCredentialDependencyError, MissingCredentialEncryptionKeyError, ValueError) as exc:
+        except (
+            MissingCredentialDependencyError,
+            MissingCredentialEncryptionKeyError,
+            GmailOAuthConfigurationError,
+        ) as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         except Exception as exc:
             logger.error("Error starting Gmail connect flow: %s", exc)
@@ -205,7 +211,7 @@ async def gmail_callback(state: str, code: str):
     ) as observation:
         try:
             result = exchange_callback(state=state, code=code)
-            orchestrator.tool_registry.refresh_runtime_capabilities()
+            orchestrator.tool_registry.refresh_runtime_capabilities(force=True)
             update_observation(
                 observation,
                 output={"connected": True, "account_label": result.get("account_label")},
@@ -216,7 +222,7 @@ async def gmail_callback(state: str, code: str):
                 url=f"{base_redirect}{separator}gmail=connected",
                 status_code=307,
             )
-        except ValueError as exc:
+        except InvalidGmailOAuthStateError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except (MissingCredentialDependencyError, MissingCredentialEncryptionKeyError) as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -241,7 +247,7 @@ async def gmail_disconnect():
                 provider=GMAIL_PROVIDER,
                 credential_kind=GMAIL_CREDENTIAL_KIND,
             )
-            orchestrator.tool_registry.refresh_runtime_capabilities()
+            orchestrator.tool_registry.refresh_runtime_capabilities(force=True)
             status = get_connection_status(user_id)
             update_observation(observation, output={"connected": False})
             return GmailConnectionStatusResponse(**status)

@@ -19,6 +19,10 @@ try:
     from backend.api import routes, runtime_routes
     import backend.main as main_module
     from backend.main import app, settings as app_settings
+    from backend.integrations.gmail_oauth import (
+        GmailOAuthConfigurationError,
+        InvalidGmailOAuthStateError,
+    )
 except Exception as exc:
     API_TESTS_AVAILABLE = False
     API_IMPORT_ERROR = str(exc)
@@ -130,7 +134,7 @@ class TestAPIRoutes(unittest.TestCase):
         response = self.client.get("/api/v1/gmail/status")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["provider"], "gmail")
-        mock_refresh_capabilities.assert_called_once()
+        mock_refresh_capabilities.assert_called_once_with(force=True)
 
     @patch("backend.api.routes.create_connect_url")
     def test_gmail_connect_endpoint_redirects_to_google(self, mock_create_connect_url):
@@ -144,6 +148,15 @@ class TestAPIRoutes(unittest.TestCase):
             response.headers["location"],
             "https://accounts.google.com/o/oauth2/v2/auth?client_id=test",
         )
+
+    @patch(
+        "backend.api.routes.create_connect_url",
+        side_effect=GmailOAuthConfigurationError("oauth not configured"),
+    )
+    def test_gmail_connect_endpoint_surfaces_configuration_gaps_as_service_unavailable(self, _mock_create_connect_url):
+        response = self.client.get("/api/v1/gmail/connect", follow_redirects=False)
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json(), {"detail": "oauth not configured"})
 
     @patch("backend.api.routes.orchestrator.tool_registry.refresh_runtime_capabilities")
     @patch("backend.api.routes.exchange_callback")
@@ -163,7 +176,19 @@ class TestAPIRoutes(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 307)
         self.assertEqual(response.headers["location"], "http://localhost:3000/settings?gmail=connected")
-        mock_refresh_capabilities.assert_called_once()
+        mock_refresh_capabilities.assert_called_once_with(force=True)
+
+    @patch(
+        "backend.api.routes.exchange_callback",
+        side_effect=InvalidGmailOAuthStateError("Invalid or expired Gmail OAuth state."),
+    )
+    def test_gmail_callback_returns_bad_request_for_invalid_state(self, _mock_exchange_callback):
+        response = self.client.get(
+            "/api/v1/gmail/callback?state=expired-state&code=test-code",
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"detail": "Invalid or expired Gmail OAuth state."})
 
     @patch("backend.api.runtime_routes.runtime_service.submit_run", new_callable=AsyncMock)
     def test_runtime_chat_submit_endpoint_requires_bearer_token(self, mock_submit_run):

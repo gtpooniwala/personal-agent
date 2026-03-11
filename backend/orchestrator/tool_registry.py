@@ -1,4 +1,5 @@
 from typing import Dict, List, Any, Optional
+from time import monotonic
 from backend.config import settings
 from .tools.calculator import CalculatorTool
 from .tools.time import CurrentTimeTool
@@ -27,11 +28,14 @@ class ToolRegistry:
     The registry makes it easy to add new tools - just implement the tool
     and register it here. The orchestrator will automatically discover it.
     """
+
+    GMAIL_CAPABILITY_REFRESH_TTL_SECONDS = 5.0
     
     def __init__(self, user_id: str = "default", selected_documents: Optional[List[str]] = None):
         self.user_id = user_id
         self.selected_documents = list(selected_documents or [])
         self._tools = {}
+        self._last_runtime_capability_refresh_at: Optional[float] = None
         self._initialize_tools()
 
     def _initialize_tools(self):
@@ -70,9 +74,13 @@ class ToolRegistry:
             "Skipping gmail_read tool registration: %s",
             ", ".join(gmail_reasons),
         )
+        self._last_runtime_capability_refresh_at = monotonic()
 
-    def refresh_runtime_capabilities(self) -> None:
+    def refresh_runtime_capabilities(self, *, force: bool = False) -> None:
         """Refresh tools whose availability can change at runtime."""
+        if not force and self._last_runtime_capability_refresh_at is not None:
+            if monotonic() - self._last_runtime_capability_refresh_at < self.GMAIL_CAPABILITY_REFRESH_TTL_SECONDS:
+                return
         self._sync_gmail_tool()
 
     def _set_search_documents_tool(self, selected_documents: Optional[List[str]]) -> None:
@@ -99,6 +107,7 @@ class ToolRegistry:
         clone.user_id = self.user_id
         clone._tools = {name: tool for name, tool in self._tools.items() if name != "search_documents"}
         clone.selected_documents = []
+        clone._last_runtime_capability_refresh_at = self._last_runtime_capability_refresh_at
         clone._set_search_documents_tool(selected_documents)
         return clone
 

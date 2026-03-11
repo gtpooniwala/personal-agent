@@ -42,7 +42,11 @@
               {
                 "must_call": [],
                 "must_not_call": [
-                   "gmail_read"
+                  "gmail_read"
+                ],
+                "response_contains_any": [
+                  "tools",
+                  "assistant tasks"
                 ]
               }
             ]

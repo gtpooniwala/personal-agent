@@ -17,6 +17,14 @@ GMAIL_CREDENTIAL_KIND = "oauth_token"
 GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
 
+class GmailOAuthConfigurationError(RuntimeError):
+    """Raised when app-level Gmail OAuth configuration is incomplete."""
+
+
+class InvalidGmailOAuthStateError(ValueError):
+    """Raised when the OAuth callback state is missing, invalid, or expired."""
+
+
 def _gmail_dependencies_installed() -> bool:
     required_modules = (
         "google.auth.transport.requests",
@@ -101,7 +109,9 @@ def _build_flow(*, state: Optional[str] = None):
 def create_connect_url(*, user_id: str, return_to: Optional[str]) -> str:
     ready, reasons = gmail_oauth_ready()
     if not ready:
-        raise ValueError(f"Gmail OAuth is not configured for this app yet ({', '.join(reasons)}).")
+        raise GmailOAuthConfigurationError(
+            f"Gmail OAuth is not configured for this app yet ({', '.join(reasons)})."
+        )
 
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
     state = db_ops.create_integration_oauth_state(
@@ -153,7 +163,7 @@ def exchange_callback(*, state: str, code: str) -> Dict[str, Any]:
         provider=GMAIL_PROVIDER,
     )
     if state_payload is None:
-        raise ValueError("Invalid or expired Gmail OAuth state.")
+        raise InvalidGmailOAuthStateError("Invalid or expired Gmail OAuth state.")
 
     flow = _build_flow(state=state)
     flow.fetch_token(code=code)

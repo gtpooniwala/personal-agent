@@ -63,8 +63,51 @@ class TestToolRegistry(unittest.TestCase):
 
     def test_get_available_tools_includes_gmail_when_ready(self):
         registry = self._build_registry(selected_documents=[], gmail_ready=True)
-        names = [tool.name for tool in registry.get_available_tools()]
+        with patch(
+            "backend.orchestrator.tool_registry.get_gmail_readiness",
+            return_value=(True, []),
+        ):
+            names = [tool.name for tool in registry.get_available_tools()]
         self.assertIn("gmail_read", names)
+
+    def test_get_available_tools_drops_gmail_when_runtime_refresh_marks_it_unavailable(self):
+        registry = self._build_registry(selected_documents=[], gmail_ready=True)
+        with patch(
+            "backend.orchestrator.tool_registry.get_gmail_readiness",
+            return_value=(False, ["account_not_connected"]),
+        ):
+            registry.refresh_runtime_capabilities(force=True)
+            names = [tool.name for tool in registry.get_available_tools()]
+        self.assertNotIn("gmail_read", names)
+
+    def test_get_available_tools_adds_gmail_when_runtime_refresh_marks_it_available(self):
+        registry = self._build_registry(selected_documents=[], gmail_ready=False)
+        with patch(
+            "backend.orchestrator.tool_registry.get_gmail_readiness",
+            return_value=(True, []),
+        ):
+            registry.refresh_runtime_capabilities(force=True)
+            names = [tool.name for tool in registry.get_available_tools()]
+        self.assertIn("gmail_read", names)
+
+    def test_get_available_tools_reuses_recent_runtime_capability_snapshot(self):
+        with patch("backend.orchestrator.tool_registry.CalculatorTool", return_value=DummyTool("calculator")), \
+             patch("backend.orchestrator.tool_registry.CurrentTimeTool", return_value=DummyTool("current_time")), \
+             patch("backend.orchestrator.tool_registry.ScratchpadTool", return_value=DummyTool("scratchpad")), \
+             patch(
+                 "backend.orchestrator.tool_registry.get_gmail_readiness",
+                 return_value=(False, ["account_not_connected"]),
+             ) as mock_get_gmail_readiness, \
+             patch("backend.orchestrator.tool_registry.GmailReadTool", return_value=DummyTool("gmail_read")), \
+             patch("backend.orchestrator.tool_registry.ResponseAgentTool", return_value=DummyTool("response_agent")), \
+             patch("backend.orchestrator.tool_registry.InternetSearchTool", return_value=DummyTool("internet_search")), \
+             patch("backend.orchestrator.tool_registry.UserProfileTool", return_value=DummyTool("user_profile")), \
+             patch("backend.orchestrator.tool_registry.SummarisationAgent", return_value=DummyTool("summarisation_agent")), \
+             patch("backend.orchestrator.tool_registry.SearchDocumentsTool", return_value=DummyTool("search_documents")):
+            registry = ToolRegistry(selected_documents=[])
+            registry.get_available_tools()
+
+        self.assertEqual(mock_get_gmail_readiness.call_count, 1)
 
     def test_register_and_unregister_tool(self):
         registry = self._build_registry()
