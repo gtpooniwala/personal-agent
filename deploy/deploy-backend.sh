@@ -113,6 +113,7 @@ sed \
 
 GMAIL_SECRET_ENV_BLOCK=""
 ENABLE_GMAIL_INTEGRATION="false"
+GMAIL_SECRET_PLACEHOLDER="            # __GMAIL_SECRET_ENV_BLOCK__  replaced by deploy-backend.sh with Gmail env vars."
 all_gmail_secrets_present=true
 for SECRET in "${GMAIL_SECRET_NAMES[@]}"; do
   if ! SECRET_CHECK_ERR="$(gcloud secrets describe "${SECRET}" --project="${PROJECT_ID}" --format='value(name)' 2>&1)"; then
@@ -168,14 +169,15 @@ path.write_text(
 )
 PY
 
-python3 - "${RENDERED_YAML}" "${GMAIL_SECRET_ENV_BLOCK}" <<'PY'
+python3 - "${RENDERED_YAML}" "${GMAIL_SECRET_PLACEHOLDER}" "${GMAIL_SECRET_ENV_BLOCK}" <<'PY'
 from pathlib import Path
 import sys
 
 path = Path(sys.argv[1])
-replacement = sys.argv[2]
+placeholder = sys.argv[2]
+replacement = sys.argv[3]
 path.write_text(
-    path.read_text().replace("${GMAIL_SECRET_ENV_BLOCK}", replacement),
+    path.read_text().replace(placeholder, replacement),
     encoding="utf-8",
 )
 PY

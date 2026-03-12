@@ -81,7 +81,7 @@ spec:
                 secretKeyRef:
                   name: personal-agent-database-url
                   key: latest
-${GMAIL_SECRET_ENV_BLOCK}
+            # __GMAIL_SECRET_ENV_BLOCK__  replaced by deploy-backend.sh with Gmail env vars.
             # Optional: uncomment when the secret exists in Secret Manager.
             # - name: OPENAI_API_KEY
             #   valueFrom:
