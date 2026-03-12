@@ -8,11 +8,18 @@ on:
       - completed
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   PROJECT_ID: pushstart-481717
   REGION: europe-west2
   SERVICE_NAME: personal-agent-backend
-  IMAGE_NAME: europe-west2-docker.pkg.dev/pushstart-481717/personal-agent/backend
+  IMAGE_NAME: europe-west2-docker.pkg.dev/${{ env.PROJECT_ID }}/personal-agent/backend
 
 jobs:
   deploy:
@@ -39,10 +46,12 @@ jobs:
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
       - name: Build and Push Docker image
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
-          SHA=${{ github.event.workflow_run.head_sha || github.sha }}
-          IMAGE_TAG=${{ env.IMAGE_NAME }}:$SHA
-          LATEST_TAG=${{ env.IMAGE_NAME }}:latest
+          SHA=$HEAD_SHA
+          IMAGE_TAG=${IMAGE_NAME}:$SHA
+          LATEST_TAG=${IMAGE_NAME}:latest
           
           docker build --platform linux/amd64 -t $IMAGE_TAG -t $LATEST_TAG -f Dockerfile .
           docker push $IMAGE_TAG
