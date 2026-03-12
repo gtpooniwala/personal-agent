@@ -1,0 +1,23 @@
+.github/workflows/deploy.yml
+  b194d83ab9d0ea85 27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.11",
+  "base_commit_sha": "eb520760722aeb28347549d2e07140dc0e480ca8",
+  "prompts": {
+    "b194d83ab9d0ea85": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_31c069d8fffeGBPZ52mae0hOe3",
+        "model": "google/gemini-3-flash-preview"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
