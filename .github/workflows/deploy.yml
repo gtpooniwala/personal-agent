@@ -1,0 +1,128 @@
+name: Deploy Backend to Cloud Run
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-${{ github.workflow }}-${{ env.SERVICE_NAME }}-${{ env.REGION }}
+  cancel-in-progress: false
+
+env:
+  REGION: ${{ vars.GCP_REGION || 'europe-west2' }}
+  SERVICE_NAME: personal-agent-backend
+  IMAGE_NAME: ${{ vars.GCP_REGION || 'europe-west2' }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/personal-agent/backend
+
+jobs:
+  deploy:
+    name: Build and Deploy Backend
+    if: ${{ (github.event_name == 'workflow_dispatch' && github.ref_name == 'main') || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Verify SHA is still HEAD of main
+        id: verify_sha
+        if: github.event_name == 'workflow_run'
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          git fetch origin main
+          MAIN_HEAD=$(git rev-parse origin/main)
+          if [ "$HEAD_SHA" != "$MAIN_HEAD" ]; then
+            echo "Skipping deploy: triggering SHA ($HEAD_SHA) is no longer HEAD of main ($MAIN_HEAD)."
+            echo "continue=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "continue=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Google Auth
+        if: steps.verify_sha.outputs.continue != 'false'
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Set up Cloud SDK
+        if: steps.verify_sha.outputs.continue != 'false'
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        if: steps.verify_sha.outputs.continue != 'false'
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and Push Docker image
+        if: steps.verify_sha.outputs.continue != 'false'
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          SHA=$HEAD_SHA
+          IMAGE_TAG=${IMAGE_NAME}:$SHA
+          LATEST_TAG=${IMAGE_NAME}:latest
+          
+          docker build --platform linux/amd64 -t $IMAGE_TAG -t $LATEST_TAG -f Dockerfile .
+          docker push $IMAGE_TAG
+          docker push $LATEST_TAG
+
+      - name: Deploy to Cloud Run
+        if: steps.verify_sha.outputs.continue != 'false'
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ env.REGION }}
+          image: ${{ env.IMAGE_NAME }}:${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Verify Deployment
+        if: steps.verify_sha.outputs.continue != 'false'
+        env:
+          SERVICE_URL: ${{ steps.deploy.outputs.url }}
+          AGENT_API_KEY: ${{ secrets.AGENT_API_KEY }}
+        run: |
+          MAX_RETRIES=5
+          INITIAL_DELAY=5
+          
+          for attempt in $(seq 1 "$MAX_RETRIES"); do
+            if [ -n "$AGENT_API_KEY" ]; then
+              AUTH_HEADER="Authorization: Bearer $AGENT_API_KEY"
+            else
+              AUTH_HEADER="X-Dummy: dummy"
+            fi
+            if ! HTTP_STATUS=$(curl -s --connect-timeout 5 --max-time 10 -H "$AUTH_HEADER" -o /dev/null -w "%{http_code}" "$SERVICE_URL/api/v1/health"); then
+              echo "curl command failed (network/DNS/timeout error)"
+              HTTP_STATUS="000"
+            fi
+            
+            if [ "$HTTP_STATUS" = "200" ]; then
+              echo "Deployment verified. Health check returned expected status ($HTTP_STATUS)."
+              exit 0
+            elif [ "$HTTP_STATUS" = "401" ] && [ -z "$AGENT_API_KEY" ]; then
+              echo "Deployment verified. Service is up and requires authentication, but no AGENT_API_KEY was provided to the workflow."
+              exit 0
+            fi
+            
+            echo "Health check attempt $attempt/$MAX_RETRIES failed with status $HTTP_STATUS"
+            
+            if [ "$attempt" -lt "$MAX_RETRIES" ]; then
+              SLEEP_SECONDS=$((INITIAL_DELAY * attempt))
+              echo "Retrying in ${SLEEP_SECONDS}s..."
+              sleep "$SLEEP_SECONDS"
+            fi
+          done
+          
+          echo "Health check failed after $MAX_RETRIES attempts. Last status: $HTTP_STATUS"
+          exit 1
