@@ -1,0 +1,27 @@
+tests/test_search_documents_tool.py
+  8e33d95905162df1 1-18,20-30,33-99,101-107,110-122,127-143
+backend/orchestrator/tools/search_documents.py
+  8e33d95905162df1 83-89,106,171,179-180,194,236
+docs/features/DOCUMENT_UPLOAD_SYSTEM.md
+  8e33d95905162df1 20-21,77-78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.11",
+  "base_commit_sha": "4d303177c51587acb57354dffbef164ef17ca020",
+  "prompts": {
+    "8e33d95905162df1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ce395-ef9b-71d3-899a-9867275f5e95",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 155,
+      "total_deletions": 8,
+      "accepted_lines": 150,
+      "overriden_lines": 0
+    }
+  }
+}
