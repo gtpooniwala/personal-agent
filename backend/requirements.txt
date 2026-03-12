@@ -35,4 +35,4 @@ requests==2.32.5
 
 # Scheduler
 croniter==3.0.0
-cryptography==45.0.7
+cryptography==46.0.5
