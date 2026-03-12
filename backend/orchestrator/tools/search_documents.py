@@ -80,6 +80,13 @@ class SearchDocumentsTool(BaseTool):
             summary_lines.append(f"- **{doc.get('filename', 'Untitled')}**: {summary}")
         return "\n".join(summary_lines)
 
+    @staticmethod
+    def _resolve_max_results(max_results: Optional[int]) -> int:
+        """Clamp requested results to the documented 1-5 range."""
+        if max_results is None:
+            max_results = 3
+        return max(1, min(5, max_results))
+
     def _run(self, query: str, max_results: int = 3) -> str:
         """
         Search ALL selected documents and provide answers based on content.
@@ -96,8 +103,7 @@ class SearchDocumentsTool(BaseTool):
         5. Provides helpful feedback if no results found
         """
         try:
-            # Validate and clamp max_results
-            max_results = max(1, min(5, max_results))
+            max_results = self._resolve_max_results(max_results)
             
             # Check if any documents are selected for search
             if len(self._selected_documents) == 0:
@@ -162,7 +168,7 @@ class SearchDocumentsTool(BaseTool):
             logger.error(f"Error in search documents tool: {str(e)}")
             return f"I encountered an error while searching your documents: {str(e)}\n\nPlease try again or contact support if the issue persists."
     
-    async def _arun(self, query: str) -> str:
+    async def _arun(self, query: str, max_results: int = 3) -> str:
         """
         Async version of the document search tool. Searches ALL selected documents for relevant information.
         
@@ -170,6 +176,8 @@ class SearchDocumentsTool(BaseTool):
         in async contexts.
         """
         try:
+            max_results = self._resolve_max_results(max_results)
+
             # Check if any documents are selected
             if len(self._selected_documents) == 0:
                 return "No documents are currently selected. Please select one or more documents to enable document search."
@@ -183,7 +191,7 @@ class SearchDocumentsTool(BaseTool):
             search_results = await doc_processor.search_documents(
                 query, 
                 self._user_id, 
-                limit=3,
+                limit=max_results,
                 selected_documents=selected_docs
             )
             
@@ -225,7 +233,7 @@ class SearchDocumentsTool(BaseTool):
             # Append all available document summaries (sync call is fine for metadata)
             all_docs = doc_processor.get_documents(self._user_id)
             response += self._format_document_summaries(all_docs)
-            logger.info(f"Document Q&A tool found {len(search_results) if search_results else 0} results for query: {query}")
+            logger.info(f"Document Q&A tool found {len(search_results) if search_results else 0} results for query: {query} (max_results: {max_results})")
             return response
         except Exception as e:
             logger.error(f"Error in search documents tool: {str(e)}")
