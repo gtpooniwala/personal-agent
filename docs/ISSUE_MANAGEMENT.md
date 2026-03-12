@@ -1,6 +1,6 @@
 # Issue Management
 
-Last updated: March 8, 2026
+Last updated: March 12, 2026
 
 ## Purpose
 - Make issue creation, labeling, and execution tracking consistent across GitHub, local planning docs, and AI-agent workflows.
@@ -11,6 +11,7 @@ Last updated: March 8, 2026
 - [`WORKBOARD.md`](WORKBOARD.md) is the source of truth for active execution sequencing.
 - [`ROADMAP.md`](ROADMAP.md) is the source of truth for medium-term planning and grouped initiatives.
 - Issue [#59](https://github.com/gtpooniwala/personal-agent/issues/59) is the permanent tracker for workflow/process improvements only.
+- Issue [#200](https://github.com/gtpooniwala/personal-agent/issues/200) is the permanent tracker for documentation maintenance only.
 
 ## Minimum Contract
 - Prefer one issue per shippable slice of work.
@@ -64,6 +65,7 @@ Use exactly one `size:*` label on normal execution issues.
 
 Exceptions:
 - Permanent tracker issues and meta issues may omit size when the work is intentionally unbounded.
+- In this repo, issue `#59` (workflow/process) and issue `#200` (documentation maintenance) are the standing examples.
 
 ### Track
 Use `track:*` labels only for long-running initiatives that cut across multiple issues.
@@ -138,11 +140,13 @@ Expected fields:
 - Use `Refs #<id>` for partial progress.
 - Use `Closes/Fixes/Resolves #<id>` only when the issue is actually done.
 - Keep issue `#59` open permanently.
+- Keep issue `#200` open permanently.
 
 ## Implementation In This Repo
 - GitHub issue forms live under [`.github/ISSUE_TEMPLATE`](../.github/ISSUE_TEMPLATE).
 - Issue label synchronization is automated by [`.github/workflows/issue_label_sync.yml`](../.github/workflows/issue_label_sync.yml).
 - Agent issue intake and relabeling should use the repo-local skill [`skills/repo-issue-flow/SKILL.md`](../skills/repo-issue-flow/SKILL.md).
+- Periodic documentation refresh PRs can reference `#200` instead of creating throwaway doc-sync issues.
 
 ## Practical Defaults
 - If you are unsure between `priority:p2` and `priority:p3`, default to `priority:p2` only when the item is already likely to be scheduled.

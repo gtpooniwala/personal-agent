@@ -1,6 +1,6 @@
 # Workboard
 
-Last updated: March 10, 2026
+Last updated: March 12, 2026
 
 ## How To Use This File
 This is the execution board an agent should follow.
@@ -16,12 +16,13 @@ Important rule:
 - When updating it in a PR, write the content to match the state that will be true once that PR is merged to `main`.
 
 ## Current Status
-- Core async runtime is in place: durable `runs`, `run_events`, and `leases`; async `POST /chat` and `POST /runs`; polling via `GET /runs/{id}/status` and `GET /runs/{id}/events`.
+- Core async runtime is in place: durable `runs`, `run_events`, and `leases`; async `POST /chat` and `POST /runs`; polling via `GET /runs/{id}/status` and `GET /runs/{id}/events`; and SSE via `GET /runs/{id}/stream`.
 - Blocking orchestration work has already been moved off the FastAPI event loop into a bounded worker pool as the `#51` migration step.
 - Foreground orchestration now builds explicit request-scoped execution context, so per-run state no longer lives implicitly on the long-lived orchestrator instance.
 - Runtime support services are in place: orphan recovery heartbeat, scheduled task loop, scheduled task CRUD/API, and runtime shutdown wiring.
 - Normal-path tool selection is model-owned, the backend SSE stream exists, foreground orchestration is request-scoped, and the frontend now adopts the SSE stream with polling fallback after the recent `#101`, `#104`, `#106`, and `#122` work.
 - External trigger framework is now landed (#88): `ExternalTrigger` registry, `TriggerEvent` deduplication, `TriggerDispatcher` service, webhook receiver stubs, and trigger CRUD routes.
+- Cloud deployment baseline pieces are now landed in-repo: Cloud SQL + Secret Manager docs/runbooks, bearer auth, Cloud Run backend service definition, and the same-origin Next.js `/api/agent/...` proxy.
 - Frontend migration, document workflow clarity, Gmail Docker readiness, conversation naming, config validation, and runtime eval harness work are already landed.
 - The remaining follow-up debt is narrower now: retry/fallback cleanup, transport deduplication, product-correctness cleanup, durable follow-up work, and true end-to-end async execution.
 
@@ -38,11 +39,11 @@ Important rule:
 ### Product, Transport, And Prompting Follow-Ups
 - [x] `done` Adopt the SSE run stream in the frontend while keeping fallback behavior ([#122](https://github.com/gtpooniwala/personal-agent/issues/122))
 - [ ] `todo` Deduplicate overlapping polling and SSE run-progress transport logic ([#121](https://github.com/gtpooniwala/personal-agent/issues/121))
-- [ ] `todo` Add timeout/watchdog handling for stalled SSE run streams ([#130](https://github.com/gtpooniwala/personal-agent/issues/130))
+- [x] `done` Add timeout/watchdog handling for stalled SSE run streams ([#130](https://github.com/gtpooniwala/personal-agent/issues/130))
 - [x] `done` Stop conversation list reads from scheduling maintenance work ([#140](https://github.com/gtpooniwala/personal-agent/issues/140))
 - [ ] `todo` Keep document-search responses scoped to selected documents ([#137](https://github.com/gtpooniwala/personal-agent/issues/137))
 - [ ] `todo` Reassess whether `response_agent` should synthesize every final answer ([#138](https://github.com/gtpooniwala/personal-agent/issues/138))
-- [ ] `todo` Make run timing fields and observability metrics truthful ([#139](https://github.com/gtpooniwala/personal-agent/issues/139))
+- [x] `done` Make run timing fields and observability metrics truthful ([#139](https://github.com/gtpooniwala/personal-agent/issues/139))
 - [ ] `todo` Extract non-run app helpers from `CoreOrchestrator` ([#134](https://github.com/gtpooniwala/personal-agent/issues/134))
 - [ ] `todo` Strengthen prompt architecture and prompting contracts ([#68](https://github.com/gtpooniwala/personal-agent/issues/68))
 - [ ] `todo` Improve document UX and RAG workflow clarity in the frontend ([#64](https://github.com/gtpooniwala/personal-agent/issues/64))
@@ -67,13 +68,15 @@ Note: LangGraph/LangChain migration (#103) is tracked in Core Runtime above; it 
 Work this track after the core runtime/orchestrator plan above is stable enough.
 
 - [x] `done` GCP deployment architecture decisions finalized ([#81](https://github.com/gtpooniwala/personal-agent/issues/81))
-- [ ] `todo` Cloud SQL production database setup ([#80](https://github.com/gtpooniwala/personal-agent/issues/80))
-- [ ] `todo` Secret Manager integration for production secrets ([#82](https://github.com/gtpooniwala/personal-agent/issues/82))
+- [x] `done` Cloud SQL production database setup ([#80](https://github.com/gtpooniwala/personal-agent/issues/80))
+- [x] `done` Secret Manager integration for production secrets ([#82](https://github.com/gtpooniwala/personal-agent/issues/82))
 - [x] `done` Bearer-token auth middleware for the FastAPI backend ([#83](https://github.com/gtpooniwala/personal-agent/issues/83))
 - [ ] `todo` Deploy the Next.js frontend to Vercel ([#127](https://github.com/gtpooniwala/personal-agent/issues/127))
-- [ ] `todo` Add a Next.js API proxy route for server-side bearer token injection ([#132](https://github.com/gtpooniwala/personal-agent/issues/132))
-- [ ] `todo` Cloud Run service definition for the backend — deploy with auth already in image ([#85](https://github.com/gtpooniwala/personal-agent/issues/85))
-- [ ] `todo` GitHub Actions CI/CD pipeline for Cloud Run deployment ([#86](https://github.com/gtpooniwala/personal-agent/issues/86))
+- [x] `done` Add a Next.js API proxy route for server-side bearer token injection ([#132](https://github.com/gtpooniwala/personal-agent/issues/132))
+- [x] `done` Cloud Run service definition for the backend — deploy with auth already in image ([#85](https://github.com/gtpooniwala/personal-agent/issues/85))
+- [ ] `todo` Configure Vercel preview env vars after Git integration ([#186](https://github.com/gtpooniwala/personal-agent/issues/186))
+- [ ] `todo` Migrate GitHub Actions GCP auth to Workload Identity Federation ([#191](https://github.com/gtpooniwala/personal-agent/issues/191))
+- [ ] `todo` Finish the deployment pipeline beyond the current backend-only GitHub Actions workflow ([#86](https://github.com/gtpooniwala/personal-agent/issues/86))
 - [ ] `todo` Update Gmail OAuth redirect URIs for production domains ([#129](https://github.com/gtpooniwala/personal-agent/issues/129))
 - [ ] `todo` Migrate document storage from local filesystem to GCS — deferred; not a blocker for initial deploy ([#79](https://github.com/gtpooniwala/personal-agent/issues/79))
 - [ ] `todo` Cold-start and min-instances tuning once the cloud baseline exists ([#87](https://github.com/gtpooniwala/personal-agent/issues/87))
@@ -95,9 +98,11 @@ Keep this compressed. Use Git history and GitHub issues for detail.
 - [x] `done` Event-loop responsiveness migration step with worker-pool orchestration offload: `#51`
 - [x] `done` Per-run orchestrator isolation, model-owned tool selection, backend SSE stream, and request-scoped orchestration: `#50`, `#72`, `#73`, `#74`, `#101`, `#104`, `#106`
 - [x] `done` Scheduler-backed recurring task baseline: `#18`, `#89`
+- [x] `done` SSE watchdog fallback for stalled run streams: `#130`
 - [x] `done` Conversation list reads are now side-effect-free: `#140`
 - [x] `done` Runtime lifecycle observability fields made truthful: `#139`
 - [x] `done` Planning docs for cloud deployment and event-driven triggers: `#78`
+- [x] `done` Cloud deployment baseline pieces: `#80`, `#82`, `#83`, `#85`, `#132`
 - [x] `done` Managed worktree slot workflow: `#125` — PR #125 (`8cc7e41`)
 - [x] `done` Frontend SSE run-progress client with polling fallback: `#122`
 

@@ -3,18 +3,19 @@
 ## System Overview
 The repository now has a real async runtime surface, not just a synchronous chat API. The core shape is:
 
-1. the frontend submits work asynchronously,
+1. the frontend submits work asynchronously through a same-origin Next.js proxy,
 2. the backend persists a run row and run events,
 3. runtime services coordinate execution and recovery,
 4. the orchestrator executes tool-aware LangGraph logic against the current conversation state,
-5. clients poll the run ledger for progress.
+5. clients observe the run ledger through SSE first and polling as fallback.
 
 ## Architecture Today
 
 ```mermaid
 flowchart LR
-    UI["Frontend (Next.js)"] --> RT["FastAPI Runtime Routes<br/>POST /chat, POST /runs"]
-    UI --> API["FastAPI Versioned API<br/>/api/v1/*"]
+    UI["Frontend (Next.js)"] --> PROXY["Next.js Agent Proxy<br/>/api/agent/*"]
+    PROXY --> RT["FastAPI Runtime Routes<br/>POST /chat, POST /runs"]
+    PROXY --> API["FastAPI Versioned API<br/>/api/v1/*"]
 
     RT --> RS["RuntimeService"]
     RS --> STORE["RunStore<br/>runs + run_events + leases"]
@@ -38,7 +39,7 @@ flowchart LR
 
 ## Current Guarantees
 - Async submission is the primary contract: `POST /chat` and `POST /runs` return a `run_id` quickly.
-- Run progress is durable enough to poll and inspect through `run_events`.
+- Run progress is durable enough to stream or poll through the same `run_events` ledger.
 - Ordering is enforced per conversation via leases, so only one active run should execute for a conversation at a time.
 - Runtime coordination stays on the event loop while full orchestration attempts run in a bounded worker pool.
 - Heartbeat sweeps can mark orphaned runs failed.
@@ -76,17 +77,18 @@ flowchart LR
 - Uploaded files still use local filesystem storage today, which is one reason cloud deployment needs a GCS migration.
 
 ### Frontend
-- The frontend is a Next.js app that submits runs, polls run state, renders tool actions, and manages conversations/documents.
-- Today it relies on polling rather than SSE streaming.
+- The frontend is a Next.js app that submits runs, renders tool actions, and manages conversations/documents.
+- It talks to the backend through the same-origin `/api/agent/*` proxy so bearer-token injection can stay server-side.
+- It prefers SSE run streaming and falls back to polling when the stream stalls or errors.
 
 ## Operational Flows
 
 ### Chat Or Run Submission
-1. Frontend submits a message to `POST /chat` or `POST /runs`.
+1. Frontend submits a message through the Next.js `/api/agent/*` proxy to `POST /chat` or `POST /runs`.
 2. Runtime creates a durable run row and appends a queued event.
 3. Runtime starts background coordination for that run.
 4. `OrchestrationExecutionPlane` runs the blocking attempt in the worker pool.
-5. Client polls `GET /runs/{id}/status` and `GET /runs/{id}/events`.
+5. Client prefers `GET /runs/{id}/stream` and falls back to `GET /runs/{id}/status` plus `GET /runs/{id}/events`.
 6. Runtime updates the run row and appends tool/result/terminal events as work completes.
 
 ### Scheduled Task Dispatch

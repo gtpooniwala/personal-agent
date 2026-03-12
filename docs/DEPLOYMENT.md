@@ -1,11 +1,13 @@
 # GCP Deployment Architecture
 
-Last updated: March 9, 2026
+Last updated: March 12, 2026
 
 This document is the architecture decision record (ADR) and deployment plan for moving from local Docker Compose to Google Cloud Platform (GCP) for personal cloud use.
 
 Current status:
 - decisions are finalized; this ADR is a record of settled choices (closed via #81).
+- core backend deployment baseline is already landed in-repo: Cloud SQL, Secret Manager, bearer auth, Cloud Run backend service definition, and the Next.js agent proxy (`#80`, `#82`, `#83`, `#85`, `#132`).
+- a backend GitHub Actions deploy workflow now exists; remaining deployment work is frontend/env/auth hardening (`#127`, `#186`, `#191`, `#86`).
 
 ---
 
@@ -31,10 +33,10 @@ Three-container Docker Compose setup:
 - `frontend` — Next.js frontend
 
 Limitations:
-- Runs only on local machine; no remote access
+- Default developer path still runs locally; remote access depends on finishing the deployment steps below
 - Local `./data` volume is local-only and not backed up (data loss risk)
 - Local auth is optional today; production/shared exposure still requires `AGENT_API_KEY`
-- No CI/CD deploy path
+- A backend Cloud Run deploy workflow now exists, but frontend rollout and GitHub-to-GCP auth hardening are still follow-up work
 - Runtime automation primitives exist locally, but external trigger and deployment behavior are not yet productionized
 
 ---
@@ -181,16 +183,17 @@ Cloud Scheduler job provisioning is in scope for #88.
 
 ## Deployment Plan (Ordered)
 
-1. **Cloud SQL** (#80) — provision instance, migrate schema, update `DATABASE_URL`
-2. **Secret Manager** (#82) — migrate all secrets; add `AGENT_API_KEY`; update Cloud Run service account
-3. **Bearer token auth middleware** (#83) — FastAPI middleware; generate and store token in Secret Manager
-4. **Backend Cloud Run service** (#85) — Cloud Run YAML/config; env vars from Secret Manager; Cloud SQL Auth Connector socket mount; `min-instances=0`; deploy backend with auth middleware already in the image; record `*.run.app` URL
-5. **Vercel frontend deploy** (#127) — connect repo; set private `API_BASE_URL` + `AGENT_API_KEY`; verify end-to-end through `/api/agent/...`
-6. **Gmail OAuth redirect URIs** (#129) — add Cloud Run and Vercel URLs to Google Cloud Console OAuth credentials; test Gmail OAuth flow
-7. **CI/CD** (#86) — build and deploy backend on merge to `main`
-8. **Event trigger framework + Cloud Scheduler** (#88) — implement trigger dispatcher; provision Cloud Scheduler jobs for polling endpoints
-9. **GCS document storage** (#79) — when durable document persistence is needed
-10. **Cold-start tuning** (#87) — optional; revisit once cloud baseline is running
+1. ~~**Cloud SQL** (#80) — provision instance, migrate schema, update `DATABASE_URL`.~~ **Done**
+2. ~~**Secret Manager** (#82) — migrate all secrets; add `AGENT_API_KEY`; update Cloud Run service account.~~ **Done**
+3. ~~**Bearer token auth middleware** (#83) — FastAPI middleware; generate and store token in Secret Manager.~~ **Done**
+4. ~~**Backend Cloud Run service** (#85) — Cloud Run YAML/config; env vars from Secret Manager; Cloud SQL Auth Connector socket mount; `min-instances=0`; deploy backend with auth middleware already in the image; record `*.run.app` URL.~~ **Done**
+5. ~~**Next.js API proxy route** (#132) — inject bearer auth server-side for `/api/agent/...` requests.~~ **Done**
+6. **Vercel frontend deploy and preview env wiring** (#127, #186) — connect repo, set private env vars, and finish preview/prod validation through `/api/agent/...`
+7. **Gmail OAuth redirect URIs** (#129) — add Cloud Run and Vercel URLs to Google Cloud Console OAuth credentials; test Gmail OAuth flow
+8. **Backend CI/CD hardening** (#86, #191) — finish the deployment pipeline from the current backend-only workflow and migrate GitHub Actions GCP auth to Workload Identity Federation
+9. **Cloud Scheduler provisioning** (#88 follow-up) — wire the remaining polling endpoints/jobs into the deployed environment
+10. **GCS document storage** (#79) — when durable document persistence is needed
+11. **Cold-start tuning** (#87) — optional; revisit once cloud baseline is running
 
 ---
 
@@ -219,5 +222,7 @@ Cloud Scheduler job provisioning is in scope for #88.
 | #86 | feat: GitHub Actions CI/CD pipeline for Cloud Run deployment |
 | #87 | chore: cold start optimization and min-instances strategy for Cloud Run |
 | #127 | feat: deploy Next.js frontend to Vercel |
+| #186 | chore: configure Vercel preview env vars after Git integration |
+| #191 | feat(ops): Migrate GitHub Actions GCP auth to Workload Identity Federation |
 | #129 | chore: update Gmail OAuth redirect URIs for production domains |
 | #132 | feat: Next.js API proxy route for server-side bearer token injection |
