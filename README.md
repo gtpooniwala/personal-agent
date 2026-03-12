@@ -225,7 +225,7 @@ Some tests rely on API/LLM behavior and are easier to run in an environment with
 Run deterministic repository checks:
 
 ```bash
-python tests/run_repo_checks.py
+python3 tests/run_repo_checks.py
 ```
 
 ## Observability Baseline
@@ -282,6 +282,7 @@ Core endpoints:
 - `POST /runs`
 - `GET /runs/{run_id}/status`
 - `GET /runs/{run_id}/events`
+- `GET /runs/{run_id}/stream`
 - `POST /chat`
 - `GET /api/v1/conversations`
 - `POST /api/v1/conversations`
@@ -328,14 +329,14 @@ Design choices reflected in this implementation:
 - Document retrieval computes similarity from embeddings stored in PostgreSQL; not yet an external vector DB.
 - Tool/model config exists, but some model selections are still hardcoded in tool/orchestrator paths.
 - Follow-up work such as summarisation is not yet modeled as durable queued task types.
-- Streaming updates are not available yet; clients rely on polling.
+- SSE streaming is implemented, but the runtime still relies on a worker-pool execution plane rather than true end-to-end async internals.
 - Integration tools (Gmail/Calendar/Todoist) have different maturity levels and setup requirements.
 
 ## Roadmap (High-Impact)
 
 - Simplify orchestration ownership so the LLM is the canonical normal-path tool selector
 - Make follow-up/background work durable and explicitly budgeted
-- Add streaming and richer trigger surfaces on top of the same run ledger
+- Tighten the SSE-plus-polling transport contract and add richer trigger surfaces on top of the same run ledger
 - Production deployment profile (GCP, secrets, auth boundary, storage migration)
 - Multi-user auth + tenant isolation
 
