@@ -13,19 +13,20 @@ permissions:
   id-token: write
 
 concurrency:
-  group: deploy-${{ github.workflow }}-${{ github.event.workflow_run.head_branch || github.ref_name }}
+  group: deploy-${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: false
 
 env:
-  REGION: europe-west2
+  REGION: ${{ vars.GCP_REGION || 'europe-west2' }}
   SERVICE_NAME: personal-agent-backend
-  IMAGE_NAME: europe-west2-docker.pkg.dev/pushstart-481717/personal-agent/backend
+  IMAGE_NAME: ${{ vars.GCP_REGION || 'europe-west2' }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/personal-agent/backend
 
 jobs:
   deploy:
     name: Build and Deploy Backend
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     
     steps:
       - name: Checkout
@@ -101,7 +102,7 @@ jobs:
             else
               AUTH_HEADER="X-Dummy: dummy"
             fi
-            if ! HTTP_STATUS=$(curl -sS --connect-timeout 5 --max-time 10 -H "$AUTH_HEADER" -o /dev/null -w "%{http_code}" "$SERVICE_URL/api/v1/health"); then
+            if ! HTTP_STATUS=$(curl -s --connect-timeout 5 --max-time 10 -H "$AUTH_HEADER" -o /dev/null -w "%{http_code}" "$SERVICE_URL/api/v1/health"); then
               echo "curl command failed (network/DNS/timeout error)"
               HTTP_STATUS="000"
             fi
