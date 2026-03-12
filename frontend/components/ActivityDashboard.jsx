@@ -1,4 +1,5 @@
 import { formatRelativeTime, formatRunStatusLabel, truncateText } from "@/lib/formatters";
+import { getRunPresentation } from "@/lib/runStatus";
 import WorkspaceViewTabs from "@/components/WorkspaceViewTabs";
 
 function describeRunEvent(event) {
@@ -32,6 +33,7 @@ export default function ActivityDashboard({
   conversations,
 }) {
   const latestEvent = activeRun?.latestEvent || null;
+  const runPresentation = getRunPresentation(activeRun);
   const recentConversations = conversations.slice(0, 6);
 
   return (
@@ -55,8 +57,11 @@ export default function ActivityDashboard({
         />
         <StatCard
           label="Run status"
-          value={formatRunStatusLabel(activeRun?.status) || "Idle"}
-          hint={latestEvent ? describeRunEvent(latestEvent) : "No recent run for this conversation."}
+          value={runPresentation?.label || "Idle"}
+          hint={
+            runPresentation?.detail ||
+            (latestEvent ? describeRunEvent(latestEvent) : "No recent run for this conversation.")
+          }
         />
         <StatCard
           label="Documents"

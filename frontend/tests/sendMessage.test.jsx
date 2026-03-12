@@ -381,13 +381,53 @@ describe('sendMessage SSE vs fallback paths', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText(RUN_TRANSPORT_TIMEOUT_MESSAGE)).toBeInTheDocument();
+      expect(screen.getAllByText(RUN_TRANSPORT_TIMEOUT_MESSAGE).length).toBeGreaterThan(0);
     });
 
     expect(screen.queryByText('[Error: Failed to send message]')).not.toBeInTheDocument();
     expect(screen.getByText(/Thinking/)).toBeInTheDocument();
     expect(screen.queryByText('Failed')).not.toBeInTheDocument();
-    expect(screen.getAllByText('Running').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Updates lost').length).toBeGreaterThan(0);
+  });
+
+  test('fallback polling keeps the polling transport state when a status response omits status', async () => {
+    jest.useFakeTimers();
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    let statusCalls = 0;
+
+    setupApiMocks({ sseMode: 'fallback' });
+    runtimeApiCall.mockImplementation(async (path) => {
+      if (path === '/chat') return { run_id: 'run-1' };
+      if (path.includes('/status')) {
+        statusCalls += 1;
+        return statusCalls === 1 ? { error: null } : { status: 'succeeded', error: null };
+      }
+      if (path.includes('/events')) return { events: [], next_after: null };
+      return {};
+    });
+
+    await act(async () => {
+      render(<HomePage />);
+    });
+
+    await waitFor(() => screen.getByRole('button', { name: /Conv A/i }));
+
+    await user.type(screen.getByRole('textbox'), 'hello via missing status');
+    await user.click(screen.getByRole('button', { name: /^send$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Live stream unavailable. Checking status in the background.')).toBeInTheDocument();
+    });
+
+    expect(screen.getAllByText('Queued').length).toBeGreaterThan(0);
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(500);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^send$/i })).not.toBeDisabled();
+    });
   });
 
   test('repeated polling failures still surface as a hard failure', async () => {
@@ -406,8 +446,6 @@ describe('sendMessage SSE vs fallback paths', () => {
       render(<HomePage />);
     });
 
-    await waitFor(() => screen.getByRole('button', { name: /Conv A/i }));
-
     await user.type(screen.getByRole('textbox'), 'hello via repeated failures');
     await user.click(screen.getByRole('button', { name: /^send$/i }));
 
@@ -416,7 +454,7 @@ describe('sendMessage SSE vs fallback paths', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Failed to send message.')).toBeInTheDocument();
+      expect(screen.getAllByText('Failed to send message.').length).toBeGreaterThan(0);
     });
 
     expect(screen.getByText('[Error: Failed to send message]')).toBeInTheDocument();

@@ -218,8 +218,68 @@ describe('ChatPanel document context UX (issue #64)', () => {
       />,
     );
 
-    const runChip = screen.getByText(/Run totally-unknown-status/i);
-    expect(runChip.className).toContain('idle');
-    expect(runChip.className).not.toContain('totally-unknown-status');
+    const [statusPill] = screen.getAllByText('Working');
+    expect(statusPill.className).toContain('idle');
+    expect(statusPill.className).not.toContain('totally-unknown-status');
+  });
+});
+
+describe('ChatPanel run status layout', () => {
+  test('does not render a run status row when there is no active run', () => {
+    render(<ChatPanel {...defaultProps} messageInput="" />);
+
+    expect(screen.queryByLabelText('Run status')).not.toBeInTheDocument();
+  });
+
+  test('renders run status outside the transcript for an empty conversation', () => {
+    render(
+      <ChatPanel
+        {...defaultProps}
+        messageInput=""
+        activeRun={{
+          status: 'running',
+          latestEvent: { type: 'started', message: 'Run started' },
+        }}
+      />,
+    );
+
+    const transcript = screen.getByLabelText('Conversation transcript');
+    const runStatus = screen.getByLabelText('Run status');
+
+    expect(runStatus).toBeInTheDocument();
+    expect(transcript).not.toContainElement(runStatus);
+    expect(screen.getAllByText('Starting').length).toBeGreaterThan(0);
+  });
+
+  test('keeps run status separate from selected document chips and full transcripts', () => {
+    render(
+      <ChatPanel
+        {...defaultProps}
+        messageInput=""
+        messages={[
+          { id: 'm1', role: 'user', content: 'Hello', timestamp: '2026-03-11T10:00:00Z', agent_actions: [] },
+          { id: 'm2', role: 'assistant', content: 'Hi there', timestamp: '2026-03-11T10:00:02Z', agent_actions: [] },
+        ]}
+        selectedDocumentDetails={[
+          { id: 'doc-1', filename: 'Quarterly Report.pdf' },
+        ]}
+        activeRun={{
+          status: 'running',
+          transport: 'polling',
+          transportMessage: 'Live stream unavailable. Checking status in the background.',
+          latestEvent: { type: 'started', message: 'Run started' },
+        }}
+      />,
+    );
+
+    const transcript = screen.getByLabelText('Conversation transcript');
+    const documentsStrip = screen.getByLabelText('Selected documents');
+    const runStatus = screen.getByLabelText('Run status');
+
+    expect(documentsStrip).toBeInTheDocument();
+    expect(documentsStrip).not.toContainElement(runStatus);
+    expect(transcript).not.toContainElement(runStatus);
+    expect(screen.getAllByText('Starting').length).toBeGreaterThan(0);
+    expect(screen.getByText('Live stream unavailable. Checking status in the background.')).toBeInTheDocument();
   });
 });
