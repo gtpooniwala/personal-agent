@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { formatRelativeTime } from "@/lib/formatters";
+import { getRunPresentation, getRunStatusClassName } from "@/lib/runStatus";
 import WorkspaceViewTabs from "@/components/WorkspaceViewTabs";
 
 const DOCUMENT_PROMPT_STARTERS = [
@@ -16,21 +17,6 @@ const DOCUMENT_PROMPT_STARTERS = [
     buildPrompt: () => "Search the selected documents for pricing, deadlines, renewal, termination, or obligation details.",
   },
 ];
-
-const RUN_STATUS_CLASSNAMES = new Set([
-  "queued",
-  "running",
-  "retrying",
-  "succeeded",
-  "failed",
-  "cancelling",
-  "cancelled",
-  "idle",
-]);
-
-function getRunStatusClassName(status) {
-  return RUN_STATUS_CLASSNAMES.has(status) ? status : "idle";
-}
 
 function buildSourceId({ filename, section, ordinal }) {
   return [filename, section, ordinal].join("::");
@@ -229,6 +215,7 @@ const ChatPanel = forwardRef(function ChatPanel({
   }, [messageInput]);
 
   const hasSelectedDocuments = selectedDocumentDetails.length > 0;
+  const runPresentation = getRunPresentation(activeRun);
 
   return (
     <section className="chat-shell">
@@ -243,26 +230,18 @@ const ChatPanel = forwardRef(function ChatPanel({
         </div>
       </header>
 
-      {(activeRun?.status || hasSelectedDocuments) && (
+      {hasSelectedDocuments && (
         <section className="active-context-bar">
-          {activeRun?.status ? (
-            <span className={`context-chip run-status ${getRunStatusClassName(activeRun.status)}`}>
-              Run {activeRun.status}
-            </span>
-          ) : null}
-
-          {hasSelectedDocuments ? (
-            <div className="selected-documents-strip" aria-label="Selected documents">
-              {selectedDocumentDetails.map((document, index) => (
-                <span
-                  key={`${document.id || "document"}-${document.filename || "untitled"}-${index}`}
-                  className="context-chip selected-document-chip"
-                >
-                  {document.filename}
-                </span>
-              ))}
-            </div>
-          ) : null}
+          <div className="selected-documents-strip" aria-label="Selected documents">
+            {selectedDocumentDetails.map((document, index) => (
+              <span
+                key={`${document.id || "document"}-${document.filename || "untitled"}-${index}`}
+                className="context-chip selected-document-chip"
+              >
+                {document.filename}
+              </span>
+            ))}
+          </div>
         </section>
       )}
 
@@ -284,7 +263,7 @@ const ChatPanel = forwardRef(function ChatPanel({
         </section>
       ) : null}
 
-      <main className="chat-stream" id="chat-container">
+      <main className="chat-stream" id="chat-container" aria-label="Conversation transcript">
         {isLoadingMessages && <p className="panel-note">Loading messages...</p>}
 
         {!isLoadingMessages && messages.length === 0 && (
@@ -304,6 +283,20 @@ const ChatPanel = forwardRef(function ChatPanel({
 
         {chatError && <p className="panel-error inline-error">{chatError}</p>}
       </main>
+
+      {runPresentation ? (
+        <section className="chat-run-status-bar" aria-label="Run status" aria-live="polite">
+          <span
+            className={`status-pill chat-run-status-pill ${getRunStatusClassName(runPresentation.status, runPresentation.transport)}`}
+          >
+            {runPresentation.shortLabel}
+          </span>
+          <div className="chat-run-status-copy">
+            <strong>{runPresentation.label}</strong>
+            {runPresentation.detail ? <p>{runPresentation.detail}</p> : null}
+          </div>
+        </section>
+      ) : null}
 
       <footer className="chat-input-row">
         <textarea

@@ -1,4 +1,5 @@
-import { formatRelativeTime, formatRunStatusLabel, truncateText } from "@/lib/formatters";
+import { formatRelativeTime, truncateText } from "@/lib/formatters";
+import { getRunPresentation } from "@/lib/runStatus";
 
 export default function ConversationList({
   conversations,
@@ -47,7 +48,7 @@ export default function ConversationList({
               conversations.map((conversation) => {
                 const isActive = conversation.id === currentConversationId;
                 const runState = runStateByConversation?.[conversation.id];
-                const runLabel = formatRunStatusLabel(runState?.status);
+                const runPresentation = getRunPresentation(runState);
 
                 return (
                   <button
@@ -61,8 +62,10 @@ export default function ConversationList({
                       <span className="conversation-date">
                         {formatRelativeTime(conversation.updated_at)}
                       </span>
-                      {runLabel && (
-                        <span className={`conversation-status ${runState.status}`}>{runLabel}</span>
+                      {runPresentation?.shortLabel && (
+                        <span className={`conversation-status ${runPresentation.tone}`}>
+                          {runPresentation.shortLabel}
+                        </span>
                       )}
                     </span>
                   </button>

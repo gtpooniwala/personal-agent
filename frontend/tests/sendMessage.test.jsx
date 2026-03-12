@@ -381,13 +381,13 @@ describe('sendMessage SSE vs fallback paths', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText(RUN_TRANSPORT_TIMEOUT_MESSAGE)).toBeInTheDocument();
+      expect(screen.getAllByText(RUN_TRANSPORT_TIMEOUT_MESSAGE).length).toBeGreaterThan(0);
     });
 
     expect(screen.queryByText('[Error: Failed to send message]')).not.toBeInTheDocument();
     expect(screen.getByText(/Thinking/)).toBeInTheDocument();
     expect(screen.queryByText('Failed')).not.toBeInTheDocument();
-    expect(screen.getAllByText('Running').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Updates lost').length).toBeGreaterThan(0);
   });
 
   test('repeated polling failures still surface as a hard failure', async () => {
@@ -406,8 +406,6 @@ describe('sendMessage SSE vs fallback paths', () => {
       render(<HomePage />);
     });
 
-    await waitFor(() => screen.getByRole('button', { name: /Conv A/i }));
-
     await user.type(screen.getByRole('textbox'), 'hello via repeated failures');
     await user.click(screen.getByRole('button', { name: /^send$/i }));
 
@@ -416,7 +414,7 @@ describe('sendMessage SSE vs fallback paths', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Failed to send message.')).toBeInTheDocument();
+      expect(screen.getAllByText('Failed to send message.').length).toBeGreaterThan(0);
     });
 
     expect(screen.getByText('[Error: Failed to send message]')).toBeInTheDocument();

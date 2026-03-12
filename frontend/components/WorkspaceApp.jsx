@@ -7,6 +7,7 @@ import ConversationList from "@/components/ConversationList";
 import DocumentsPanel from "@/components/DocumentsPanel";
 import MetricsDashboard from "@/components/MetricsDashboard";
 import { apiCall, runtimeApiCall, uploadPdf } from "@/lib/api";
+import { RUN_IN_PROGRESS_STATUSES } from "@/lib/runStatus";
 import { subscribeToRunStream } from "@/lib/runStream";
 
 const RUN_POLL_INTERVAL_MS = 500;
@@ -26,8 +27,6 @@ const PANEL_COLLAPSE_THRESHOLD = 120;
 const APP_ROOT_PADDING = 16;
 const PANEL_GAP = 16;
 const DESKTOP_RESIZE_BREAKPOINT = 1120;
-
-const RUN_IN_PROGRESS_STATUSES = new Set(["queued", "running", "retrying", "cancelling"]);
 
 class RunTransportTimeoutError extends Error {
   constructor(message = "Run transport timed out") {
@@ -505,6 +504,8 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
         runId,
         status: "queued",
         error: "",
+        transport: "streaming",
+        transportMessage: "",
         latestEvent: null,
         events: [],
       });
@@ -540,6 +541,10 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
                 runId: pollRunId,
                 status: pollStatus?.status || previousRunState.status || "queued",
                 error: pollStatus?.error || "",
+                transport: RUN_IN_PROGRESS_STATUSES.has(pollStatus?.status) ? "polling" : "complete",
+                transportMessage: RUN_IN_PROGRESS_STATUSES.has(pollStatus?.status)
+                  ? "Live stream unavailable. Checking status in the background."
+                  : "",
                 events: mergedEvents,
                 latestEvent: mergedEvents[mergedEvents.length - 1] || previousRunState.latestEvent || null,
               };
@@ -579,6 +584,11 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
                   runId,
                   status: event.status || prev.status,
                   error: prev.error,
+                  transport: prev.transport === "polling" ? "polling" : "streaming",
+                  transportMessage:
+                    prev.transport === "polling"
+                      ? "Live stream unavailable. Checking status in the background."
+                      : "",
                   events: merged,
                   latestEvent: merged[merged.length - 1] || prev.latestEvent || null,
                 };
@@ -590,6 +600,8 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
                 ...prev,
                 status: completeStatus,
                 error: error || "",
+                transport: "complete",
+                transportMessage: "",
               }));
             }
           },
@@ -597,10 +609,22 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
             resolve();
           },
           onFallback: () => {
+            updateRunState(requestConversationId, (prev) => ({
+              ...prev,
+              transport: "polling",
+              transportMessage: "Live stream unavailable. Checking status in the background.",
+            }));
             pollRunUntilComplete(runId, requestConversationId)
               .then((s) => {
                 runFinalStatus = s?.status;
                 runFinalError = s?.error;
+                updateRunState(requestConversationId, (prev) => ({
+                  ...prev,
+                  status: s?.status || prev.status,
+                  error: s?.error || "",
+                  transport: "complete",
+                  transportMessage: "",
+                }));
                 resolve();
               })
               .catch(reject);
@@ -628,6 +652,13 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
       if (streamCleanup) activeStreamCleanupsRef.current.delete(streamCleanup);
 
       if (error instanceof RunTransportTimeoutError) {
+        if (requestConversationId) {
+          updateRunState(requestConversationId, (previousRunState) => ({
+            ...previousRunState,
+            transport: "degraded",
+            transportMessage: RUN_TRANSPORT_TIMEOUT_MESSAGE,
+          }));
+        }
         if (requestConversationId && activeConversationIdRef.current === requestConversationId) {
           setChatError(RUN_TRANSPORT_TIMEOUT_MESSAGE);
         }
@@ -643,6 +674,8 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
           ...previousRunState,
           status: "failed",
           error: "Failed to send message.",
+          transport: "complete",
+          transportMessage: "",
         }));
       }
 
@@ -883,15 +916,19 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
 
   useEffect(() => {
     return () => {
-      if (focusAnimationFrameRef.current !== null) {
-        cancelAnimationFrame(focusAnimationFrameRef.current);
+      const focusAnimationFrame = focusAnimationFrameRef.current;
+      const uploadResetTimer = uploadResetTimerRef.current;
+      const activeStreamCleanups = activeStreamCleanupsRef.current;
+
+      if (focusAnimationFrame !== null) {
+        cancelAnimationFrame(focusAnimationFrame);
       }
 
-      if (uploadResetTimerRef.current) {
-        clearTimeout(uploadResetTimerRef.current);
+      if (uploadResetTimer) {
+        clearTimeout(uploadResetTimer);
       }
 
-      for (const cleanup of activeStreamCleanupsRef.current) {
+      for (const cleanup of activeStreamCleanups) {
         cleanup();
       }
     };
