@@ -34,6 +34,7 @@ from backend.runtime.contracts import (
     RUN_STATUS_RETRYING,
     RUN_STATUS_RUNNING,
     RUN_STATUS_SUCCEEDED,
+    isoformat_utc,
     utcnow,
 )
 from backend.runtime.orchestration import (
@@ -50,6 +51,12 @@ SESSION_BUSY_MESSAGE = "Another operation is already running in this conversatio
 MAX_RETRY_ATTEMPTS = 3
 LEASE_TTL_SECONDS = 300
 LEASE_RENEWAL_INTERVAL_SECONDS = LEASE_TTL_SECONDS // 2
+PHASE_LABELS = {
+    "queue_wait": "Queue wait",
+    "fetching_data": "Fetching data",
+    "llm_execution": "LLM execution",
+    "final_response": "Final response",
+}
 
 
 @dataclass(frozen=True)
@@ -246,6 +253,7 @@ class RuntimeService:
                             event_type=RUN_EVENT_RETRYING,
                             status=RUN_STATUS_RETRYING,
                             message=f"Retrying after error: {type(exc).__name__}",
+                            metadata={"attempt": attempt},
                         )
 
                 try:
@@ -310,6 +318,8 @@ class RuntimeService:
 
     async def _execute_attempt(self, execution: RunExecution, attempt: int) -> None:
         """A single orchestration attempt: bookkeeping here, heavy work in the pool."""
+        existing_run = await self._get_run_record(execution.run_id)
+        started_at = utcnow()
         update_run_kwargs = {
             "run_id": execution.run_id,
             "status": RUN_STATUS_RUNNING,
@@ -319,14 +329,24 @@ class RuntimeService:
             "result": None,
         }
         if attempt == 1:
-            update_run_kwargs["started_at"] = utcnow()
+            update_run_kwargs["started_at"] = started_at
 
         await self._update_run_record(**update_run_kwargs)
+        started_metadata = {"attempt": attempt}
+        if attempt == 1:
+            queue_wait_timing = self._build_phase_timing(
+                phase_key="queue_wait",
+                started_at=existing_run.created_at,
+                ended_at=started_at,
+            )
+            self._record_phase_timings({"queue_wait": queue_wait_timing})
+            started_metadata["phase_timings"] = {"queue_wait": queue_wait_timing}
         await self._append_run_event(
             run_id=execution.run_id,
             event_type=RUN_EVENT_STARTED,
             status=RUN_STATUS_RUNNING,
             message="Run started" if attempt == 1 else f"Run attempt {attempt} started",
+            metadata=started_metadata,
         )
         if attempt == 1:
             increment_counter("runtime.runs.running_total")
@@ -345,22 +365,41 @@ class RuntimeService:
                 attempt=attempt_input,
             )
 
+        attempt_metadata = self._build_attempt_metadata(
+            attempt=attempt,
+            timings=result.get("timings"),
+        )
+        self._record_phase_timings(attempt_metadata.get("phase_timings"))
+
+        raw_actions = result.get("orchestration_actions")
+        normalized_actions = self._normalize_orchestration_actions(raw_actions)
+        normalized_result = dict(result)
+        normalized_result["orchestration_actions"] = normalized_actions
+
         if result.get("error", False):
             error_message = result.get("response") or "Run failed"
             await self._mark_run_failed(
                 run_id=execution.run_id,
                 error_message=error_message,
+                metadata=attempt_metadata,
             )
             return
 
-        for action in result.get("orchestration_actions") or []:
+        for action, tool_timing in zip(
+            normalized_actions,
+            self._match_tool_timings(normalized_result),
+        ):
             tool_name = action.get("tool") or "unknown"
+            tool_metadata = {"attempt": attempt}
+            if tool_timing is not None:
+                tool_metadata["tool_timing"] = tool_timing
             await self._append_run_event(
                 run_id=execution.run_id,
                 event_type=RUN_EVENT_TOOL_RESULT,
                 status=RUN_STATUS_RUNNING,
                 message="Tool action completed",
                 tool=tool_name,
+                metadata=tool_metadata,
             )
 
         response = result.get("response") or ""
@@ -376,6 +415,7 @@ class RuntimeService:
             event_type=RUN_EVENT_SUCCEEDED,
             status=RUN_STATUS_SUCCEEDED,
             message="Run completed successfully",
+            metadata=attempt_metadata,
         )
         increment_counter("runtime.runs.succeeded_total")
 
@@ -388,7 +428,13 @@ class RuntimeService:
             )
         )
 
-    async def _mark_run_failed(self, *, run_id: str, error_message: str) -> None:
+    async def _mark_run_failed(
+        self,
+        *,
+        run_id: str,
+        error_message: str,
+        metadata: Optional[Dict[str, object]] = None,
+    ) -> None:
         await self._update_run_record(
             run_id=run_id,
             status=RUN_STATUS_FAILED,
@@ -401,6 +447,7 @@ class RuntimeService:
             event_type=RUN_EVENT_FAILED,
             status=RUN_STATUS_FAILED,
             message=error_message,
+            metadata=metadata,
         )
         increment_counter("runtime.runs.failed_total")
 
@@ -572,3 +619,109 @@ class RuntimeService:
 
     async def _release_lease(self, lease_key: str, owner_id: str) -> None:
         await offload_blocking_call(self._db_ops().release_lease, lease_key, owner_id)
+
+    @staticmethod
+    def _build_phase_timing(
+        *,
+        phase_key: str,
+        started_at,
+        ended_at,
+    ) -> Dict[str, object]:
+        duration_ms = max(int((ended_at - started_at).total_seconds() * 1000), 0)
+        return {
+            "key": phase_key,
+            "label": PHASE_LABELS.get(phase_key, phase_key.replace("_", " ").title()),
+            "started_at": isoformat_utc(started_at),
+            "ended_at": isoformat_utc(ended_at),
+            "duration_ms": duration_ms,
+        }
+
+    def _build_attempt_metadata(
+        self,
+        *,
+        attempt: int,
+        timings: Optional[Dict[str, object]],
+    ) -> Dict[str, object]:
+        metadata: Dict[str, object] = {"attempt": attempt}
+        if not isinstance(timings, dict):
+            return metadata
+
+        phase_timings = timings.get("phases")
+        if isinstance(phase_timings, dict) and phase_timings:
+            metadata["phase_timings"] = phase_timings
+
+        tool_timings = timings.get("tool_timings")
+        if isinstance(tool_timings, list) and tool_timings:
+            metadata["tool_timings"] = tool_timings
+
+        total_tool_latency = timings.get("tool_calls_total_duration_ms")
+        if isinstance(total_tool_latency, int):
+            metadata["tool_calls_total_duration_ms"] = total_tool_latency
+
+        return metadata
+
+    def _record_phase_timings(
+        self,
+        phase_timings: Optional[Dict[str, object]],
+    ) -> None:
+        if not isinstance(phase_timings, dict):
+            return
+
+        for phase_key, timing in phase_timings.items():
+            if not isinstance(timing, dict):
+                continue
+            duration_ms = timing.get("duration_ms")
+            if not isinstance(duration_ms, int):
+                continue
+            increment_counter(f"runtime.phase.{phase_key}.count_total")
+            increment_counter(
+                f"runtime.phase.{phase_key}.latency_ms_total",
+                amount=duration_ms,
+            )
+
+    @staticmethod
+    def _match_tool_timings(
+        result: Dict[str, object],
+    ) -> list[Optional[Dict[str, object]]]:
+        actions = result.get("orchestration_actions") or []
+        timings = result.get("timings") or {}
+        tool_timings = timings.get("tool_timings") if isinstance(timings, dict) else None
+        if not isinstance(actions, list):
+            return []
+        if not isinstance(tool_timings, list):
+            return [None for _ in actions]
+
+        remaining = list(tool_timings)
+        matched: list[Optional[Dict[str, object]]] = []
+        for action in actions:
+            tool_name = action.get("tool") if isinstance(action, dict) else None
+            match_index = next(
+                (
+                    index
+                    for index, timing in enumerate(remaining)
+                    if isinstance(timing, dict)
+                    and timing.get("tool") == (tool_name or "unknown")
+                ),
+                None,
+            )
+            if match_index is None:
+                matched.append(None)
+                continue
+            matched.append(remaining.pop(match_index))
+        return matched
+
+    @staticmethod
+    def _normalize_orchestration_actions(
+        raw_actions: object,
+    ) -> list[Dict[str, object]]:
+        if raw_actions is None:
+            return []
+        if not isinstance(raw_actions, list):
+            return []
+        normalized: list[Dict[str, object]] = []
+        for action in raw_actions:
+            if isinstance(action, dict):
+                normalized.append(action)
+            else:
+                normalized.append({})
+        return normalized

@@ -332,7 +332,45 @@ async def get_observability_summary():
             tool_usage = {
                 key.removeprefix("orchestrator.tool_calls.").removesuffix(".total"): value
                 for key, value in counters.items()
-                if key.startswith("orchestrator.tool_calls.") and key.endswith(".total")
+                if key.startswith("orchestrator.tool_calls.")
+                and key.endswith(".total")
+                and not key.endswith(".latency_ms_total")
+            }
+            tool_latency_ms = {}
+            for key, value in counters.items():
+                if not key.startswith("orchestrator.tool_calls."):
+                    continue
+                if not key.endswith(".latency_ms_total"):
+                    continue
+                if key == "orchestrator.tool_calls.latency_ms_total":
+                    continue
+                tool_name = key.removeprefix("orchestrator.tool_calls.").removesuffix(
+                    ".latency_ms_total"
+                )
+                tool_latency_ms[tool_name] = _average(
+                    value,
+                    counters.get(f"orchestrator.tool_calls.{tool_name}.total", 0),
+                )
+            phase_latency_ms = {
+                phase: _average(
+                    counters.get(f"runtime.phase.{phase}.latency_ms_total", 0),
+                    counters.get(f"runtime.phase.{phase}.count_total", 0),
+                )
+                for phase in ("queue_wait", "fetching_data", "llm_execution", "final_response")
+            }
+            route_latency_ms = {
+                "conversation_list": _average(
+                    counters.get("api.conversations.list.latency_ms_total", 0),
+                    counters.get("api.conversations.list.success_total", 0),
+                ),
+                "conversation_messages": _average(
+                    counters.get("api.conversations.messages.latency_ms_total", 0),
+                    counters.get("api.conversations.messages.success_total", 0),
+                ),
+                "document_list": _average(
+                    counters.get("api.documents.list.latency_ms_total", 0),
+                    counters.get("api.documents.list.success_total", 0),
+                ),
             }
 
             runtime_submit_requests = counters.get("runtime.submit_run.requests_total", 0)
@@ -366,6 +404,7 @@ async def get_observability_summary():
                         counters.get("runtime.execute_run.success_total", 0),
                     ),
                     "average_completed_run_latency_ms": database_summary["average_run_latency_ms"],
+                    "phase_latency_ms": phase_latency_ms,
                 },
                 "orchestration": {
                     "tool_calls_total": counters.get("orchestrator.tool_calls_total", 0),
@@ -379,6 +418,15 @@ async def get_observability_summary():
                         counters.get("orchestrator.langgraph.invoke.latency_ms_total", 0),
                         counters.get("orchestrator.langgraph.invoke.success_total", 0),
                     ),
+                    "average_final_response_latency_ms": _average(
+                        counters.get("orchestrator.final_response.latency_ms_total", 0),
+                        counters.get("orchestrator.final_response.count_total", 0),
+                    ),
+                    "average_tool_call_latency_ms": _average(
+                        counters.get("orchestrator.tool_calls.latency_ms_total", 0),
+                        counters.get("orchestrator.tool_calls_total", 0),
+                    ),
+                    "tool_latency_ms": tool_latency_ms,
                 },
                 "api": {
                     "chat_submit_requests_total": api_chat_submit_requests,
@@ -392,6 +440,7 @@ async def get_observability_summary():
                         counters.get("api.documents.upload.latency_ms_total", 0),
                         counters.get("api.documents.upload.success_total", 0),
                     ),
+                    "route_latency_ms": route_latency_ms,
                 },
                 "tool_usage": dict(sorted(tool_usage.items(), key=lambda item: item[1], reverse=True)),
                 "run_status_counts": database_summary["run_status_counts"],

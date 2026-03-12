@@ -396,6 +396,122 @@ class TestCoreOrchestrator(unittest.TestCase):
         self.assertIn("orchestrator.tool_calls_total", incremented_keys)
         self.assertIn("orchestrator.tool_calls.calculator.total", incremented_keys)
 
+    def test_process_request_returns_phase_and_tool_timings(self):
+        mock_agent = MagicMock()
+        mock_tool_call = {
+            "id": "tool-call-1",
+            "name": "calculator",
+            "args": {"expression": "2+2"},
+        }
+        mock_ai_message = Mock()
+        mock_ai_message.tool_calls = [mock_tool_call]
+        mock_tool_message = Mock()
+        mock_tool_message.tool_calls = []
+        mock_tool_message.tool_call_id = "tool-call-1"
+        mock_tool_message.content = "4"
+        mock_agent.invoke.return_value = {"messages": [mock_ai_message, mock_tool_message]}
+        response_agent_tool = Mock()
+        response_agent_tool.synthesize.return_value = "Answer"
+        run_registry = Mock()
+        run_registry.get_tool.side_effect = (
+            lambda name: response_agent_tool if name == "response_agent" else None
+        )
+
+        def clone_registry(_selected_documents, tool_timing_sink=None):
+            if tool_timing_sink is not None:
+                tool_timing_sink(
+                    {
+                        "tool": "calculator",
+                        "started_at": "2026-03-12T10:00:00Z",
+                        "ended_at": "2026-03-12T10:00:01Z",
+                        "duration_ms": 11,
+                    }
+                )
+            return run_registry
+
+        with patch.object(
+            self.orchestrator.tool_registry,
+            "clone_with_selected_documents",
+            side_effect=clone_registry,
+        ), patch.object(
+            self.orchestrator,
+            "_build_orchestrator_agent",
+            return_value=mock_agent,
+        ), patch.object(
+            self.orchestrator,
+            "_ensure_llm",
+            return_value=Mock(),
+        ), patch("backend.orchestrator.core.db_ops") as mock_db_ops, patch(
+            "backend.orchestrator.core.increment_counter"
+        ), patch(
+            "backend.orchestrator.core.observe_operation"
+        ) as mock_obs:
+            mock_obs.return_value.__enter__ = Mock(return_value=None)
+            mock_obs.return_value.__exit__ = Mock(return_value=False)
+            mock_db_ops.get_conversation_history.return_value = []
+            mock_db_ops.save_message.return_value = None
+
+            result = asyncio.run(
+                self.orchestrator.process_request(
+                    "What is 2+2?",
+                    "conv-timings",
+                    selected_documents=[],
+                )
+            )
+
+        self.assertEqual(result["response"], "Answer")
+        self.assertIn("fetching_data", result["timings"]["phases"])
+        self.assertIn("llm_execution", result["timings"]["phases"])
+        self.assertIn("final_response", result["timings"]["phases"])
+        self.assertEqual(result["timings"]["tool_timings"][0]["tool"], "calculator")
+        self.assertEqual(result["timings"]["tool_timings"][0]["duration_ms"], 11)
+
+    def test_process_request_fallback_reports_final_response_timing_without_tool_timings(self):
+        mock_agent = MagicMock()
+        mock_agent.invoke.side_effect = RuntimeError("provider timeout")
+        direct_response = AsyncMock(return_value="Fallback answer")
+        response_agent_tool = Mock()
+        run_registry = Mock()
+        run_registry.get_tool.side_effect = lambda name: response_agent_tool if name == "response_agent" else None
+
+        with patch.object(
+            self.orchestrator.tool_registry,
+            "clone_with_selected_documents",
+            return_value=run_registry,
+        ), patch.object(
+            self.orchestrator,
+            "_build_orchestrator_agent",
+            return_value=mock_agent,
+        ), patch.object(
+            self.orchestrator,
+            "_ensure_llm",
+            return_value=Mock(),
+        ), patch.object(
+            self.orchestrator,
+            "_generate_direct_response",
+            direct_response,
+        ), patch("backend.orchestrator.core.db_ops") as mock_db_ops, patch(
+            "backend.orchestrator.core.increment_counter"
+        ), patch(
+            "backend.orchestrator.core.observe_operation"
+        ) as mock_obs:
+            mock_obs.return_value.__enter__ = Mock(return_value=None)
+            mock_obs.return_value.__exit__ = Mock(return_value=False)
+            mock_db_ops.get_conversation_history.return_value = []
+            mock_db_ops.save_message.return_value = None
+
+            result = asyncio.run(
+                self.orchestrator.process_request(
+                    "What is 15 + 27?",
+                    "conv-fallback-timings",
+                    selected_documents=[],
+                )
+            )
+
+        self.assertEqual(result["response"], "Fallback answer")
+        self.assertIn("final_response", result["timings"]["phases"])
+        self.assertEqual(result["timings"]["tool_timings"], [])
+
     def test_process_request_does_not_persist_user_message_when_setup_fails(self):
         with patch.object(
             self.orchestrator,

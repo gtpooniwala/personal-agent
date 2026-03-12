@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from dataclasses import replace
 from datetime import datetime
 from threading import RLock
@@ -65,6 +66,7 @@ class RunStore(ABC):
         status: str,
         message: str,
         tool: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> RunEventRecord:
         raise NotImplementedError
 
@@ -171,6 +173,7 @@ class InMemoryRunStore(RunStore):
         status: str,
         message: str,
         tool: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> RunEventRecord:
         with self._lock:
             if run_id not in self._runs:
@@ -185,11 +188,15 @@ class InMemoryRunStore(RunStore):
                 message=message,
                 tool=tool,
                 created_at=utcnow(),
+                metadata=deepcopy(metadata) if metadata is not None else None,
             )
             self._events[run_id].append(event)
             if len(self._events[run_id]) > self.MAX_EVENTS_PER_RUN:
                 self._events[run_id] = self._events[run_id][-self.MAX_EVENTS_PER_RUN :]
-            return replace(event)
+            return replace(
+                event,
+                metadata=deepcopy(event.metadata) if event.metadata is not None else None,
+            )
 
     def list_events(
         self,
@@ -222,7 +229,13 @@ class InMemoryRunStore(RunStore):
             page = events[start_idx : start_idx + limit]
             has_more = start_idx + limit < len(events)
             next_after = page[-1].event_id if page else after
-            return [replace(evt) for evt in page], next_after, has_more
+            return [
+                replace(
+                    evt,
+                    metadata=deepcopy(evt.metadata) if evt.metadata is not None else None,
+                )
+                for evt in page
+            ], next_after, has_more
 
     def _prune_runs_locked(self) -> None:
         overflow = len(self._runs) - self.MAX_STORED_RUNS
@@ -279,6 +292,7 @@ class SqliteRunStorePlaceholder(RunStore):
         status: str,
         message: str,
         tool: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> RunEventRecord:
         raise NotImplementedError(
             "Durable SQLite run store will land with issue #15 schema work"
@@ -392,6 +406,7 @@ class DbRunStore(RunStore):
         status: str,
         message: str,
         tool: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> RunEventRecord:
         # Verify run exists before appending event
         if not self._db_ops.get_run(run_id):
@@ -403,6 +418,7 @@ class DbRunStore(RunStore):
             status=status,
             message=message,
             tool=tool,
+            metadata=metadata,
         )
         return RunEventRecord(
             event_id=str(db_event["id"]),
@@ -412,6 +428,7 @@ class DbRunStore(RunStore):
             message=db_event["message"],
             created_at=self._parse_iso(db_event["created_at"]),
             tool=db_event.get("tool"),
+            metadata=db_event.get("metadata"),
         )
 
     def list_events(
@@ -452,6 +469,7 @@ class DbRunStore(RunStore):
                 message=event["message"],
                 created_at=self._parse_iso(event["created_at"]),
                 tool=event.get("tool"),
+                metadata=event.get("metadata"),
             )
             for event in db_events
         ]
@@ -509,6 +527,7 @@ class PostgresRunStorePlaceholder(RunStore):
         status: str,
         message: str,
         tool: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> RunEventRecord:
         raise NotImplementedError(
             "Postgres run store will be wired in the migration PR"

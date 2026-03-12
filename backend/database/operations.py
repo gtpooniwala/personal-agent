@@ -75,6 +75,12 @@ class DatabaseOperations:
 
     @staticmethod
     def _serialize_run_event(event: RunEvent) -> Dict[str, Any]:
+        metadata = None
+        if event.payload:
+            try:
+                metadata = json.loads(event.payload)
+            except (TypeError, json.JSONDecodeError):
+                metadata = None
         return {
             "id": event.id,
             "run_id": event.run_id,
@@ -84,6 +90,7 @@ class DatabaseOperations:
             "tool": event.tool,
             "error": event.error,
             "payload": event.payload,
+            "metadata": metadata,
             "created_at": DatabaseOperations._to_iso(event.created_at),
         }
 
@@ -682,10 +689,13 @@ class DatabaseOperations:
         tool: Optional[str] = None,
         error: Optional[str] = None,
         payload: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Append and return a run event."""
         self._validate_run_event_type(event_type)
         self._validate_run_status(status)
+        if metadata is not None and payload is not None:
+            raise ValueError("Provide either metadata or payload, not both")
 
         session = self.get_session()
         try:
@@ -696,7 +706,7 @@ class DatabaseOperations:
                 message=message,
                 tool=tool,
                 error=error,
-                payload=payload,
+                payload=json.dumps(metadata) if metadata is not None else payload,
             )
             session.add(event)
             session.commit()

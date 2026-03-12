@@ -1,9 +1,12 @@
 import asyncio
+from contextlib import contextmanager
+from datetime import datetime, timezone
 import json
 import logging
 import re
 from dataclasses import dataclass
-from typing import Dict, Any, Optional, List, Tuple
+from time import perf_counter
+from typing import Dict, Any, Iterator, Optional, List, Tuple
 
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
@@ -33,6 +36,19 @@ NO_SELECTED_DOCUMENTS_MESSAGE = (
 DOCUMENT_INTENT_PATTERN = re.compile(
     r"\b(document|documents|uploaded|file|files|contract|contracts|pdf|pdfs)\b"
 )
+PHASE_LABELS = {
+    "fetching_data": "Fetching data",
+    "llm_execution": "LLM execution",
+    "final_response": "Final response",
+}
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _isoformat_utc(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 @dataclass(frozen=True)
@@ -46,6 +62,55 @@ class OrchestratorRunContext:
     llm: Any
     run_registry: ToolRegistry
     run_agent: Any
+
+
+class AttemptTimingCollector:
+    """Collect structured per-attempt phase and tool timing data."""
+
+    def __init__(self) -> None:
+        self._phase_timings: Dict[str, Dict[str, Any]] = {}
+        self._tool_timings: List[Dict[str, Any]] = []
+
+    @contextmanager
+    def measure_phase(self, phase_key: str, label: Optional[str] = None) -> Iterator[None]:
+        started_at = _utcnow()
+        start = perf_counter()
+        try:
+            yield
+        finally:
+            ended_at = _utcnow()
+            self._phase_timings[phase_key] = {
+                "key": phase_key,
+                "label": label or PHASE_LABELS.get(
+                    phase_key,
+                    phase_key.replace("_", " ").title(),
+                ),
+                "started_at": _isoformat_utc(started_at),
+                "ended_at": _isoformat_utc(ended_at),
+                "duration_ms": max(int((perf_counter() - start) * 1000), 0),
+            }
+
+    def record_tool_timing(self, timing: Dict[str, Any]) -> None:
+        tool_name = str(timing.get("tool") or "unknown")
+        duration_ms = max(int(timing.get("duration_ms") or 0), 0)
+        self._tool_timings.append(
+            {
+                "tool": tool_name,
+                "started_at": timing.get("started_at"),
+                "ended_at": timing.get("ended_at"),
+                "duration_ms": duration_ms,
+            }
+        )
+
+    def build_payload(self) -> Dict[str, Any]:
+        return {
+            "phases": dict(self._phase_timings),
+            "tool_timings": list(self._tool_timings),
+            "tool_call_count": len(self._tool_timings),
+            "tool_calls_total_duration_ms": sum(
+                timing["duration_ms"] for timing in self._tool_timings
+            ),
+        }
 
 
 class CoreOrchestrator:
@@ -265,9 +330,11 @@ class CoreOrchestrator:
             metadata={"component": "orchestrator"},
         ) as operation_observation:
             try:
+                timing_collector = AttemptTimingCollector()
                 llm = self._ensure_llm()
                 run_registry = self.tool_registry.clone_with_selected_documents(
-                    selected_documents
+                    selected_documents,
+                    tool_timing_sink=timing_collector.record_tool_timing,
                 )
                 run_agent = self._build_orchestrator_agent(
                     conversation_id,
@@ -275,22 +342,23 @@ class CoreOrchestrator:
                     llm=llm,
                 )
 
-                # Save user message to database
-                db_ops.save_message(conversation_id, "user", user_request)
+                with timing_collector.measure_phase("fetching_data"):
+                    # Save user message to database
+                    db_ops.save_message(conversation_id, "user", user_request)
 
-                condensed_history = self.get_condensed_conversation_history(
-                    conversation_id
-                )
-                context = self._build_run_context(
-                    user_request=user_request,
-                    conversation_id=conversation_id,
-                    selected_documents=selected_documents,
-                    condensed_history=condensed_history,
-                    llm=llm,
-                    run_registry=run_registry,
-                    run_agent=run_agent,
-                )
-                messages = self._build_langgraph_messages(context.condensed_history)
+                    condensed_history = self.get_condensed_conversation_history(
+                        conversation_id
+                    )
+                    context = self._build_run_context(
+                        user_request=user_request,
+                        conversation_id=conversation_id,
+                        selected_documents=selected_documents,
+                        condensed_history=condensed_history,
+                        llm=llm,
+                        run_registry=run_registry,
+                        run_agent=run_agent,
+                    )
+                    messages = self._build_langgraph_messages(context.condensed_history)
                 token_usage = None
                 fallback_used = False
                 executed_actions: List[Dict[str, Any]] = []
@@ -305,18 +373,23 @@ class CoreOrchestrator:
                         metadata={"component": "orchestrator"},
                     ) as invoke_observation:
                         config = {"configurable": {"thread_id": conversation_id}}
-                        result = context.run_agent.invoke({"messages": messages}, config=config)
+                        with timing_collector.measure_phase("llm_execution"):
+                            result = context.run_agent.invoke(
+                                {"messages": messages},
+                                config=config,
+                            )
                         orchestration_actions = (
                             self._extract_langgraph_actions(result["messages"])
                             if result and "messages" in result
                             else []
                         ) or []
                         executed_actions = list(orchestration_actions)
-                        response = self._compose_response(
-                            context=context,
-                            agent_result=result,
-                            orchestration_actions=orchestration_actions,
-                        )
+                        with timing_collector.measure_phase("final_response"):
+                            response = self._compose_response(
+                                context=context,
+                                agent_result=result,
+                                orchestration_actions=orchestration_actions,
+                            )
 
                         if result and "messages" in result:
                             usage = self._extract_usage_metadata(result["messages"])
@@ -332,17 +405,37 @@ class CoreOrchestrator:
                     # back to an honest direct response rather than switching to a
                     # second handwritten routing policy. Retry behavior is tracked
                     # separately from this ownership cleanup.
-                    response = await self._generate_direct_response(
-                        llm=context.llm,
-                        user_request=user_request,
-                        conversation_history=context.condensed_history,
-                    )
+                    with timing_collector.measure_phase("final_response"):
+                        response = await self._generate_direct_response(
+                            llm=context.llm,
+                            user_request=user_request,
+                            conversation_history=context.condensed_history,
+                        )
                     orchestration_actions = []
 
+                timing_payload = timing_collector.build_payload()
                 for action in executed_actions or []:
                     tool_name = action.get("tool", "unknown")
                     increment_counter("orchestrator.tool_calls_total")
                     increment_counter(f"orchestrator.tool_calls.{tool_name}.total")
+                for tool_timing in timing_payload["tool_timings"]:
+                    tool_name = tool_timing["tool"]
+                    duration_ms = tool_timing["duration_ms"]
+                    increment_counter(
+                        "orchestrator.tool_calls.latency_ms_total",
+                        amount=duration_ms,
+                    )
+                    increment_counter(
+                        f"orchestrator.tool_calls.{tool_name}.latency_ms_total",
+                        amount=duration_ms,
+                    )
+                final_response_timing = timing_payload["phases"].get("final_response")
+                if final_response_timing is not None:
+                    increment_counter("orchestrator.final_response.count_total")
+                    increment_counter(
+                        "orchestrator.final_response.latency_ms_total",
+                        amount=final_response_timing["duration_ms"],
+                    )
                 if token_usage:
                     increment_counter("orchestrator.token_usage_total", amount=int(token_usage))
 
@@ -359,6 +452,7 @@ class CoreOrchestrator:
                         "tool_actions_count": len(executed_actions or []),
                         "token_usage": token_usage,
                         "fallback_used": fallback_used,
+                        "timings": timing_payload["phases"],
                     },
                 )
 
@@ -394,6 +488,7 @@ class CoreOrchestrator:
                     "conversation_id": conversation_id,
                     "orchestration_actions": orchestration_actions,
                     "token_usage": token_usage,
+                    "timings": timing_payload,
                 }
 
             except (MissingProviderKeyError, MissingModelDependencyError) as e:
@@ -410,7 +505,8 @@ class CoreOrchestrator:
                 return {
                     "response": response,
                     "conversation_id": conversation_id,
-                    "error": True
+                    "error": True,
+                    "timings": timing_collector.build_payload(),
                 }
             except Exception as e:
                 logger.error(f"Error in orchestrator processing: {str(e)}")
@@ -430,7 +526,8 @@ class CoreOrchestrator:
                 return {
                     "response": error_response,
                     "conversation_id": conversation_id,
-                    "error": True
+                    "error": True,
+                    "timings": timing_collector.build_payload(),
                 }
     
     async def maybe_summarise_conversation(self, conversation_id: str, context_window_tokens: int = 4096, threshold: float = 0.8) -> bool:

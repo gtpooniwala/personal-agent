@@ -308,12 +308,17 @@ class TestDatabaseOperations(unittest.TestCase):
             status="running",
             tool="calculator",
             message="Calling calculator",
+            metadata={"tool_timing": {"tool": "calculator", "duration_ms": 12}},
         )
 
         events = self.db_ops.list_run_events(run["id"])
         self.assertEqual([event["id"] for event in events], [first["id"], second["id"], third["id"]])
         self.assertEqual([event["type"] for event in events], ["queued", "started", "tool_call"])
         self.assertEqual(events[2]["tool"], "calculator")
+        self.assertEqual(
+            events[2]["metadata"],
+            {"tool_timing": {"tool": "calculator", "duration_ms": 12}},
+        )
 
         after_first = self.db_ops.list_run_events(run["id"], after_event_id=first["id"])
         self.assertEqual([event["id"] for event in after_first], [second["id"], third["id"]])

@@ -1,6 +1,9 @@
-from typing import Dict, List, Any, Optional
+from datetime import datetime, timezone
+from typing import Callable, Dict, List, Any, Optional
 from time import monotonic
 from backend.config import settings
+from langchain_core.tools import BaseTool
+from pydantic import PrivateAttr
 from .tools.calculator import CalculatorTool
 from .tools.time import CurrentTimeTool
 from .tools.search_documents import SearchDocumentsTool
@@ -13,6 +16,68 @@ from backend.orchestrator.tools.internet_search import InternetSearchTool
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _isoformat_utc(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+class InstrumentedTool(BaseTool):
+    """Run-scoped wrapper that records tool-call latency without changing behavior."""
+
+    name: str
+    description: str
+    args_schema: Any = None
+    return_direct: bool = False
+    _wrapped: BaseTool = PrivateAttr()
+    _timing_sink: Optional[Callable[[Dict[str, Any]], None]] = PrivateAttr(default=None)
+
+    def __init__(
+        self,
+        wrapped: BaseTool,
+        timing_sink: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> None:
+        super().__init__(
+            name=wrapped.name,
+            description=wrapped.description,
+            args_schema=getattr(wrapped, "args_schema", None),
+            return_direct=getattr(wrapped, "return_direct", False),
+        )
+        self._wrapped = wrapped
+        self._timing_sink = timing_sink
+
+    def _record_timing(self, started_at: float, started_timestamp: datetime) -> None:
+        if self._timing_sink is None:
+            return
+        ended_timestamp = datetime.now(timezone.utc)
+        duration_ms = max(int((monotonic() - started_at) * 1000), 0)
+        self._timing_sink(
+            {
+                "tool": self.name,
+                "started_at": _isoformat_utc(started_timestamp),
+                "ended_at": _isoformat_utc(ended_timestamp),
+                "duration_ms": duration_ms,
+            }
+        )
+
+    def _run(self, *args: Any, **kwargs: Any) -> Any:
+        started_at = monotonic()
+        started_timestamp = datetime.now(timezone.utc)
+        try:
+            return self._wrapped._run(*args, **kwargs)
+        finally:
+            self._record_timing(started_at, started_timestamp)
+
+    async def _arun(self, *args: Any, **kwargs: Any) -> Any:
+        started_at = monotonic()
+        started_timestamp = datetime.now(timezone.utc)
+        try:
+            wrapped_arun = getattr(self._wrapped, "_arun", None)
+            if callable(wrapped_arun):
+                return await wrapped_arun(*args, **kwargs)
+            return self._wrapped._run(*args, **kwargs)
+        finally:
+            self._record_timing(started_at, started_timestamp)
 
 
 class ToolRegistry:
@@ -36,6 +101,7 @@ class ToolRegistry:
         self.selected_documents = list(selected_documents or [])
         self._tools = {}
         self._last_runtime_capability_refresh_at: Optional[float] = None
+        self._tool_timing_sink: Optional[Callable[[Dict[str, Any]], None]] = None
         self._initialize_tools()
 
     def _initialize_tools(self):
@@ -66,7 +132,10 @@ class ToolRegistry:
             self.user_id,
         )
         if gmail_ready:
-            self._tools["gmail_read"] = GmailReadTool(self.user_id)
+            gmail_tool: BaseTool = GmailReadTool(self.user_id)
+            if self._tool_timing_sink is not None:
+                gmail_tool = InstrumentedTool(gmail_tool, self._tool_timing_sink)
+            self._tools["gmail_read"] = gmail_tool
             self._last_runtime_capability_refresh_at = monotonic()
             return
 
@@ -99,7 +168,12 @@ class ToolRegistry:
         self._set_search_documents_tool(selected_documents)
         logger.info(f"Updated tool registry with {len(selected_documents)} selected documents")
 
-    def clone_with_selected_documents(self, selected_documents: Optional[List[str]] = None) -> "ToolRegistry":
+    def clone_with_selected_documents(
+        self,
+        selected_documents: Optional[List[str]] = None,
+        *,
+        tool_timing_sink: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> "ToolRegistry":
         """
         Create a run-scoped registry that reuses static tool instances and rebuilds
         only document-dependent state.
@@ -109,8 +183,24 @@ class ToolRegistry:
         clone._tools = {name: tool for name, tool in self._tools.items() if name != "search_documents"}
         clone.selected_documents = []
         clone._last_runtime_capability_refresh_at = self._last_runtime_capability_refresh_at
+        clone._tool_timing_sink = tool_timing_sink
         clone._set_search_documents_tool(selected_documents)
+        if tool_timing_sink is not None:
+            clone.refresh_runtime_capabilities(force=True)
+            clone._wrap_active_tools(tool_timing_sink)
         return clone
+
+    def _wrap_active_tools(
+        self,
+        timing_sink: Callable[[Dict[str, Any]], None],
+    ) -> None:
+        self._tool_timing_sink = timing_sink
+        for tool_name in ("calculator", "current_time", "scratchpad", "internet_search", "user_profile", "gmail_read", "search_documents"):
+            tool = self._tools.get(tool_name)
+            if tool is not None:
+                if isinstance(tool, InstrumentedTool):
+                    tool = tool._wrapped
+                self._tools[tool_name] = InstrumentedTool(tool, timing_sink)
 
     def get_available_tools(self) -> List[Any]:
         """
