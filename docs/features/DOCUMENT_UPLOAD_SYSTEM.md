@@ -17,7 +17,8 @@ The Personal Agent now features an advanced document upload system that automati
 - Dynamic prompting based on document availability
 
 ### ⚡ **Dynamic Search Results**
-- Document search supports dynamic chunk selection (1-5 results)
+- The `search_documents` tool honors `max_results` in both sync and async execution paths
+- Requests are clamped to 1-5 results before calling document search
 - AI can choose how many chunks to retrieve based on query complexity
 - Optimized for both simple and complex queries
 
@@ -73,8 +74,8 @@ doc_processor.search_documents(query, user_id, limit=max_results, selected_docum
 
 ### Document QA Tool Updates
 ```python
-# Now supports dynamic chunk selection
-DocumentQAInput(
+# The tool contract supports dynamic chunk selection in both sync and async use
+SearchDocumentsInput(
     query="What are the key points?",
     max_results=3  # 1-5 chunks based on complexity
 )
