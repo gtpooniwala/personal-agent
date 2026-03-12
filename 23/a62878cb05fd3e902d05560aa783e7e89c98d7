@@ -1,0 +1,45 @@
+tests/test_core_orchestrator.py
+  0a7bd22d7814fed9 399-514
+backend/runtime/service.py
+  0a7bd22d7814fed9 37,54-59,256,321-322,332,335-343,349,368-372,379,383-386,388-390,397,413,430-431,445,617-706
+backend/runtime/store.py
+  0a7bd22d7814fed9 6,69,176,191,286,400,412,422,463,521
+backend/api/models.py
+  0a7bd22d7814fed9 240-307,319-320,322,324
+tests/test_api_routes.py
+  0a7bd22d7814fed9 320-331,343-346,419-426,436-441,443,450-451,453,470-473
+backend/orchestrator/tool_registry.py
+  0a7bd22d7814fed9 1-2,5-6,21-82,169-171,183-184,187-194
+backend/orchestrator/core.py
+  0a7bd22d7814fed9 2-3,8-9,39-43,46-51,67-113,333,336-337,345,376,379,387,408,416,421-438,455,491,508-509,529-530
+tests/test_runtime_store.py
+  0a7bd22d7814fed9 26-27,36-39
+tests/test_database_operations.py
+  0a7bd22d7814fed9 311,318-321
+backend/api/routes.py
+  0a7bd22d7814fed9 337,339-373,407,421-427,429,443
+backend/database/operations.py
+  0a7bd22d7814fed9 78-83,93,692,697-698,709
+tests/test_runtime_service.py
+  0a7bd22d7814fed9 87-121,132-152,237-248,288-297
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.11",
+  "base_commit_sha": "23a62878cb05fd3e902d05560aa783e7e89c98d7",
+  "prompts": {
+    "0a7bd22d7814fed9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ce3a9-ed8b-7472-9304-c0166e23e918",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 738,
+      "total_deletions": 42,
+      "accepted_lines": 693,
+      "overriden_lines": 0
+    }
+  }
+}
