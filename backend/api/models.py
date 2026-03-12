@@ -89,6 +89,18 @@ class ToolInfo(BaseModel):
     description: str = Field(..., description="Tool description")
 
 
+class GmailConnectionStatusResponse(BaseModel):
+    """Status for the Gmail integration connection."""
+
+    provider: str = Field(..., description="Integration provider name")
+    connected: bool = Field(..., description="Whether the current user has connected Gmail")
+    ready: bool = Field(..., description="Whether the app-level Gmail config is complete")
+    reasons: List[str] = Field(default_factory=list, description="Blocking or informational reasons")
+    account_label: Optional[str] = Field(None, description="Connected Gmail address if known")
+    expires_at: Optional[str] = Field(None, description="Token expiry timestamp if known")
+    scopes: List[str] = Field(default_factory=list, description="Granted Gmail scopes")
+
+
 class HealthResponse(BaseModel):
     """Health check response."""
     status: str = Field(..., description="Service status")

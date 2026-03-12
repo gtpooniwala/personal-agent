@@ -2,7 +2,7 @@ from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field, PrivateAttr
 from typing import List, Dict, Any, Optional, Type
 
-from backend.llm import create_chat_model, MissingProviderKeyError, MissingModelDependencyError
+from backend.llm import create_chat_model, extract_text, MissingProviderKeyError, MissingModelDependencyError
 from backend.orchestrator.prompts import build_response_agent_prompt, format_conversation_history, format_tool_results
 
 class ResponseAgentInput(BaseModel):
@@ -59,7 +59,7 @@ class ResponseAgentTool(BaseTool):
             "conversation_history_str": conversation_history_str,
         }
         response = self._chain.invoke(inputs)
-        return response.content if hasattr(response, "content") else str(response)
+        return extract_text(response)
 
     def synthesize(
         self,

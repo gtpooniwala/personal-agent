@@ -1,23 +1,48 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Query
+from fastapi.responses import RedirectResponse
 from backend.api.models import (
     ConversationCreate, ConversationResponse,
     MessageResponse, ToolInfo, HealthResponse, DocumentUploadResponse,
     DocumentListResponse, DocumentDeleteResponse, DocumentInfo,
     ObservabilitySummaryResponse,
-    TitleGenerationResponse
+    TitleGenerationResponse,
+    GmailConnectionStatusResponse,
 )
 from backend.services.document_service import doc_processor
 from backend.config import settings
 from typing import List
 from datetime import datetime
 import logging
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 from backend.api.state import orchestrator
 from backend.database.operations import db_ops
 from backend.observability import observe_operation, update_observation
+from backend.integrations.credential_store import (
+    MissingCredentialDependencyError,
+    MissingCredentialEncryptionKeyError,
+    credential_store,
+)
+from backend.integrations.gmail_oauth import (
+    GMAIL_CREDENTIAL_KIND,
+    GMAIL_PROVIDER,
+    GmailOAuthConfigurationError,
+    InvalidGmailOAuthStateError,
+    InvalidRedirectTargetError,
+    create_connect_url,
+    exchange_callback,
+    get_connection_status,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _current_user_id() -> str:
+    # The broader auth/user model still defaults to a single local user. The
+    # credential store is keyed by user_id so a future auth layer can plug into
+    # this without changing provider storage contracts.
+    return "default"
 
 
 def _average(total: int, count: int) -> float | None:
@@ -30,6 +55,33 @@ def _percentage(numerator: int, denominator: int) -> float | None:
     if denominator <= 0:
         return None
     return round((numerator / denominator) * 100, 1)
+
+
+def _resolve_frontend_redirect_target(return_to: str | None) -> str:
+    target = (return_to or "").strip()
+    frontend_url = (settings.frontend_url or "").strip()
+
+    if not target:
+        return frontend_url or "/"
+
+    parsed = urlsplit(target)
+    if parsed.scheme and parsed.netloc:
+        return target
+
+    if target.startswith("/") and frontend_url:
+        return urljoin(f"{frontend_url.rstrip('/')}/", target.lstrip("/"))
+
+    return target
+
+
+def _append_query_param(url: str, key: str, value: str) -> str:
+    parsed = urlsplit(url)
+    query = parse_qsl(parsed.query, keep_blank_values=True)
+    query.append((key, value))
+    path = parsed.path or "/"
+    return urlunsplit(
+        (parsed.scheme, parsed.netloc, path, urlencode(query), parsed.fragment)
+    )
 
 @router.get("/conversations", response_model=List[ConversationResponse])
 async def get_conversations():
@@ -124,6 +176,131 @@ async def health_check():
         timestamp=datetime.now().isoformat(),
         version="1.0.0"
     )
+
+
+@router.get("/gmail/status", response_model=GmailConnectionStatusResponse)
+async def gmail_connection_status():
+    """Return the current Gmail integration status for the active user."""
+    user_id = _current_user_id()
+    with observe_operation(
+        name="api.gmail.status",
+        counter_prefix="api.gmail.status",
+        as_type="retriever",
+        metadata={"component": "api", "endpoint": "/api/v1/gmail/status"},
+    ) as observation:
+        try:
+            status = get_connection_status(user_id)
+            orchestrator.tool_registry.refresh_runtime_capabilities(force=True)
+            update_observation(
+                observation,
+                output={"connected": status.get("connected", False)},
+            )
+            return GmailConnectionStatusResponse(**status)
+        except (MissingCredentialDependencyError, MissingCredentialEncryptionKeyError) as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except Exception as exc:
+            logger.error("Error getting Gmail status: %s", exc)
+            raise HTTPException(status_code=500, detail="Failed to retrieve Gmail status") from exc
+
+
+@router.get("/gmail/connect")
+async def gmail_connect(return_to: str | None = Query(default=None)):
+    """Start the Gmail OAuth web flow for the active user."""
+    user_id = _current_user_id()
+    with observe_operation(
+        name="api.gmail.connect",
+        counter_prefix="api.gmail.connect",
+        as_type="span",
+        input_data={"has_return_to": bool(return_to)},
+        metadata={"component": "api", "endpoint": "/api/v1/gmail/connect"},
+    ) as observation:
+        try:
+            authorization_url = create_connect_url(user_id=user_id, return_to=return_to)
+            update_observation(observation, output={"redirect": True})
+            return RedirectResponse(url=authorization_url, status_code=307)
+        except (
+            MissingCredentialDependencyError,
+            MissingCredentialEncryptionKeyError,
+            GmailOAuthConfigurationError,
+            InvalidRedirectTargetError,
+        ) as exc:
+            status = 400 if isinstance(exc, InvalidRedirectTargetError) else 503
+            raise HTTPException(status_code=status, detail=str(exc)) from exc
+        except Exception as exc:
+            logger.error("Error starting Gmail connect flow: %s", exc)
+            raise HTTPException(status_code=500, detail="Failed to start Gmail connect flow") from exc
+
+
+@router.get("/gmail/callback")
+async def gmail_callback(
+    state: str,
+    code: str | None = None,
+    error: str | None = Query(default=None),
+    error_description: str | None = Query(default=None),
+):
+    """Handle the Google OAuth callback for Gmail."""
+    with observe_operation(
+        name="api.gmail.callback",
+        counter_prefix="api.gmail.callback",
+        as_type="span",
+        metadata={"component": "api", "endpoint": "/api/v1/gmail/callback"},
+    ) as observation:
+        try:
+            if error:
+                description = f": {error_description}" if error_description else ""
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Gmail OAuth failed with error `{error}`{description}",
+                )
+            if not code:
+                raise HTTPException(status_code=400, detail="Missing Gmail OAuth authorization code.")
+            result = exchange_callback(state=state, code=code)
+            orchestrator.tool_registry.refresh_runtime_capabilities(force=True)
+            update_observation(
+                observation,
+                output={"connected": True, "account_label": result.get("account_label")},
+            )
+            base_redirect = _resolve_frontend_redirect_target(result.get("return_to"))
+            return RedirectResponse(
+                url=_append_query_param(base_redirect, "gmail", "connected"),
+                status_code=307,
+            )
+        except HTTPException:
+            raise
+        except (InvalidGmailOAuthStateError, InvalidRedirectTargetError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except (MissingCredentialDependencyError, MissingCredentialEncryptionKeyError) as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except Exception as exc:
+            logger.error("Error completing Gmail callback: %s", exc)
+            raise HTTPException(status_code=500, detail="Failed to complete Gmail OAuth callback") from exc
+
+
+@router.delete("/gmail/connection", response_model=GmailConnectionStatusResponse)
+async def gmail_disconnect():
+    """Delete the saved Gmail connection for the active user."""
+    user_id = _current_user_id()
+    with observe_operation(
+        name="api.gmail.disconnect",
+        counter_prefix="api.gmail.disconnect",
+        as_type="span",
+        metadata={"component": "api", "endpoint": "/api/v1/gmail/connection"},
+    ) as observation:
+        try:
+            credential_store.delete(
+                user_id=user_id,
+                provider=GMAIL_PROVIDER,
+                credential_kind=GMAIL_CREDENTIAL_KIND,
+            )
+            orchestrator.tool_registry.refresh_runtime_capabilities(force=True)
+            status = get_connection_status(user_id)
+            update_observation(observation, output={"connected": False})
+            return GmailConnectionStatusResponse(**status)
+        except (MissingCredentialDependencyError, MissingCredentialEncryptionKeyError) as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except Exception as exc:
+            logger.error("Error disconnecting Gmail: %s", exc)
+            raise HTTPException(status_code=500, detail="Failed to disconnect Gmail") from exc
 
 
 @router.get("/observability/summary", response_model=ObservabilitySummaryResponse)

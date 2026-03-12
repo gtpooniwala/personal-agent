@@ -19,7 +19,12 @@ try:
     from backend.api import routes, runtime_routes
     import backend.main as main_module
     from backend.main import app, settings as app_settings
-except Exception as exc:
+    from backend.integrations.gmail_oauth import (
+        GmailOAuthConfigurationError,
+        InvalidGmailOAuthStateError,
+        InvalidRedirectTargetError,
+    )
+except (ImportError, ModuleNotFoundError) as exc:
     API_TESTS_AVAILABLE = False
     API_IMPORT_ERROR = str(exc)
 
@@ -110,6 +115,137 @@ class TestAPIRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["status"], "healthy")
+
+    @patch("backend.api.routes.orchestrator.tool_registry.refresh_runtime_capabilities")
+    @patch("backend.api.routes.get_connection_status")
+    def test_gmail_status_endpoint_returns_connection_status(
+        self,
+        mock_get_status,
+        mock_refresh_capabilities,
+    ):
+        mock_get_status.return_value = {
+            "provider": "gmail",
+            "connected": False,
+            "ready": True,
+            "reasons": ["account_not_connected"],
+            "account_label": None,
+            "expires_at": None,
+            "scopes": [],
+        }
+        response = self.client.get("/api/v1/gmail/status")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["provider"], "gmail")
+        mock_refresh_capabilities.assert_called_once_with(force=True)
+
+    @patch("backend.api.routes.create_connect_url")
+    def test_gmail_connect_endpoint_redirects_to_google(self, mock_create_connect_url):
+        mock_create_connect_url.return_value = "https://accounts.google.com/o/oauth2/v2/auth?client_id=test"
+        response = self.client.get(
+            "/api/v1/gmail/connect?return_to=http://localhost:3000/settings",
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 307)
+        self.assertEqual(
+            response.headers["location"],
+            "https://accounts.google.com/o/oauth2/v2/auth?client_id=test",
+        )
+
+    @patch(
+        "backend.api.routes.create_connect_url",
+        side_effect=GmailOAuthConfigurationError("oauth not configured"),
+    )
+    def test_gmail_connect_endpoint_surfaces_configuration_gaps_as_service_unavailable(self, _mock_create_connect_url):
+        response = self.client.get("/api/v1/gmail/connect", follow_redirects=False)
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json(), {"detail": "oauth not configured"})
+
+    @patch(
+        "backend.api.routes.create_connect_url",
+        side_effect=InvalidRedirectTargetError("return_to must target the configured frontend origin."),
+    )
+    def test_gmail_connect_endpoint_rejects_unsafe_return_to(self, _mock_create_connect_url):
+        response = self.client.get("/api/v1/gmail/connect?return_to=https://evil.example.com", follow_redirects=False)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"detail": "return_to must target the configured frontend origin."})
+
+    @patch("backend.api.routes.orchestrator.tool_registry.refresh_runtime_capabilities")
+    @patch("backend.api.routes.exchange_callback")
+    def test_gmail_callback_redirects_back_to_frontend(
+        self,
+        mock_exchange_callback,
+        mock_refresh_capabilities,
+    ):
+        mock_exchange_callback.return_value = {
+            "user_id": "default",
+            "return_to": "http://localhost:3000/settings",
+            "account_label": "user@example.com",
+        }
+        response = self.client.get(
+            "/api/v1/gmail/callback?state=test-state&code=test-code",
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 307)
+        self.assertEqual(response.headers["location"], "http://localhost:3000/settings?gmail=connected")
+        mock_refresh_capabilities.assert_called_once_with(force=True)
+
+    @patch("backend.api.routes.orchestrator.tool_registry.refresh_runtime_capabilities")
+    @patch("backend.api.routes.exchange_callback")
+    def test_gmail_callback_prefixes_relative_return_to_and_preserves_fragment(
+        self,
+        mock_exchange_callback,
+        mock_refresh_capabilities,
+    ):
+        mock_exchange_callback.return_value = {
+            "user_id": "default",
+            "return_to": "/settings?tab=gmail#connections",
+            "account_label": "user@example.com",
+        }
+        with self._override_settings(frontend_url="http://localhost:3001"):
+            response = self.client.get(
+                "/api/v1/gmail/callback?state=test-state&code=test-code",
+                follow_redirects=False,
+            )
+        self.assertEqual(response.status_code, 307)
+        self.assertEqual(
+            response.headers["location"],
+            "http://localhost:3001/settings?tab=gmail&gmail=connected#connections",
+        )
+        mock_refresh_capabilities.assert_called_once_with(force=True)
+
+    @patch(
+        "backend.api.routes.exchange_callback",
+        side_effect=InvalidGmailOAuthStateError("Invalid or expired Gmail OAuth state."),
+    )
+    def test_gmail_callback_returns_bad_request_for_invalid_state(self, _mock_exchange_callback):
+        response = self.client.get(
+            "/api/v1/gmail/callback?state=expired-state&code=test-code",
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"detail": "Invalid or expired Gmail OAuth state."})
+
+    @patch(
+        "backend.api.routes.exchange_callback",
+        side_effect=InvalidRedirectTargetError("return_to must target the configured frontend origin."),
+    )
+    def test_gmail_callback_rejects_unsafe_persisted_return_to(self, _mock_exchange_callback):
+        response = self.client.get(
+            "/api/v1/gmail/callback?state=test-state&code=test-code",
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"detail": "return_to must target the configured frontend origin."})
+
+    def test_gmail_callback_surfaces_oauth_denial_without_422(self):
+        response = self.client.get(
+            "/api/v1/gmail/callback?state=test-state&error=access_denied&error_description=user%20denied",
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json(),
+            {"detail": "Gmail OAuth failed with error `access_denied`: user denied"},
+        )
 
     @patch("backend.api.runtime_routes.runtime_service.submit_run", new_callable=AsyncMock)
     def test_runtime_chat_submit_endpoint_requires_bearer_token(self, mock_submit_run):

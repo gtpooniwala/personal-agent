@@ -5,6 +5,8 @@ from backend.database.models import (
     Conversation,
     Document,
     ExternalTrigger,
+    IntegrationCredential,
+    IntegrationOAuthState,
     MemoryStore,
     Message,
     Run,
@@ -19,6 +21,7 @@ import json
 from datetime import datetime, timedelta, timezone
 import atexit
 import threading
+import uuid
 
 from backend.runtime import RUN_EVENT_TYPE_SET, RUN_STATUS_SET
 
@@ -93,6 +96,23 @@ class DatabaseOperations:
             "acquired_at": DatabaseOperations._to_iso(row["acquired_at"]),
             "expires_at": DatabaseOperations._to_iso(row["expires_at"]),
             "updated_at": DatabaseOperations._to_iso(row["updated_at"]),
+        }
+
+    @staticmethod
+    def _serialize_integration_credential(record: IntegrationCredential) -> Dict[str, Any]:
+        return {
+            "id": record.id,
+            "user_id": record.user_id,
+            "provider": record.provider,
+            "credential_kind": record.credential_kind,
+            "account_label": record.account_label,
+            "scopes": json.loads(record.scopes) if record.scopes else [],
+            "status": record.status,
+            "expires_at": DatabaseOperations._to_iso(record.expires_at),
+            "ciphertext": record.ciphertext,
+            "key_version": record.key_version,
+            "created_at": DatabaseOperations._to_iso(record.created_at),
+            "updated_at": DatabaseOperations._to_iso(record.updated_at),
         }
 
     @staticmethod
@@ -256,6 +276,171 @@ class DatabaseOperations:
                 }
                 for msg in messages
             ]
+        finally:
+            session.close()
+
+    def upsert_integration_credential(
+        self,
+        *,
+        user_id: str,
+        provider: str,
+        credential_kind: str,
+        ciphertext: str,
+        account_label: Optional[str] = None,
+        scopes: Optional[List[str]] = None,
+        status: str = "connected",
+        expires_at: Optional[datetime] = None,
+        key_version: str = "v1",
+    ) -> Dict[str, Any]:
+        """Create or update an encrypted integration credential record."""
+        session = self.get_session()
+        try:
+            record = (
+                session.query(IntegrationCredential)
+                .filter(
+                    IntegrationCredential.user_id == user_id,
+                    IntegrationCredential.provider == provider,
+                    IntegrationCredential.credential_kind == credential_kind,
+                )
+                .first()
+            )
+            if record is None:
+                record = IntegrationCredential(
+                    user_id=user_id,
+                    provider=provider,
+                    credential_kind=credential_kind,
+                    ciphertext=ciphertext,
+                    account_label=account_label,
+                    scopes=json.dumps(scopes) if scopes is not None else None,
+                    status=status,
+                    expires_at=expires_at,
+                    key_version=key_version,
+                )
+                session.add(record)
+            else:
+                record.ciphertext = ciphertext
+                record.account_label = account_label
+                record.scopes = json.dumps(scopes) if scopes is not None else None
+                record.status = status
+                record.expires_at = expires_at
+                record.key_version = key_version
+                record.updated_at = datetime.now(timezone.utc)
+
+            session.commit()
+            session.refresh(record)
+            return self._serialize_integration_credential(record)
+        finally:
+            session.close()
+
+    def get_integration_credential(
+        self,
+        *,
+        user_id: str,
+        provider: str,
+        credential_kind: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Return one integration credential if present."""
+        session = self.get_session()
+        try:
+            record = (
+                session.query(IntegrationCredential)
+                .filter(
+                    IntegrationCredential.user_id == user_id,
+                    IntegrationCredential.provider == provider,
+                    IntegrationCredential.credential_kind == credential_kind,
+                )
+                .first()
+            )
+            return self._serialize_integration_credential(record) if record else None
+        finally:
+            session.close()
+
+    def delete_integration_credential(
+        self,
+        *,
+        user_id: str,
+        provider: str,
+        credential_kind: str,
+    ) -> bool:
+        """Delete one integration credential record."""
+        session = self.get_session()
+        try:
+            deleted = (
+                session.query(IntegrationCredential)
+                .filter(
+                    IntegrationCredential.user_id == user_id,
+                    IntegrationCredential.provider == provider,
+                    IntegrationCredential.credential_kind == credential_kind,
+                )
+                .delete()
+            )
+            session.commit()
+            return bool(deleted)
+        finally:
+            session.close()
+
+    def create_integration_oauth_state(
+        self,
+        *,
+        user_id: str,
+        provider: str,
+        return_to: Optional[str],
+        expires_at: datetime,
+    ) -> str:
+        """Persist a short-lived OAuth state token."""
+        session = self.get_session()
+        try:
+            state = str(uuid.uuid4())
+            record = IntegrationOAuthState(
+                state=state,
+                user_id=user_id,
+                provider=provider,
+                return_to=return_to,
+                expires_at=expires_at,
+            )
+            session.add(record)
+            session.commit()
+            return state
+        finally:
+            session.close()
+
+    def consume_integration_oauth_state(
+        self,
+        *,
+        state: str,
+        provider: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Load and delete a valid OAuth state token."""
+        session = self.get_session()
+        try:
+            record = (
+                session.query(IntegrationOAuthState)
+                .filter(
+                    IntegrationOAuthState.state == state,
+                    IntegrationOAuthState.provider == provider,
+                )
+                .with_for_update()
+                .first()
+            )
+            if record is None:
+                return None
+
+            expires_at = record.expires_at
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            payload = {
+                "state": record.state,
+                "user_id": record.user_id,
+                "provider": record.provider,
+                "return_to": record.return_to,
+                "expires_at": self._to_iso(expires_at),
+            }
+            session.delete(record)
+            session.commit()
+            if expires_at < datetime.now(timezone.utc):
+                return None
+
+            return payload
         finally:
             session.close()
     

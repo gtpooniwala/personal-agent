@@ -1,4 +1,4 @@
-const VERSIONED_ROOTS = new Set(["conversations", "tools", "documents", "health", "observability"]);
+const VERSIONED_ROOTS = new Set(["conversations", "tools", "documents", "health", "observability", "gmail"]);
 const RUNTIME_ROOTS = new Set(["chat", "runs"]);
 const BLOCKED_REQUEST_HEADERS = new Set([
   "authorization",

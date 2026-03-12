@@ -1,4 +1,5 @@
 from typing import Dict, List, Any, Optional
+from time import monotonic
 from backend.config import settings
 from .tools.calculator import CalculatorTool
 from .tools.time import CurrentTimeTool
@@ -27,11 +28,14 @@ class ToolRegistry:
     The registry makes it easy to add new tools - just implement the tool
     and register it here. The orchestrator will automatically discover it.
     """
+
+    GMAIL_CAPABILITY_REFRESH_TTL_SECONDS = 5.0
     
     def __init__(self, user_id: str = "default", selected_documents: Optional[List[str]] = None):
         self.user_id = user_id
         self.selected_documents = list(selected_documents or [])
         self._tools = {}
+        self._last_runtime_capability_refresh_at: Optional[float] = None
         self._initialize_tools()
 
     def _initialize_tools(self):
@@ -42,15 +46,7 @@ class ToolRegistry:
         self._tools["calculator"] = CalculatorTool()
         self._tools["current_time"] = CurrentTimeTool()
         self._tools["scratchpad"] = ScratchpadTool(self.user_id)
-
-        gmail_ready, gmail_reasons = get_gmail_readiness(settings.enable_gmail_integration)
-        if gmail_ready:
-            self._tools["gmail_read"] = GmailReadTool()
-        else:
-            logger.info(
-                "Skipping gmail_read tool registration: %s",
-                ", ".join(gmail_reasons)
-            )
+        self._sync_gmail_tool()
 
         # Response agent tool (for handling responses)
         self._tools["response_agent"] = ResponseAgentTool()
@@ -63,6 +59,30 @@ class ToolRegistry:
         # Summarisation agent (always available)
         self._tools["summarisation_agent"] = SummarisationAgent()
         self._set_search_documents_tool(self.selected_documents)
+
+    def _sync_gmail_tool(self) -> None:
+        gmail_ready, gmail_reasons = get_gmail_readiness(
+            settings.enable_gmail_integration,
+            self.user_id,
+        )
+        if gmail_ready:
+            self._tools["gmail_read"] = GmailReadTool(self.user_id)
+            self._last_runtime_capability_refresh_at = monotonic()
+            return
+
+        self._tools.pop("gmail_read", None)
+        logger.info(
+            "Skipping gmail_read tool registration: %s",
+            ", ".join(gmail_reasons),
+        )
+        self._last_runtime_capability_refresh_at = monotonic()
+
+    def refresh_runtime_capabilities(self, *, force: bool = False) -> None:
+        """Refresh tools whose availability can change at runtime."""
+        if not force and self._last_runtime_capability_refresh_at is not None:
+            if monotonic() - self._last_runtime_capability_refresh_at < self.GMAIL_CAPABILITY_REFRESH_TTL_SECONDS:
+                return
+        self._sync_gmail_tool()
 
     def _set_search_documents_tool(self, selected_documents: Optional[List[str]]) -> None:
         """Refresh the document-scoped search tool without rebuilding static tools."""
@@ -88,6 +108,7 @@ class ToolRegistry:
         clone.user_id = self.user_id
         clone._tools = {name: tool for name, tool in self._tools.items() if name != "search_documents"}
         clone.selected_documents = []
+        clone._last_runtime_capability_refresh_at = self._last_runtime_capability_refresh_at
         clone._set_search_documents_tool(selected_documents)
         return clone
 
@@ -95,6 +116,7 @@ class ToolRegistry:
         """
         Get list of tools that should be available to the orchestrator.
         """
+        self.refresh_runtime_capabilities()
         # This is capability gating only. The model owns normal tool selection
         # from the tools exposed here.
         available_tools = ["calculator", "current_time", "scratchpad", "internet_search", "user_profile"]
@@ -145,11 +167,12 @@ class ToolRegistry:
     
     def get_tool_info(self) -> List[Dict[str, str]]:
         """Get information about all registered tools."""
+        active_tool_names = {tool.name for tool in self.get_available_tools()}
         return [
             {
                 "name": name,
                 "description": getattr(tool, 'description', 'No description available'),
-                "active": name in [t.name for t in self.get_available_tools()]
+                "active": name in active_tool_names,
             }
-            for name, tool in self._tools.items()
+            for name, tool in list(self._tools.items())
         ]

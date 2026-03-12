@@ -1,31 +1,31 @@
-import os
-import pickle
+from __future__ import annotations
+
 from importlib.util import find_spec
-from typing import List, Tuple
+import logging
+from typing import List, Optional, Tuple, Type
 
 from langchain_core.tools import BaseTool
+from pydantic import BaseModel, Field
 
-GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
+from backend.integrations.credential_store import (
+    MissingCredentialDependencyError,
+    MissingCredentialEncryptionKeyError,
+    UnreadableCredentialError,
+)
+from backend.integrations.gmail_oauth import (
+    get_connection_status,
+    gmail_tool_ready,
+    load_user_credentials,
+    save_user_credentials,
+)
 
-
-def _get_credentials_path() -> str:
-    return os.environ.get(
-        "GMAIL_CREDENTIALS_PATH",
-        os.path.join(BASE_DIR, "backend/data/gmail/client_secret.json"),
-    )
-
-
-def _get_token_path() -> str:
-    return os.environ.get(
-        "GMAIL_TOKEN_PATH", os.path.join(BASE_DIR, "backend/data/gmail/token.pickle")
-    )
+logger = logging.getLogger(__name__)
 
 
 def _gmail_dependencies_installed() -> bool:
     required_modules = (
         "google.auth.transport.requests",
-        "google_auth_oauthlib.flow",
+        "google.oauth2.credentials",
         "googleapiclient.discovery",
     )
     for module_name in required_modules:
@@ -37,147 +37,143 @@ def _gmail_dependencies_installed() -> bool:
     return True
 
 
-def get_gmail_readiness(enable_gmail_integration: bool) -> Tuple[bool, List[str]]:
-    """
-    Determine whether Gmail integration should be exposed to the orchestrator.
-    """
+def get_gmail_readiness(enable_gmail_integration: bool, user_id: str = "default") -> Tuple[bool, List[str]]:
+    """Determine whether Gmail integration should be exposed to the orchestrator."""
     if not enable_gmail_integration:
         return False, ["feature_flag_disabled"]
+    return gmail_tool_ready(user_id)
 
-    reasons = []
-    if not _gmail_dependencies_installed():
-        reasons.append("dependencies_missing")
-    if not os.path.exists(_get_credentials_path()):
-        reasons.append("credentials_missing")
 
-    return len(reasons) == 0, reasons
+class GmailReadInput(BaseModel):
+    """Structured input contract for Gmail inbox reads."""
+
+    query: Optional[str] = Field(
+        default=None,
+        description="Optional Gmail search query, such as 'from:alice newer_than:7d' or 'label:unread'. Leave empty for latest inbox messages.",
+    )
+    max_results: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="Maximum number of matching emails to return.",
+    )
+    label_ids: Optional[List[str]] = Field(
+        default=None,
+        description="Optional Gmail label filters such as ['INBOX'] or ['UNREAD']. Defaults to ['INBOX'].",
+    )
 
 
 class GmailReadTool(BaseTool):
     """
     Tool: gmail_read
     Description: Use this tool to search, filter, and read emails from the user's Gmail inbox.
-
-    Features:
-    - OAuth authentication (secure, user-granted access)
-    - Full Gmail search syntax support (by sender, subject, date, label, etc.)
-    - Fetches multiple emails per query (not just the latest)
-    - Returns sender, subject, date, and snippet for each email
-    - Supports label-based filtering (e.g., INBOX, UNREAD)
-    - Handles both simple and advanced user queries
-
-    Usage:
-    - "Show emails from Alice last week"
-    - "Find unread messages with 'invoice' in the subject"
-    - "Read my latest email"
-    - "Search for emails about project X from Bob"
     """
 
     name: str = "gmail_read"
     description: str = (
-        "Fetches the most recent email from the user's Gmail inbox. "
-        "Returns sender, subject, snippet, and date. "
-        "Use for queries like 'show my latest email', 'read my newest message', or 'what is my last received email?'."
+        "Reads the user's Gmail inbox and can fetch the latest emails, newest messages, unread mail, "
+        "or messages matching a sender/search query. Returns sender, subject, snippet, and date. "
+        "Use for queries like 'show my latest emails', 'read my newest message', "
+        "'what are my latest emails?', or 'find email from Alice'."
     )
+    args_schema: Type[BaseModel] = GmailReadInput
 
-    def _run(self, **kwargs):
-        credentials_path = _get_credentials_path()
-        token_path = _get_token_path()
+    def __init__(self, user_id: str = "default"):
+        super().__init__()
+        object.__setattr__(self, "_user_id", user_id)
 
+    def _run(
+        self,
+        query: Optional[str] = None,
+        max_results: int = 5,
+        label_ids: Optional[List[str]] = None,
+    ) -> str:
         if not _gmail_dependencies_installed():
             return (
                 "Gmail integration dependencies are missing. "
                 "Please run `pip install -r backend/requirements-gmail.txt` to use this tool."
             )
 
-        if not os.path.exists(credentials_path):
+        try:
+            status = get_connection_status(self._user_id)
+        except (MissingCredentialDependencyError, MissingCredentialEncryptionKeyError) as exc:
+            return str(exc)
+
+        if not status.get("ready"):
+            reasons = ", ".join(status.get("reasons") or ["unknown"])
+            return f"Gmail integration is not configured for this app yet ({reasons})."
+
+        try:
+            creds = load_user_credentials(self._user_id)
+        except UnreadableCredentialError as exc:
             return (
-                "Gmail credentials file not found. "
-                "Set GMAIL_CREDENTIALS_PATH or place a client secret file at 'backend/data/gmail/client_secret.json'."
+                f"{exc} From the frontend, visit `/api/agent/gmail/connect` to reconnect Gmail "
+                "(or call `/api/v1/gmail/connect` directly against the backend API)."
+            )
+
+        if creds is None:
+            return (
+                "Gmail is not connected for this user yet. From the frontend, visit "
+                "`/api/agent/gmail/connect` to authorize access (or call `/api/v1/gmail/connect` "
+                "directly against the backend API)."
             )
 
         try:
             from google.auth.transport.requests import Request
             from google.auth.exceptions import RefreshError
-            from google_auth_oauthlib.flow import InstalledAppFlow
             from googleapiclient.discovery import build
             from googleapiclient.errors import HttpError
-        except ImportError as e:
-            return f"Failed to import Gmail dependencies: {e}. Please check your installation."
+        except ImportError as exc:
+            return f"Failed to import Gmail dependencies: {exc}. Please check your installation."
 
-        creds = None
-        # Load token if it exists
-        if os.path.exists(token_path):
-            try:
-                with open(token_path, "rb") as token:
-                    creds = pickle.load(token)
-            except Exception as e:
-                return f"Failed to read existing token at '{token_path}': {e}. Please delete it and authenticate again."
-
-        # If no valid creds, do OAuth flow
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
+        if not creds.valid:
+            if creds.expired and creds.refresh_token:
                 try:
                     creds.refresh(Request())
-                except RefreshError as e:
-                    return f"Gmail auth expired and refresh failed: {e}. Please delete '{token_path}' and re-authenticate."
-                except Exception as e:
-                    return f"Unexpected error refreshing Gmail token: {e}. Please delete '{token_path}' and try again."
-            else:
-                try:
-                    flow = InstalledAppFlow.from_client_secrets_file(
-                        credentials_path, GMAIL_SCOPES
+                    save_user_credentials(
+                        self._user_id,
+                        creds,
+                        account_label=status.get("account_label"),
                     )
-                    creds = flow.run_local_server(port=0)
-                except Exception as e:
-                    return f"Failed to run OAuth flow: {e}. Please verify your client_secret.json."
+                except RefreshError as exc:
+                    return (
+                        "Gmail authorization expired and refresh failed. "
+                        "Please reconnect your Gmail account. "
+                        f"Details: {exc}"
+                    )
+                except Exception as exc:
+                    return f"Unexpected error refreshing Gmail token: {exc}. Please reconnect Gmail."
+            else:
+                return "Gmail is connected, but the saved credentials are no longer usable. Please reconnect Gmail."
 
-            # Save the credentials for next run
-            token_dir = os.path.dirname(token_path)
-            if token_dir and not os.path.exists(token_dir):
-                try:
-                    os.makedirs(token_dir, exist_ok=True)
-                except OSError as e:
-                    return f"Failed to create directory for Gmail token at '{token_dir}': {e}."
-            try:
-                with open(token_path, "wb") as token:
-                    pickle.dump(creds, token)
-            except OSError as e:
-                return f"Failed to save Gmail OAuth token to '{token_path}': {e}."
-
-        # Build Gmail API service
         try:
             service = build("gmail", "v1", credentials=creds)
-        except Exception as e:
-            return f"Failed to build Gmail service: {e}."
+        except Exception as exc:
+            return f"Failed to build Gmail service: {exc}."
 
-        # Support search query, max_results, and label_ids
-        query = kwargs.get("query", None)  # Gmail search string
-        raw_max_results = kwargs.get("max_results", 5)
-        try:
-            max_results = int(raw_max_results)
-            if max_results <= 0:
-                raise ValueError("Must be positive")
-        except (TypeError, ValueError):
-            return f"Invalid 'max_results' value: {raw_max_results}. Please provide a positive integer."
-
-        label_ids = kwargs.get("label_ids", ["INBOX"])  # Default to INBOX
+        effective_label_ids = ["INBOX"] if label_ids is None else label_ids
 
         try:
             results = (
                 service.users()
                 .messages()
-                .list(userId="me", maxResults=max_results, labelIds=label_ids, q=query)
+                .list(
+                    userId="me",
+                    maxResults=int(max_results),
+                    labelIds=effective_label_ids,
+                    q=query,
+                )
                 .execute()
             )
-        except HttpError as e:
-            return f"Gmail API error during message search: {e}."
-        except Exception as e:
-            return f"Unexpected error during message search: {e}."
+        except HttpError as exc:
+            return f"Gmail API error during message search: {exc}."
+        except Exception as exc:
+            return f"Unexpected error during message search: {exc}."
 
         messages = results.get("messages", [])
         if not messages:
             return "No emails found matching your search."
+
         emails = []
         for msg_meta in messages:
             msg_id = msg_meta["id"]
@@ -193,10 +189,10 @@ class GmailReadTool(BaseTool):
                     )
                     .execute()
                 )
-            except HttpError as e:
-                return f"Gmail API error during message retrieval for {msg_id}: {e}."
-            except Exception as e:
-                return f"Unexpected error during message retrieval for {msg_id}: {e}."
+            except HttpError as exc:
+                return f"Gmail API error during message retrieval for {msg_id}: {exc}."
+            except Exception as exc:
+                return f"Unexpected error during message retrieval for {msg_id}: {exc}."
 
             headers = {h["name"]: h["value"] for h in msg["payload"].get("headers", [])}
             snippet = msg.get("snippet", "")
@@ -208,13 +204,29 @@ class GmailReadTool(BaseTool):
                     "snippet": snippet,
                 }
             )
-        # Format output for readability
+
         output = []
         for i, email in enumerate(emails, 1):
             output.append(
                 f"Email {i}:\nFrom: {email['from']}\nSubject: {email['subject']}\nDate: {email['date']}\nSnippet: {email['snippet']}\n"
             )
+        logger.info(
+            "Gmail tool executed",
+            extra={
+                "event": "gmail.tool.executed",
+                "user_id": self._user_id,
+                "max_results": max_results,
+                "query_present": bool(query),
+                "query_length": len(query) if query else 0,
+                "label_ids_count": len(effective_label_ids),
+            },
+        )
         return "\n".join(output)
 
-    async def _arun(self, **kwargs):
-        return self._run(**kwargs)
+    async def _arun(
+        self,
+        query: Optional[str] = None,
+        max_results: int = 5,
+        label_ids: Optional[List[str]] = None,
+    ) -> str:
+        return self._run(query=query, max_results=max_results, label_ids=label_ids)

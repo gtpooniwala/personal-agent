@@ -110,8 +110,8 @@ cp .env.example .env
 ### 3) Start backend + frontend
 
 ```bash
-# If you plan to use Gmail in docker compose, create the host auth directory first.
-mkdir -p data/gmail
+# If you plan to use Gmail, set GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET /
+# GOOGLE_OAUTH_REDIRECT_URI / CREDENTIALS_MASTER_KEY in .env first.
 docker compose up --build
 ```
 

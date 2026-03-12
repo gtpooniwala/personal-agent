@@ -31,26 +31,39 @@ The Gmail Tool provides robust integration with Gmail, enabling the agent to sea
   pip install -r backend/requirements-gmail.txt
   ```
 - **Google Cloud Project**:
-  1. Create a project in Google Cloud Console.
-  2. Enable the **Gmail API**.
-  3. Configure OAuth consent screen (add your email as a test user).
-  4. Create OAuth 2.0 Desktop App credentials.
-  5. Download the JSON file and save it as `backend/data/gmail/client_secret.json` (or set `GMAIL_CREDENTIALS_PATH`).
-  6. If you run the backend via `docker compose`, place Gmail auth files under `data/gmail/` on the host. The compose backend reads `/app/data/gmail/client_secret.json` and `/app/data/gmail/token.pickle`.
-- **First Run**:
-  - The first time the tool is used, it will launch a local browser window to authorize access.
-  - A token will be saved to `backend/data/gmail/token.pickle` for future use.
+  1. Sign in with the Google account that should own the app integration, typically your work account.
+  2. Create or select the app's Google Cloud project.
+  3. Enable the **Gmail API** once for that project.
+  4. Configure the OAuth consent screen for an External app.
+  5. If the app is still private, keep the consent screen in Testing and add each allowed Gmail user as a test user.
+  6. Create OAuth 2.0 **Web application** credentials.
+  7. Add the callback URI your users will actually hit:
+     - local Python: `http://localhost:8000/api/v1/gmail/callback`
+     - local Docker: `http://localhost:3001/api/agent/gmail/callback`
+     - production: `https://<your-frontend-host>/api/agent/gmail/callback`
+  8. Set `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `GOOGLE_OAUTH_REDIRECT_URI` in the app environment.
+  9. Set `CREDENTIALS_MASTER_KEY` so the app can store per-user Gmail tokens encrypted in Postgres.
+  10. Restart the backend after updating secrets.
+- **Credential Model**:
+  - App-level OAuth client secrets stay in env or a secret manager.
+  - Per-user Gmail access tokens and refresh tokens are stored encrypted in Postgres.
+  - Users do not need their own Google Cloud project or to enable Gmail API themselves.
+- **User Connect Flow**:
+  - In Docker/prod, the user visits `/api/agent/gmail/connect`.
+  - In direct-backend local Python, the user visits `/api/v1/gmail/connect`.
+  - Google redirects back to the configured callback URI above.
+  - The app stores the user's Gmail token encrypted in Postgres.
 
 ## Troubleshooting
 - **Dependencies Missing**: If you see an error about missing dependencies, run the pip install command above.
-- **Credentials Not Found**: Ensure `client_secret.json` is in the correct path (`backend/data/gmail/`) or `GMAIL_CREDENTIALS_PATH` is set.
-- **Auth Errors**: If authentication fails or tokens expire unexpectedly, delete `backend/data/gmail/token.pickle` and try again to trigger a new OAuth flow.
-- **Docker Compose Pathing**: When running in Docker, use `data/gmail/client_secret.json` and `data/gmail/token.pickle` on the host because the compose backend maps those to `/app/data/gmail/*`.
+- **App OAuth Config Missing**: Ensure `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `GOOGLE_OAUTH_REDIRECT_URI` are set.
+- **Encrypted Store Not Configured**: Ensure `CREDENTIALS_MASTER_KEY` is set and valid.
+- **Auth Errors**: If authentication fails or tokens expire unexpectedly, disconnect Gmail and reconnect through `/api/agent/gmail/connect` in Docker/prod, or `/api/v1/gmail/connect` for direct-backend local Python.
 
 ## Limitations
 - Only read/search is implemented (no send/compose yet)
-- Requires user to complete OAuth flow on first use
-- Tool is hidden from the active tool list unless dependencies and credentials checks pass (OAuth/token setup happens on first use)
+- Requires the user to complete the web OAuth flow once
+- Tool is hidden from the active tool list unless dependencies, app OAuth config, encrypted storage, and a user connection are all available
 
 ## References
 - See [`README.md`](../../README.md) and [`AGENTS.md`](../../AGENTS.md) for user and workflow documentation

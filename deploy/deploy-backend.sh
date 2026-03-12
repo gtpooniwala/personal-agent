@@ -75,6 +75,12 @@ fi
 
 # Service account created during one-time setup (see docs/cloud-run-setup.md).
 CR_SA="personal-agent-backend@${PROJECT_ID}.iam.gserviceaccount.com"
+GMAIL_SECRET_NAMES=(
+  "personal-agent-google-oauth-client-id"
+  "personal-agent-google-oauth-client-secret"
+  "personal-agent-google-oauth-redirect-uri"
+  "personal-agent-credentials-master-key"
+)
 
 echo "==> Deploying ${SERVICE_NAME}"
 echo "    Project : ${PROJECT_ID}"
@@ -104,6 +110,77 @@ sed \
   -e "s|\${CR_SA}|${CR_SA}|g" \
   -e "s|\${VERCEL_URL}|${VERCEL_URL}|g" \
   "${SERVICE_YAML}" > "${RENDERED_YAML}"
+
+GMAIL_SECRET_ENV_BLOCK=""
+ENABLE_GMAIL_INTEGRATION="false"
+GMAIL_SECRET_PLACEHOLDER="            # __GMAIL_SECRET_ENV_BLOCK__  replaced by deploy-backend.sh with Gmail env vars."
+all_gmail_secrets_present=true
+for SECRET in "${GMAIL_SECRET_NAMES[@]}"; do
+  if ! SECRET_CHECK_ERR="$(gcloud secrets describe "${SECRET}" --project="${PROJECT_ID}" --format='value(name)' 2>&1)"; then
+    if [[ "${SECRET_CHECK_ERR}" == *"NOT_FOUND"* || "${SECRET_CHECK_ERR}" == *"not found"* ]]; then
+      all_gmail_secrets_present=false
+      break
+    fi
+    echo "ERROR: failed to verify secret ${SECRET}: ${SECRET_CHECK_ERR}" >&2
+    exit 1
+  fi
+done
+
+if [[ "${all_gmail_secrets_present}" == "true" ]]; then
+  ENABLE_GMAIL_INTEGRATION="true"
+  GMAIL_SECRET_ENV_BLOCK="$(cat <<'EOF'
+            - name: GOOGLE_OAUTH_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: personal-agent-google-oauth-client-id
+                  key: latest
+            - name: GOOGLE_OAUTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: personal-agent-google-oauth-client-secret
+                  key: latest
+            - name: GOOGLE_OAUTH_REDIRECT_URI
+              valueFrom:
+                secretKeyRef:
+                  name: personal-agent-google-oauth-redirect-uri
+                  key: latest
+            - name: CREDENTIALS_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: personal-agent-credentials-master-key
+                  key: latest
+EOF
+)"
+  echo "    Gmail  : enabled (all Gmail OAuth secrets found)"
+else
+  GMAIL_SECRET_ENV_BLOCK="            # Gmail OAuth secrets omitted: create the Gmail secrets to enable Gmail integration in this environment."
+  echo "    Gmail  : disabled (one or more Gmail OAuth secrets missing)"
+fi
+
+python3 - "${RENDERED_YAML}" "${ENABLE_GMAIL_INTEGRATION}" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+replacement = sys.argv[2]
+path.write_text(
+    path.read_text().replace("${ENABLE_GMAIL_INTEGRATION}", replacement),
+    encoding="utf-8",
+)
+PY
+
+python3 - "${RENDERED_YAML}" "${GMAIL_SECRET_PLACEHOLDER}" "${GMAIL_SECRET_ENV_BLOCK}" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+placeholder = sys.argv[2]
+replacement = sys.argv[3]
+path.write_text(
+    path.read_text().replace(placeholder, replacement),
+    encoding="utf-8",
+)
+PY
 
 # ── Step 3: Deploy to Cloud Run ──────────────────────────────────────────────
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from importlib import import_module
+import json
 from typing import Any, Dict, Optional, Tuple
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
@@ -11,7 +12,7 @@ from backend.config import llm_config, settings
 
 DEFAULT_PROVIDER = "gemini"
 DEFAULT_CHAT_MODELS: Dict[str, str] = {
-    "gemini": "gemini-2.5-flash",
+    "gemini": "gemini-3-pro-preview",
     "openai": "gpt-4.1-mini",
 }
 DEFAULT_EMBEDDING_MODELS: Dict[str, str] = {
@@ -196,11 +197,43 @@ def create_embeddings_model():
     raise ValueError(f"Unsupported embeddings provider: {provider}")
 
 
+def _extract_text_from_content(content: Any) -> str:
+    """Best-effort plain-text extraction from provider-specific content payloads."""
+    def _dump_json_fallback(value: Any) -> str:
+        try:
+            return json.dumps(value, ensure_ascii=False, default=str)
+        except TypeError:
+            return str(value)
+
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+                continue
+            if isinstance(item, dict):
+                text = item.get("text")
+                if isinstance(text, str) and text.strip():
+                    parts.append(text)
+                    continue
+        if parts:
+            return "\n".join(part.strip() for part in parts if part.strip())
+        return _dump_json_fallback(content)
+    if isinstance(content, dict):
+        text = content.get("text")
+        if isinstance(text, str):
+            return text
+        return _dump_json_fallback(content)
+    return str(content)
+
+
 def extract_text(response: Any) -> str:
     """Extract plain text content from a LangChain response object."""
     if hasattr(response, "content"):
-        return str(response.content)
-    return str(response)
+        return _extract_text_from_content(response.content)
+    return _extract_text_from_content(response)
 
 
 async def predict_text(model: Any, prompt: str) -> str:

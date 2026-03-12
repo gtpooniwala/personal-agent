@@ -35,7 +35,7 @@ embeddings:
   model: models/gemini-embedding-001
 
 llms:
-  default: gemini-2.5-flash
+  default: gemini-3-pro-preview
   orchestrator: default
   response_agent: default
   document_qa: default

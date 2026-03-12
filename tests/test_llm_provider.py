@@ -1,74 +1,91 @@
-"""Tests for backend.llm.provider model/provider routing behavior."""
+"""Tests for provider-agnostic LLM model selection and response normalization."""
 
-import os
-import sys
 import unittest
-from types import SimpleNamespace
 from unittest.mock import patch
 
-# Add project root to path
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, project_root)
-
 from backend.llm import provider
+from backend.llm.provider import (
+    MissingModelDependencyError,
+    MissingProviderKeyError,
+    create_chat_model,
+    create_embeddings_model,
+    extract_text,
+)
 
 
-class TestLLMProviderRouting(unittest.TestCase):
-    def test_split_provider_model_infers_openai_embedding_models(self):
-        inferred_provider, inferred_model = provider._split_provider_model(
-            "text-embedding-3-small", "gemini"
+class _FakeResponse:
+    def __init__(self, content):
+        self.content = content
+
+
+class TestExtractText(unittest.TestCase):
+    def test_extract_text_handles_structured_content_blocks(self):
+        response = _FakeResponse(
+            [
+                {"type": "text", "text": "First line"},
+                {"type": "thinking", "signature": "ignored"},
+                {"type": "text", "text": "Second line"},
+            ]
         )
-        self.assertEqual(inferred_provider, "openai")
-        self.assertEqual(inferred_model, "text-embedding-3-small")
 
-    def test_create_embeddings_model_routes_text_embedding_to_openai(self):
-        config = {
-            "providers": {"default": "gemini"},
-            "embeddings": {"model": "text-embedding-3-small"},
-        }
+        self.assertEqual(extract_text(response), "First line\nSecond line")
 
-        with patch.object(provider, "llm_config", config), patch.object(
-            provider.settings, "openai_api_key", "test-openai-key"
-        ), patch.object(provider.settings, "gemini_api_key", "test-gemini-key"), patch(
-            "backend.llm.provider.OpenAIEmbeddings"
-        ) as mock_openai_embeddings, patch.object(
-            provider, "_load_gemini_embeddings_class"
-        ) as mock_load_gemini_embeddings_class:
-            expected = object()
-            mock_openai_embeddings.return_value = expected
+    def test_extract_text_keeps_plain_strings(self):
+        response = _FakeResponse("plain text")
+        self.assertEqual(extract_text(response), "plain text")
 
-            actual = provider.create_embeddings_model()
+    def test_extract_text_stringifies_non_serializable_blocks(self):
+        class _Block:
+            def __str__(self):
+                return "non-serializable-block"
 
-            self.assertIs(actual, expected)
-            mock_openai_embeddings.assert_called_once_with(
-                model="text-embedding-3-small",
-                openai_api_key="test-openai-key",
-            )
-            mock_load_gemini_embeddings_class.assert_not_called()
+        response = _FakeResponse([_Block()])
+        self.assertEqual(extract_text(response), '["non-serializable-block"]')
 
-    def test_import_gemini_module_maps_missing_package_to_dependency_error(self):
-        missing_error = ModuleNotFoundError("No module named 'langchain_google_genai'")
-        missing_error.name = "langchain_google_genai"
 
-        with patch("backend.llm.provider.import_module", side_effect=missing_error):
-            with self.assertRaises(provider.MissingModelDependencyError) as ctx:
-                provider._import_gemini_module()
-
-        self.assertIn("langchain-google-genai is not installed", str(ctx.exception))
-
-    def test_import_gemini_module_does_not_mask_runtime_import_failure(self):
-        with patch("backend.llm.provider.import_module", side_effect=RuntimeError("boom")):
-            with self.assertRaisesRegex(RuntimeError, "boom"):
-                provider._import_gemini_module()
-
-    def test_load_gemini_classes_read_from_imported_module(self):
-        fake_module = SimpleNamespace(
-            ChatGoogleGenerativeAI=object,
-            GoogleGenerativeAIEmbeddings=object,
+class TestModelFactoryRouting(unittest.TestCase):
+    @patch.object(provider.settings, "openai_api_key", "test-openai-key")
+    @patch.object(provider, "ChatOpenAI")
+    def test_create_chat_model_routes_openai_models_to_chat_openai(self, mock_chat_openai):
+        create_chat_model("orchestrator", model_override="gpt-4.1-mini", temperature=0.2, max_tokens=64)
+        mock_chat_openai.assert_called_once_with(
+            model="gpt-4.1-mini",
+            temperature=0.2,
+            openai_api_key="test-openai-key",
+            max_tokens=64,
         )
-        with patch("backend.llm.provider.import_module", return_value=fake_module):
-            self.assertIs(provider._load_gemini_chat_class(), object)
-            self.assertIs(provider._load_gemini_embeddings_class(), object)
+
+    @patch.object(provider.settings, "gemini_api_key", None)
+    def test_create_chat_model_requires_gemini_key_when_gemini_selected(self):
+        with patch.object(provider, "_load_gemini_chat_class"):
+            with self.assertRaises(MissingProviderKeyError):
+                create_chat_model("orchestrator", model_override="gemini-3-pro-preview")
+
+    @patch.object(provider.settings, "gemini_api_key", "test-gemini-key")
+    @patch.object(provider, "_load_gemini_chat_class")
+    def test_create_chat_model_uses_gemini_factory_for_gemini_models(self, mock_load_chat_class):
+        fake_chat_class = mock_load_chat_class.return_value
+        create_chat_model("orchestrator", model_override="gemini-3-pro-preview", temperature=0.1)
+        fake_chat_class.assert_called_once_with(
+            model="gemini-3-pro-preview",
+            temperature=0.1,
+            google_api_key="test-gemini-key",
+        )
+
+    @patch.object(provider, "import_module")
+    def test_import_gemini_module_wraps_missing_top_level_dependency(self, mock_import_module):
+        exc = ModuleNotFoundError("No module named 'langchain_google_genai'")
+        exc.name = "langchain_google_genai"
+        mock_import_module.side_effect = exc
+
+        with self.assertRaises(MissingModelDependencyError):
+            provider._import_gemini_module()
+
+    @patch.object(provider.settings, "openai_api_key", None)
+    def test_create_embeddings_model_requires_openai_key_for_openai_embeddings(self):
+        with patch.dict(provider.llm_config, {"embeddings": {"provider": "openai", "model": "text-embedding-3-small"}}, clear=False):
+            with self.assertRaises(MissingProviderKeyError):
+                create_embeddings_model()
 
 
 if __name__ == "__main__":

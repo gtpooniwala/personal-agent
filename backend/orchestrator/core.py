@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional, List, Tuple
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.messages import HumanMessage, AIMessage
-from backend.llm import create_chat_model, predict_text, MissingProviderKeyError, MissingModelDependencyError
+from backend.llm import create_chat_model, extract_text, predict_text, MissingProviderKeyError, MissingModelDependencyError
 from backend.orchestrator.tool_registry import ToolRegistry
 from backend.orchestrator.prompts import (
     build_direct_response_prompt,
@@ -165,7 +165,7 @@ class CoreOrchestrator:
                 msg for msg in agent_result["messages"] if isinstance(msg, AIMessage)
             ]
             if ai_messages:
-                return ai_messages[-1].content
+                return extract_text(ai_messages[-1])
 
         return "I apologize, but I couldn't process your request properly."
     

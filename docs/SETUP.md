@@ -25,9 +25,10 @@ OPENAI_API_KEY=...
 Useful database variables:
 ```env
 DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5432/personal_agent
-DATABASE_URL_DOCKER=postgresql+psycopg://personal_agent:personal_agent@postgres:5432/personal_agent
+DATABASE_URL_DOCKER=postgresql+psycopg://personal_agent:personal_agent@postgres:5433/personal_agent
 TEST_DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5433/personal_agent_test
 EVAL_DATABASE_URL=postgresql+psycopg://personal_agent:personal_agent@localhost:5433/personal_agent_test
+# DOCKER_POSTGRES_DATA_DIR=/absolute/path/to/.personal-agent/postgres  # optional override
 ```
 
 Optional observability:
@@ -44,10 +45,29 @@ AGENT_API_KEY=replace-with-a-long-random-token
 ENVIRONMENT=local
 ```
 
-Optional Gmail in Docker:
-```bash
-mkdir -p data/gmail
+Optional Gmail setup:
+```env
+GOOGLE_OAUTH_CLIENT_ID=...
+GOOGLE_OAUTH_CLIENT_SECRET=...
+GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3001/api/agent/gmail/callback
+CREDENTIALS_MASTER_KEY=...
 ```
+
+One-time Google Cloud setup for Gmail:
+1. Sign in to Google Cloud with the work account that should own the app integration.
+2. Create or select the project that backs this app.
+3. Enable the Gmail API for that project.
+4. Configure an OAuth consent screen for an External app.
+5. While the app is still private/internal to your team, keep the consent screen in Testing and add each allowed Gmail user as a test user.
+6. Create one OAuth 2.0 Web application client for the app.
+7. Add the callback URI you will actually use:
+   - local Python: `http://localhost:8000/api/v1/gmail/callback`
+   - local Docker: `http://localhost:3001/api/agent/gmail/callback`
+   - production: `https://<your-frontend-host>/api/agent/gmail/callback`
+8. Copy the client ID and client secret into `.env` or your secret manager.
+9. Generate `CREDENTIALS_MASTER_KEY` once and keep it stable across deploys.
+
+Users do not need their own Google Cloud project or Gmail API enablement. You enable Gmail API once in the app's project, then each user connects Gmail through the app's OAuth flow.
 
 Start services:
 ```bash
@@ -62,11 +82,25 @@ Access:
 These Docker ports come from:
 - `DOCKER_FRONTEND_PORT`
 - `DOCKER_API_PORT`
+- `DOCKER_POSTGRES_PORT`
+
+The Docker Postgres container now uses a shared absolute host path by default:
+- `DOCKER_POSTGRES_DATA_DIR=${HOME}/.personal-agent/postgres`
+
+That keeps user-specific integration credentials, including Gmail OAuth tokens stored in Postgres,
+available across worktrees by default. If you intentionally want an isolated clean-room database for
+one worktree, override `DOCKER_POSTGRES_DATA_DIR` in that worktree's `.env`.
+
+Compose uses those port values directly on both the host and inside each container. There is no
+host-to-container remapping layer anymore, so changing `DOCKER_API_PORT=8010` means the backend
+listens on `8010` and Docker publishes `8010:8010`.
 
 Auth behavior:
 - If `AGENT_API_KEY` is unset and `ENVIRONMENT=local`, the backend stays open for local development.
 - If `AGENT_API_KEY` is set, send `Authorization: Bearer <AGENT_API_KEY>` to backend endpoints.
 - When local auth is enabled, `/docs` and `/openapi.json` are protected too, so browser-loaded Swagger is not anonymously reachable.
+- The Docker frontend proxy talks to the backend over the internal Compose network using `DOCKER_API_BASE_URL` (default `http://personal-agent:8001`), not host `localhost`.
+- The Docker frontend reuses `AGENT_API_KEY` when you set one; otherwise it falls back to a local-only proxy token so `/api/agent/...` requests still work during unauthenticated local development.
 
 ## Local Debug Path
 Use this when you need local Python or frontend debugging outside containers.
@@ -140,6 +174,9 @@ The app requires at least one of:
 
 ### Gmail not available
 Gmail support is conditional. Make sure:
-- Gmail credentials are present
-- any required auth files are mounted or available
+- Gmail dependencies are installed
+- `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `GOOGLE_OAUTH_REDIRECT_URI` are set
+- `CREDENTIALS_MASTER_KEY` is set so per-user tokens can be stored encrypted in Postgres
+- the user has completed the Gmail connect flow (`/api/agent/gmail/connect` in Docker/prod, or `/api/v1/gmail/connect` for direct-backend local Python)
 - `ENABLE_GMAIL_INTEGRATION` is not disabling it
+- the Google OAuth consent screen is using the correct work-owned project and the user is allowed to authorize it

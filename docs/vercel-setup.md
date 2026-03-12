@@ -194,10 +194,10 @@ Keep both deployed origins available for later tasks:
 - Cloud Run service URL for scheduler jobs and backend checks
 - Vercel production URL for CORS and Gmail OAuth redirect updates in #129
 
-Gmail callback target remains:
+Gmail callback target for auth-enabled deployments should use the frontend proxy:
 
 ```text
-<CLOUD_RUN_URL>/api/v1/gmail/callback
+<VERCEL_URL>/api/agent/gmail/callback
 ```
 
 The Vercel origin should also be added to the Google Cloud OAuth client configuration when #129 is implemented.
