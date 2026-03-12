@@ -7,8 +7,8 @@ if [ "$BRANCH" = "main" ]; then
   exit 1
 fi
 
-if ! echo "$BRANCH" | grep -Eq '^(codex|claude)/[a-z0-9][a-z0-9-]*/[0-9]+-[a-z0-9][a-z0-9-]*$'; then
-  echo "Push blocked: branch must match <agent>/<type>/<issue>-<slug> (e.g. codex/fix/7-safe-calculator)."
+if ! echo "$BRANCH" | grep -Eq '^(codex|claude|opencode)/[a-z0-9][a-z0-9-]*/[0-9]+-[a-z0-9][a-z0-9-]*$'; then
+  echo "Push blocked: branch must match <agent>/<type>/<issue>-<slug> (e.g. opencode/fix/7-safe-calculator)."
   exit 1
 fi
 
