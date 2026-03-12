@@ -84,7 +84,7 @@ class TestSearchDocumentsToolAsync(unittest.IsolatedAsyncioTestCase):
                 with patch(
                     "backend.services.document_service.doc_processor",
                     mock_doc_processor,
-                ), self.assertLogs(search_documents_module.logger.name, level="INFO") as logs:
+                ), self.assertLogs("backend.orchestrator.tools.search_documents", level="INFO") as logs:
                     await tool._arun("pricing", max_results=requested)
 
                 mock_doc_processor.search_documents.assert_awaited_once_with(

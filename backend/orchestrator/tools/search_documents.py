@@ -130,7 +130,7 @@ class SearchDocumentsTool(BaseTool):
                 response += f"""I couldn't find any relevant information in the {len(self._selected_documents)} selected document(s) for your query: \"{query}\"\n\nThis could mean:\n- The information isn't in the selected documents\n- The documents are still being processed\n- Try rephrasing your question with different keywords\n\nYou can try asking about different topics or selecting different documents."""
             else:
                 # Format response with relevant document excerpts
-                response_parts = ["Based on your the uploaded documents, here's what I found relevant to the query:\n"]
+                response_parts = ["Based on your uploaded documents, here's what I found relevant to the query:\n"]
                 
                 for i, result in enumerate(search_results, 1):
                     similarity_score = result.get('similarity', 0)
