@@ -1,0 +1,56 @@
+name: Deploy Backend to Cloud Run
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types:
+      - completed
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: pushstart-481717
+  REGION: europe-west2
+  SERVICE_NAME: personal-agent-backend
+  IMAGE_NAME: europe-west2-docker.pkg.dev/pushstart-481717/personal-agent/backend
+
+jobs:
+  deploy:
+    name: Build and Deploy Backend
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Google Auth
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and Push Docker image
+        run: |
+          SHA=${{ github.event.workflow_run.head_sha || github.sha }}
+          IMAGE_TAG=${{ env.IMAGE_NAME }}:$SHA
+          LATEST_TAG=${{ env.IMAGE_NAME }}:latest
+          
+          docker build -t $IMAGE_TAG -t $LATEST_TAG -f Dockerfile .
+          docker push $IMAGE_TAG
+          docker push $LATEST_TAG
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ env.REGION }}
+          image: ${{ env.IMAGE_NAME }}:${{ github.event.workflow_run.head_sha || github.sha }}
