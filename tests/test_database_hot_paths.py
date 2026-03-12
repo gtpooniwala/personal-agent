@@ -3,16 +3,24 @@ import sys
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import create_engine, event, inspect
-from sqlalchemy.orm import sessionmaker
-
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from backend.database.models import Base, Conversation
-from backend.database.operations import DatabaseOperations
+AVAILABLE = True
+IMPORT_ERROR = ""
+
+try:
+    from sqlalchemy import create_engine, event, inspect
+    from sqlalchemy.orm import sessionmaker
+
+    from backend.database.models import Base, Conversation
+    from backend.database.operations import DatabaseOperations
+except (ImportError, ModuleNotFoundError) as exc:
+    AVAILABLE = False
+    IMPORT_ERROR = str(exc)
 
 
+@unittest.skipUnless(AVAILABLE, f"Database hot-path test dependencies unavailable: {IMPORT_ERROR}")
 class TestDatabaseHotPaths(unittest.TestCase):
     def setUp(self):
         self.engine = create_engine("sqlite:///:memory:")

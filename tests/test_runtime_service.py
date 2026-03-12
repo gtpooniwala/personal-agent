@@ -107,12 +107,16 @@ class SlowReadRunStore(InMemoryRunStore):
     def __init__(self, delay_seconds=0.15):
         super().__init__()
         self.delay_seconds = delay_seconds
+        self.get_run_started = threading.Event()
+        self.list_events_started = threading.Event()
 
     def get_run(self, run_id: str):
+        self.get_run_started.set()
         time.sleep(self.delay_seconds)
         return super().get_run(run_id)
 
     def list_events(self, *, run_id: str, after, limit: int):
+        self.list_events_started.set()
         time.sleep(self.delay_seconds)
         return super().list_events(run_id=run_id, after=after, limit=limit)
 
@@ -501,7 +505,8 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         )
 
         status_task = asyncio.create_task(service.get_run_status(run.run_id))
-        await asyncio.sleep(0)
+        await asyncio.to_thread(store.get_run_started.wait, 1.0)
+        self.assertTrue(store.get_run_started.is_set())
 
         loop_latency = await self._measure_sleep_window()
         status = await status_task
@@ -531,7 +536,8 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         events_task = asyncio.create_task(
             service.get_run_events(run_id=run.run_id, after=None, limit=100)
         )
-        await asyncio.sleep(0)
+        await asyncio.to_thread(store.list_events_started.wait, 1.0)
+        self.assertTrue(store.list_events_started.is_set())
 
         loop_latency = await self._measure_sleep_window()
         events = await events_task
