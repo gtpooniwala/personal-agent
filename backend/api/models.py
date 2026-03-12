@@ -237,6 +237,74 @@ class ObservabilityRunSummary(BaseModel):
     error: Optional[str] = Field(None, description="Failure details if present")
 
 
+class ObservabilityRuntimeSummary(BaseModel):
+    submit_requests_total: int = Field(..., description="Number of run submissions")
+    execute_requests_total: int = Field(..., description="Number of runtime execution attempts")
+    queued_total: int = Field(..., description="Number of queued runs")
+    succeeded_total: int = Field(..., description="Number of successful runs")
+    failed_total: int = Field(..., description="Number of failed runs")
+    success_rate_pct: Optional[float] = Field(None, description="Completed-run success rate")
+    average_execution_latency_ms: Optional[float] = Field(
+        None,
+        description="Average runtime execution latency from counters",
+    )
+    average_completed_run_latency_ms: Optional[float] = Field(
+        None,
+        description="Average completed run duration from durable state",
+    )
+    phase_latency_ms: Dict[str, Optional[float]] = Field(
+        default_factory=dict,
+        description="Average latency by runtime phase",
+    )
+
+
+class ObservabilityOrchestrationSummary(BaseModel):
+    tool_calls_total: int = Field(..., description="Number of tool calls")
+    token_usage_total: int = Field(..., description="Tracked token usage")
+    fallback_total: int = Field(..., description="Number of fallback responses")
+    average_request_latency_ms: Optional[float] = Field(
+        None,
+        description="Average orchestration request latency",
+    )
+    average_langgraph_latency_ms: Optional[float] = Field(
+        None,
+        description="Average LangGraph invoke latency",
+    )
+    average_final_response_latency_ms: Optional[float] = Field(
+        None,
+        description="Average final-response synthesis latency",
+    )
+    average_tool_call_latency_ms: Optional[float] = Field(
+        None,
+        description="Average tool-call latency",
+    )
+    tool_latency_ms: Dict[str, Optional[float]] = Field(
+        default_factory=dict,
+        description="Average tool-call latency by tool",
+    )
+
+
+class ObservabilityApiSummary(BaseModel):
+    chat_submit_requests_total: int = Field(..., description="Number of async chat submissions")
+    documents_upload_requests_total: int = Field(..., description="Number of document uploads")
+    conversations_list_requests_total: int = Field(
+        ...,
+        description="Number of conversation list requests",
+    )
+    average_chat_submit_latency_ms: Optional[float] = Field(
+        None,
+        description="Average async chat submission latency",
+    )
+    average_documents_upload_latency_ms: Optional[float] = Field(
+        None,
+        description="Average document upload latency",
+    )
+    route_latency_ms: Dict[str, Optional[float]] = Field(
+        default_factory=dict,
+        description="Average latency by workspace route",
+    )
+
+
 class ObservabilitySummaryResponse(BaseModel):
     """Summary payload for the frontend metrics page."""
 
@@ -248,9 +316,12 @@ class ObservabilitySummaryResponse(BaseModel):
     langfuse_enabled: bool = Field(..., description="Whether Langfuse export is active")
     langfuse_base_url: str = Field(..., description="Configured Langfuse base URL")
     totals: Dict[str, int] = Field(..., description="High-level record counts")
-    runtime: Dict[str, Optional[float]] = Field(..., description="Runtime metrics snapshot")
-    orchestration: Dict[str, Optional[float]] = Field(..., description="Orchestration metrics snapshot")
-    api: Dict[str, Optional[float]] = Field(..., description="API request metrics snapshot")
+    runtime: ObservabilityRuntimeSummary = Field(..., description="Runtime metrics snapshot")
+    orchestration: ObservabilityOrchestrationSummary = Field(
+        ...,
+        description="Orchestration metrics snapshot",
+    )
+    api: ObservabilityApiSummary = Field(..., description="API request metrics snapshot")
     tool_usage: Dict[str, int] = Field(default_factory=dict, description="Tool call counts by tool")
     run_status_counts: Dict[str, int] = Field(default_factory=dict, description="Run counts grouped by status")
     recent_runs: List[ObservabilityRunSummary] = Field(

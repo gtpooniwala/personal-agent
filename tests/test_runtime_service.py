@@ -22,6 +22,11 @@ try:
 except (ImportError, ModuleNotFoundError) as exc:
     RUNTIME_SERVICE_TESTS_AVAILABLE = False
     RUNTIME_SERVICE_IMPORT_ERROR = str(exc)
+    RuntimeService = None
+    RunExecution = None
+
+    class InMemoryRunStore:  # type: ignore[no-redef]
+        pass
 
 
 class RuntimeRequest:
@@ -79,6 +84,41 @@ class SuccessfulOrchestrator(BaseTestOrchestrator):
                 {"tool": "calculator", "input": "2+2", "output": "4"},
             ],
             "token_usage": 4,
+            "timings": {
+                "phases": {
+                    "fetching_data": {
+                        "key": "fetching_data",
+                        "label": "Fetching data",
+                        "started_at": "2026-03-12T10:00:00Z",
+                        "ended_at": "2026-03-12T10:00:01Z",
+                        "duration_ms": 10,
+                    },
+                    "llm_execution": {
+                        "key": "llm_execution",
+                        "label": "LLM execution",
+                        "started_at": "2026-03-12T10:00:01Z",
+                        "ended_at": "2026-03-12T10:00:02Z",
+                        "duration_ms": 20,
+                    },
+                    "final_response": {
+                        "key": "final_response",
+                        "label": "Final response",
+                        "started_at": "2026-03-12T10:00:02Z",
+                        "ended_at": "2026-03-12T10:00:03Z",
+                        "duration_ms": 30,
+                    },
+                },
+                "tool_timings": [
+                    {
+                        "tool": "calculator",
+                        "started_at": "2026-03-12T10:00:01Z",
+                        "ended_at": "2026-03-12T10:00:02Z",
+                        "duration_ms": 15,
+                    }
+                ],
+                "tool_call_count": 1,
+                "tool_calls_total_duration_ms": 15,
+            },
         }
 
 
@@ -89,6 +129,27 @@ class FailingOrchestrator(BaseTestOrchestrator):
             "response": "something failed",
             "conversation_id": conversation_id,
             "error": True,
+            "timings": {
+                "phases": {
+                    "fetching_data": {
+                        "key": "fetching_data",
+                        "label": "Fetching data",
+                        "started_at": "2026-03-12T10:00:00Z",
+                        "ended_at": "2026-03-12T10:00:01Z",
+                        "duration_ms": 10,
+                    },
+                    "final_response": {
+                        "key": "final_response",
+                        "label": "Final response",
+                        "started_at": "2026-03-12T10:00:01Z",
+                        "ended_at": "2026-03-12T10:00:02Z",
+                        "duration_ms": 5,
+                    },
+                },
+                "tool_timings": [],
+                "tool_call_count": 0,
+                "tool_calls_total_duration_ms": 0,
+            },
         }
 
 
@@ -173,6 +234,18 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         self.assertIn("started", event_types)
         self.assertIn("tool_result", event_types)
         self.assertIn("succeeded", event_types)
+        started_event = next(event for event in events["events"] if event["type"] == "started")
+        tool_event = next(event for event in events["events"] if event["type"] == "tool_result")
+        success_event = next(event for event in events["events"] if event["type"] == "succeeded")
+        self.assertIn("queue_wait", started_event["metadata"]["phase_timings"])
+        self.assertEqual(
+            tool_event["metadata"]["tool_timing"]["duration_ms"],
+            15,
+        )
+        self.assertEqual(
+            success_event["metadata"]["phase_timings"]["final_response"]["duration_ms"],
+            30,
+        )
 
     async def test_submit_run_triggers_background_title_generation(self):
         orchestrator = SuccessfulOrchestrator()
@@ -212,6 +285,16 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(status["attempt_count"], 1)
         self.assertIsNotNone(status["started_at"])
         self.assertIsNotNone(status["completed_at"])
+        events = await service.get_run_events(
+            run_id=submitted["run_id"],
+            after=None,
+            limit=100,
+        )
+        failed_event = next(event for event in events["events"] if event["type"] == "failed")
+        self.assertEqual(
+            failed_event["metadata"]["phase_timings"]["fetching_data"]["duration_ms"],
+            10,
+        )
 
     async def test_concurrent_runs_to_same_conversation_are_rejected(self):
         """Two concurrent runs to same conversation should result in one failing with session_busy."""

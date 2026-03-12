@@ -19,7 +19,13 @@ class TestInMemoryRunStore(unittest.TestCase):
 
     def test_cursor_pagination(self):
         run = self.store.create_run(conversation_id="conv-1", message="hello", selected_documents=[])
-        self.store.append_event(run_id=run.run_id, event_type="queued", status="queued", message="queued")
+        self.store.append_event(
+            run_id=run.run_id,
+            event_type="queued",
+            status="queued",
+            message="queued",
+            metadata={"phase_timings": {"queue_wait": {"duration_ms": 5}}},
+        )
         self.store.append_event(run_id=run.run_id, event_type="started", status="running", message="started")
         self.store.append_event(run_id=run.run_id, event_type="succeeded", status="succeeded", message="done")
 
@@ -27,6 +33,10 @@ class TestInMemoryRunStore(unittest.TestCase):
         self.assertEqual(len(first_page), 2)
         self.assertTrue(has_more)
         self.assertIsNotNone(cursor)
+        self.assertEqual(
+            first_page[0].metadata,
+            {"phase_timings": {"queue_wait": {"duration_ms": 5}}},
+        )
 
         second_page, second_cursor, second_has_more = self.store.list_events(run_id=run.run_id, after=cursor, limit=2)
         self.assertEqual(len(second_page), 1)

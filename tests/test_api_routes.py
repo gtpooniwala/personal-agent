@@ -317,7 +317,18 @@ class TestAPIRoutes(unittest.TestCase):
                     "message": "Run started",
                     "created_at": "2026-03-06T10:00:01Z",
                     "tool": None,
-                    "metadata": None,
+                    "metadata": {
+                        "attempt": 1,
+                        "phase_timings": {
+                            "queue_wait": {
+                                "key": "queue_wait",
+                                "label": "Queue wait",
+                                "started_at": "2026-03-06T10:00:00Z",
+                                "ended_at": "2026-03-06T10:00:01Z",
+                                "duration_ms": 12,
+                            }
+                        },
+                    },
                 }
             ],
             "next_after": "1",
@@ -329,6 +340,10 @@ class TestAPIRoutes(unittest.TestCase):
         self.assertEqual(payload["run_id"], "run-1")
         self.assertEqual(payload["next_after"], "1")
         self.assertEqual(len(payload["events"]), 1)
+        self.assertEqual(
+            payload["events"][0]["metadata"]["phase_timings"]["queue_wait"]["duration_ms"],
+            12,
+        )
 
     @patch("backend.api.scheduler_routes.db_ops.list_scheduled_tasks")
     def test_scheduler_routes_reject_missing_bearer_token_before_route_logic_runs(self, mock_list_tasks):
@@ -401,6 +416,14 @@ class TestAPIRoutes(unittest.TestCase):
                 "runtime.runs.succeeded_total": 2,
                 "runtime.runs.failed_total": 1,
                 "runtime.runs.queued_total": 4,
+                "runtime.phase.queue_wait.latency_ms_total": 15,
+                "runtime.phase.queue_wait.count_total": 3,
+                "runtime.phase.fetching_data.latency_ms_total": 30,
+                "runtime.phase.fetching_data.count_total": 3,
+                "runtime.phase.llm_execution.latency_ms_total": 90,
+                "runtime.phase.llm_execution.count_total": 3,
+                "runtime.phase.final_response.latency_ms_total": 45,
+                "runtime.phase.final_response.count_total": 3,
                 "api.runtime.chat_submit.requests_total": 5,
                 "api.documents.upload.requests_total": 6,
                 "api.conversations.list.requests_total": 7,
@@ -410,14 +433,24 @@ class TestAPIRoutes(unittest.TestCase):
                 "api.runtime.chat_submit.success_total": 5,
                 "api.documents.upload.latency_ms_total": 90,
                 "api.documents.upload.success_total": 3,
+                "api.conversations.list.latency_ms_total": 84,
+                "api.conversations.list.success_total": 7,
+                "api.conversations.messages.latency_ms_total": 48,
+                "api.conversations.messages.success_total": 6,
+                "api.documents.list.latency_ms_total": 36,
+                "api.documents.list.success_total": 4,
                 "orchestrator.tool_calls_total": 9,
+                "orchestrator.tool_calls.latency_ms_total": 81,
                 "orchestrator.token_usage_total": 10,
                 "orchestrator.fallback_total": 1,
                 "orchestrator.process_request.latency_ms_total": 300,
                 "orchestrator.process_request.success_total": 3,
                 "orchestrator.langgraph.invoke.latency_ms_total": 150,
                 "orchestrator.langgraph.invoke.success_total": 3,
+                "orchestrator.final_response.latency_ms_total": 45,
+                "orchestrator.final_response.count_total": 3,
                 "orchestrator.tool_calls.search_documents.total": 4,
+                "orchestrator.tool_calls.search_documents.latency_ms_total": 52,
             },
             {
                 "latest_counter_update": "2026-03-12T10:00:00Z",
@@ -434,6 +467,10 @@ class TestAPIRoutes(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload["totals"]["runs"], 3)
         self.assertEqual(payload["tool_usage"]["search_documents"], 4)
+        self.assertEqual(payload["runtime"]["phase_latency_ms"]["queue_wait"], 5.0)
+        self.assertEqual(payload["orchestration"]["average_final_response_latency_ms"], 15.0)
+        self.assertEqual(payload["orchestration"]["tool_latency_ms"]["search_documents"], 13.0)
+        self.assertEqual(payload["api"]["route_latency_ms"]["conversation_messages"], 8.0)
         mock_offload_blocking_calls.assert_awaited_once()
         self.assertEqual(len(mock_offload_blocking_calls.await_args.args), 2)
 
