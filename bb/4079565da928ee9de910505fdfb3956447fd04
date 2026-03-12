@@ -1,0 +1,23 @@
+.githooks/pre-push
+  4317a7d259e2fca4 10-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "bb4079565da928ee9de910505fdfb3956447fd04",
+  "prompts": {
+    "4317a7d259e2fca4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_31ffa6d76ffe1cjfPes33lujLu",
+        "model": "google/gemini-3.1-pro-preview-customtools"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
