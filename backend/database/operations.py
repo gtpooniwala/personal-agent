@@ -148,6 +148,8 @@ class DatabaseOperations:
                     Message.conversation_id.label("conversation_id"),
                     func.count(Message.id).label("message_count"),
                 )
+                .join(Conversation, Message.conversation_id == Conversation.id)
+                .filter(Conversation.user_id == user_id)
                 .group_by(Message.conversation_id)
                 .subquery()
             )
