@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from dataclasses import replace
 from datetime import datetime
 from threading import RLock
@@ -187,12 +188,15 @@ class InMemoryRunStore(RunStore):
                 message=message,
                 tool=tool,
                 created_at=utcnow(),
-                metadata=dict(metadata) if metadata is not None else None,
+                metadata=deepcopy(metadata) if metadata is not None else None,
             )
             self._events[run_id].append(event)
             if len(self._events[run_id]) > self.MAX_EVENTS_PER_RUN:
                 self._events[run_id] = self._events[run_id][-self.MAX_EVENTS_PER_RUN :]
-            return replace(event)
+            return replace(
+                event,
+                metadata=deepcopy(event.metadata) if event.metadata is not None else None,
+            )
 
     def list_events(
         self,
@@ -225,7 +229,13 @@ class InMemoryRunStore(RunStore):
             page = events[start_idx : start_idx + limit]
             has_more = start_idx + limit < len(events)
             next_after = page[-1].event_id if page else after
-            return [replace(evt) for evt in page], next_after, has_more
+            return [
+                replace(
+                    evt,
+                    metadata=deepcopy(evt.metadata) if evt.metadata is not None else None,
+                )
+                for evt in page
+            ], next_after, has_more
 
     def _prune_runs_locked(self) -> None:
         overflow = len(self._runs) - self.MAX_STORED_RUNS

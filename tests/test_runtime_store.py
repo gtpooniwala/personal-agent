@@ -49,6 +49,26 @@ class TestInMemoryRunStore(unittest.TestCase):
         with self.assertRaises(InvalidEventsCursorError):
             self.store.list_events(run_id=run.run_id, after="not-a-number", limit=10)
 
+    def test_event_metadata_is_returned_defensively(self):
+        run = self.store.create_run(conversation_id="conv-1", message="hello", selected_documents=[])
+        appended = self.store.append_event(
+            run_id=run.run_id,
+            event_type="queued",
+            status="queued",
+            message="queued",
+            metadata={"phase_timings": {"queue_wait": {"duration_ms": 5}}},
+        )
+        appended.metadata["phase_timings"]["queue_wait"]["duration_ms"] = 99
+
+        events, _, _ = self.store.list_events(run_id=run.run_id, after=None, limit=10)
+        events[0].metadata["phase_timings"]["queue_wait"]["duration_ms"] = 77
+
+        reloaded, _, _ = self.store.list_events(run_id=run.run_id, after=None, limit=10)
+        self.assertEqual(
+            reloaded[0].metadata["phase_timings"]["queue_wait"]["duration_ms"],
+            5,
+        )
+
     def test_unknown_run_raises_not_found(self):
         with self.assertRaises(RunNotFoundError):
             self.store.get_run("missing")

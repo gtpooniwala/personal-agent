@@ -101,6 +101,7 @@ class ToolRegistry:
         self.selected_documents = list(selected_documents or [])
         self._tools = {}
         self._last_runtime_capability_refresh_at: Optional[float] = None
+        self._tool_timing_sink: Optional[Callable[[Dict[str, Any]], None]] = None
         self._initialize_tools()
 
     def _initialize_tools(self):
@@ -131,7 +132,10 @@ class ToolRegistry:
             self.user_id,
         )
         if gmail_ready:
-            self._tools["gmail_read"] = GmailReadTool(self.user_id)
+            gmail_tool: BaseTool = GmailReadTool(self.user_id)
+            if self._tool_timing_sink is not None:
+                gmail_tool = InstrumentedTool(gmail_tool, self._tool_timing_sink)
+            self._tools["gmail_read"] = gmail_tool
             self._last_runtime_capability_refresh_at = monotonic()
             return
 
@@ -179,8 +183,10 @@ class ToolRegistry:
         clone._tools = {name: tool for name, tool in self._tools.items() if name != "search_documents"}
         clone.selected_documents = []
         clone._last_runtime_capability_refresh_at = self._last_runtime_capability_refresh_at
+        clone._tool_timing_sink = tool_timing_sink
         clone._set_search_documents_tool(selected_documents)
         if tool_timing_sink is not None:
+            clone.refresh_runtime_capabilities(force=True)
             clone._wrap_active_tools(tool_timing_sink)
         return clone
 
@@ -188,9 +194,12 @@ class ToolRegistry:
         self,
         timing_sink: Callable[[Dict[str, Any]], None],
     ) -> None:
+        self._tool_timing_sink = timing_sink
         for tool_name in ("calculator", "current_time", "scratchpad", "internet_search", "user_profile", "gmail_read", "search_documents"):
             tool = self._tools.get(tool_name)
             if tool is not None:
+                if isinstance(tool, InstrumentedTool):
+                    tool = tool._wrapped
                 self._tools[tool_name] = InstrumentedTool(tool, timing_sink)
 
     def get_available_tools(self) -> List[Any]:
