@@ -52,3 +52,7 @@ These docs remain in the repo because they are still useful to a reader or agent
 - If you are changing runtime behavior, also read [`ARCHITECTURE.md`](ARCHITECTURE.md), [`MIGRATION_RUNTIME_ARCHITECTURE.md`](MIGRATION_RUNTIME_ARCHITECTURE.md), and [`SYSTEM_FLOW.md`](SYSTEM_FLOW.md).
 - If you are changing prompts, read [`PROMPT_ARCHITECTURE.md`](PROMPT_ARCHITECTURE.md) and run the relevant checks in [`TESTING.md`](TESTING.md).
 - If you are changing deployment or triggers, keep [`DEPLOYMENT.md`](DEPLOYMENT.md) and [`EVENT_TRIGGERS.md`](EVENT_TRIGGERS.md) aligned with the linked issues.
+
+## Docs Maintenance
+- Use issue [#200](https://github.com/gtpooniwala/personal-agent/issues/200) as the permanent tracker for recurring documentation refresh work.
+- For a docs audit pass, start with [`../README.md`](../README.md), [`WORKBOARD.md`](WORKBOARD.md), [`ROADMAP.md`](ROADMAP.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), [`API.md`](API.md), [`SETUP.md`](SETUP.md), [`TESTING.md`](TESTING.md), and [`ISSUE_MANAGEMENT.md`](ISSUE_MANAGEMENT.md).

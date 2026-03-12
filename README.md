@@ -17,7 +17,8 @@ The assistant can:
 
 ```mermaid
 flowchart LR
-    UI["Frontend (Next.js App Router)"] --> API["FastAPI API Layer"]
+    UI["Frontend (Next.js App Router)"] --> PROXY["Next.js Agent Proxy<br/>/api/agent/*"]
+    PROXY --> API["FastAPI API Layer"]
     API --> RT["RuntimeService"]
     RT --> STORE["RunStore<br/>runs + run_events + leases"]
     RT --> PLANE["OrchestrationExecutionPlane"]
@@ -42,9 +43,9 @@ flowchart LR
 
 Current runtime path:
 1. User sends a message from the frontend.
-2. `POST /chat` or `POST /runs` submits asynchronous work and returns a `run_id`.
+2. The frontend calls the same-origin Next.js proxy, which forwards `POST /chat` or `POST /runs` to the backend and returns a `run_id`.
 3. Runtime coordination stays on the event loop while blocking orchestration attempts run in a bounded worker pool with per-conversation serialization.
-4. Frontend polls `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events` for real-time updates.
+4. The frontend prefers `GET /runs/{run_id}/stream` for live updates and falls back to `GET /runs/{run_id}/status` plus `GET /runs/{run_id}/events`.
 
 ## Implemented Capabilities
 
@@ -77,14 +78,16 @@ Contributor reference for current implementation:
 - Landed runtime baseline:
   - Durable run lifecycle schema plus event and lease tables.
   - Async submission via `POST /runs` and `POST /chat`.
-  - Real-time polling via `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events`.
+  - Real-time SSE streaming via `GET /runs/{run_id}/stream`, with polling fallback via `GET /runs/{run_id}/status` and `GET /runs/{run_id}/events`.
   - Per-conversation serialization and retry handling.
   - Heartbeat orphan recovery and scheduler-backed recurring task support.
   - `#51` worker-pool step landed: runtime coordination remains async while full orchestration attempts are offloaded from the FastAPI event loop.
+  - Same-origin Next.js `/api/agent/*` proxy for server-side bearer-token injection in the Vercel/Cloud Run path.
 - Important remaining follow-ups:
   - Normal tool selection is model-owned from the currently exposed tool set; follow-up reliability work should focus on retries rather than restoring handwritten routing.
   - Some follow-up work still runs as in-process background tasks.
-  - SSE streaming and true end-to-end async internals are not implemented yet.
+  - True end-to-end async internals are still future work.
+  - Deployment hardening now focuses on env wiring, proxy/access-control follow-ups, and GitHub-to-GCP auth cleanup rather than missing core deployment scaffolding.
   - `/api/v1/*` remains active for non-runtime endpoints (conversations, tools, documents, health, observability).
 
 ## Quick Start (Docker, Recommended)
@@ -222,7 +225,7 @@ Some tests rely on API/LLM behavior and are easier to run in an environment with
 Run deterministic repository checks:
 
 ```bash
-python tests/run_repo_checks.py
+python3 tests/run_repo_checks.py
 ```
 
 ## Observability Baseline
@@ -279,6 +282,7 @@ Core endpoints:
 - `POST /runs`
 - `GET /runs/{run_id}/status`
 - `GET /runs/{run_id}/events`
+- `GET /runs/{run_id}/stream`
 - `POST /chat`
 - `GET /api/v1/conversations`
 - `POST /api/v1/conversations`
@@ -325,14 +329,14 @@ Design choices reflected in this implementation:
 - Document retrieval computes similarity from embeddings stored in PostgreSQL; not yet an external vector DB.
 - Tool/model config exists, but some model selections are still hardcoded in tool/orchestrator paths.
 - Follow-up work such as summarisation is not yet modeled as durable queued task types.
-- Streaming updates are not available yet; clients rely on polling.
+- SSE streaming is implemented, but the runtime still relies on a worker-pool execution plane rather than true end-to-end async internals.
 - Integration tools (Gmail/Calendar/Todoist) have different maturity levels and setup requirements.
 
 ## Roadmap (High-Impact)
 
 - Simplify orchestration ownership so the LLM is the canonical normal-path tool selector
 - Make follow-up/background work durable and explicitly budgeted
-- Add streaming and richer trigger surfaces on top of the same run ledger
+- Tighten the SSE-plus-polling transport contract and add richer trigger surfaces on top of the same run ledger
 - Production deployment profile (GCP, secrets, auth boundary, storage migration)
 - Multi-user auth + tenant isolation
 
