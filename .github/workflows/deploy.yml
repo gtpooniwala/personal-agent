@@ -35,6 +35,7 @@ jobs:
           fetch-depth: 0
 
       - name: Verify SHA is still HEAD of main
+        id: verify_sha
         if: github.event_name == 'workflow_run'
         env:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -43,11 +44,13 @@ jobs:
           MAIN_HEAD=$(git rev-parse origin/main)
           if [ "$HEAD_SHA" != "$MAIN_HEAD" ]; then
             echo "Skipping deploy: triggering SHA ($HEAD_SHA) is no longer HEAD of main ($MAIN_HEAD)."
-            # Exit successfully to not show a red X, but skip the rest of the deploy
-            exit 0
+            echo "continue=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "continue=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Google Auth
+        if: steps.verify_sha.outputs.continue != 'false'
         id: auth
         uses: google-github-actions/auth@v2
         with:
@@ -55,12 +58,15 @@ jobs:
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}
 
       - name: Set up Cloud SDK
+        if: steps.verify_sha.outputs.continue != 'false'
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Configure Docker for Artifact Registry
+        if: steps.verify_sha.outputs.continue != 'false'
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
       - name: Build and Push Docker image
+        if: steps.verify_sha.outputs.continue != 'false'
         env:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
@@ -73,6 +79,7 @@ jobs:
           docker push $LATEST_TAG
 
       - name: Deploy to Cloud Run
+        if: steps.verify_sha.outputs.continue != 'false'
         id: deploy
         uses: google-github-actions/deploy-cloudrun@v2
         with:
@@ -81,6 +88,7 @@ jobs:
           image: ${{ env.IMAGE_NAME }}:${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Verify Deployment
+        if: steps.verify_sha.outputs.continue != 'false'
         env:
           SERVICE_URL: ${{ steps.deploy.outputs.url }}
         run: |
@@ -88,7 +96,7 @@ jobs:
           INITIAL_DELAY=5
           
           for attempt in $(seq 1 "$MAX_RETRIES"); do
-            HTTP_STATUS=$(curl -sS --connect-timeout 5 --max-time 10 -o /dev/null -w "%{http_code}" $SERVICE_URL/api/v1/health || echo "000")
+            HTTP_STATUS=$(curl -sS --connect-timeout 5 --max-time 10 -o /dev/null -w "%{http_code}" "$SERVICE_URL/api/v1/health" || echo "000")
             
             if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "401" ]; then
               echo "Deployment verified. Health check returned expected status ($HTTP_STATUS)."

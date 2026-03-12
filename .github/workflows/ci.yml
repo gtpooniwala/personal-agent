@@ -28,7 +28,7 @@ jobs:
       - name: Detect CI-relevant changes
         id: changes
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event_name }}" = "push" ]; then
             echo "run_backend_tests=true" >> "$GITHUB_OUTPUT"
             echo "run_frontend_tests=true" >> "$GITHUB_OUTPUT"
             echo "run_repo_checks=true" >> "$GITHUB_OUTPUT"
