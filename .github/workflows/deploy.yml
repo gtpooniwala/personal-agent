@@ -44,7 +44,7 @@ jobs:
           IMAGE_TAG=${{ env.IMAGE_NAME }}:$SHA
           LATEST_TAG=${{ env.IMAGE_NAME }}:latest
           
-          docker build -t $IMAGE_TAG -t $LATEST_TAG -f Dockerfile .
+          docker build --platform linux/amd64 -t $IMAGE_TAG -t $LATEST_TAG -f Dockerfile .
           docker push $IMAGE_TAG
           docker push $LATEST_TAG
 
