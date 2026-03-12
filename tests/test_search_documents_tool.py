@@ -16,7 +16,7 @@ search_documents_module = None
 try:
     import backend.orchestrator.tools.search_documents as search_documents_module
     from backend.orchestrator.tools.search_documents import SearchDocumentsTool
-except Exception as exc:
+except ImportError as exc:
     SEARCH_DOCUMENTS_TOOL_AVAILABLE = False
     SEARCH_DOCUMENTS_TOOL_IMPORT_ERROR = str(exc)
 
