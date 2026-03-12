@@ -1,0 +1,39 @@
+frontend/tests/ChatPanel.test.jsx
+  cc9f0ba72cfb7abb 221-283
+frontend/components/ChatPanel.jsx
+  cc9f0ba72cfb7abb 3,218,233,244,266,287-299
+frontend/components/WorkspaceApp.jsx
+  cc9f0ba72cfb7abb 10,507-508,544-547,587-591,603-604,612-616,621-627,655-661,677-678,919-924,927-928,931
+frontend/components/ActivityDashboard.jsx
+  cc9f0ba72cfb7abb 2,36,60,62-63
+frontend/tests/sendMessage.test.jsx
+  cc9f0ba72cfb7abb 384,390,417
+frontend/components/ConversationList.jsx
+  cc9f0ba72cfb7abb 1-2,51,65-67
+frontend/tests/runStatus.test.js
+  cc9f0ba72cfb7abb 1-66
+frontend/app/globals.css
+  cc9f0ba72cfb7abb 350,354-358,363,366,385-389,396-398,503-506,510-511,519-525,528-550,591,787-789,794,797
+frontend/lib/runStatus.js
+  cc9f0ba72cfb7abb 1-152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "2f6af8342718def491b324fd46aef0e4bfe2e2c4",
+  "prompts": {
+    "cc9f0ba72cfb7abb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019cdf43-269d-79b1-8424-e3887c35ef0c",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 432,
+      "total_deletions": 59,
+      "accepted_lines": 420,
+      "overriden_lines": 0
+    }
+  }
+}
