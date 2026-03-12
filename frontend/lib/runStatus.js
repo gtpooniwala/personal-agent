@@ -114,13 +114,13 @@ export function getRunPresentation(runState) {
       break;
   }
 
-  if (latestEvent?.type === "queued") {
+  if (!isTerminal && latestEvent?.type === "queued") {
     label = "Queued";
     shortLabel = "Queued";
-  } else if (latestEvent?.type === "started") {
+  } else if (!isTerminal && latestEvent?.type === "started") {
     label = status === "retrying" ? "Retrying" : "Starting";
     shortLabel = label;
-  } else if (latestEvent?.type === "retrying") {
+  } else if (!isTerminal && latestEvent?.type === "retrying") {
     label = "Retrying";
     shortLabel = "Retrying";
   }

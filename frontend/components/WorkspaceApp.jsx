@@ -525,7 +525,11 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
               throw statusResult.reason || new Error("Run status request failed");
             }
 
-            pollStatus = statusResult.value;
+            const resolvedStatus = statusResult.value?.status || pollStatus?.status || "queued";
+            pollStatus = {
+              ...(statusResult.value || {}),
+              status: resolvedStatus,
+            };
             let nextEvents = [];
 
             if (eventsResult.status === "fulfilled") {
@@ -536,13 +540,15 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
 
             updateRunState(conversationId, (previousRunState) => {
               const mergedEvents = mergeRunEvents(previousRunState.events, nextEvents);
+              const nextStatus = pollStatus?.status || previousRunState.status || "queued";
+              const isInProgress = RUN_IN_PROGRESS_STATUSES.has(nextStatus);
 
               return {
                 runId: pollRunId,
-                status: pollStatus?.status || previousRunState.status || "queued",
+                status: nextStatus,
                 error: pollStatus?.error || "",
-                transport: RUN_IN_PROGRESS_STATUSES.has(pollStatus?.status) ? "polling" : "complete",
-                transportMessage: RUN_IN_PROGRESS_STATUSES.has(pollStatus?.status)
+                transport: isInProgress ? "polling" : "complete",
+                transportMessage: isInProgress
                   ? "Live stream unavailable. Checking status in the background."
                   : "",
                 events: mergedEvents,
@@ -557,7 +563,7 @@ export default function WorkspaceApp({ view, currentPath, initialConversationId 
             continue;
           }
 
-          if (!RUN_IN_PROGRESS_STATUSES.has(pollStatus?.status)) {
+          if (!RUN_IN_PROGRESS_STATUSES.has(pollStatus?.status || "queued")) {
             break;
           }
 

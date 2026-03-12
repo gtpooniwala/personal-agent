@@ -53,6 +53,23 @@ describe('getRunPresentation', () => {
       detail: 'Run completed successfully',
     });
   });
+
+  test('does not let non-terminal latest events override a terminal label', () => {
+    expect(
+      getRunPresentation({
+        status: 'succeeded',
+        latestEvent: {
+          type: 'started',
+          message: 'Run started',
+        },
+      }),
+    ).toMatchObject({
+      label: 'Completed',
+      shortLabel: 'Completed',
+      tone: 'succeeded',
+      detail: 'Run started',
+    });
+  });
 });
 
 describe('getRunStatusClassName', () => {
