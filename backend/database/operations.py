@@ -143,17 +143,41 @@ class DatabaseOperations:
         """Get all conversations for a user."""
         session = self.get_session()
         try:
-            conversations = session.query(Conversation).filter(
-                Conversation.user_id == user_id
-            ).order_by(Conversation.updated_at.desc()).all()
-            
+            message_counts = (
+                session.query(
+                    Message.conversation_id.label("conversation_id"),
+                    func.count(Message.id).label("message_count"),
+                )
+                .group_by(Message.conversation_id)
+                .subquery()
+            )
+            conversations = (
+                session.query(
+                    Conversation.id.label("id"),
+                    Conversation.title.label("title"),
+                    Conversation.created_at.label("created_at"),
+                    Conversation.updated_at.label("updated_at"),
+                    func.coalesce(
+                        message_counts.c.message_count,
+                        0,
+                    ).label("message_count"),
+                )
+                .outerjoin(
+                    message_counts,
+                    message_counts.c.conversation_id == Conversation.id,
+                )
+                .filter(Conversation.user_id == user_id)
+                .order_by(Conversation.updated_at.desc())
+                .all()
+            )
+
             return [
                 {
                     "id": conv.id,
                     "title": conv.title,
                     "created_at": conv.created_at.isoformat(),
                     "updated_at": conv.updated_at.isoformat(),
-                    "message_count": len(conv.messages)
+                    "message_count": int(conv.message_count or 0),
                 }
                 for conv in conversations
             ]

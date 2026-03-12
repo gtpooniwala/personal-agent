@@ -17,6 +17,11 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 from backend.api.state import orchestrator
 from backend.database.operations import db_ops
 from backend.observability import observe_operation, update_observation
+from backend.runtime.blocking import (
+    BlockingCall,
+    offload_blocking_call,
+    offload_blocking_calls,
+)
 from backend.integrations.credential_store import (
     MissingCredentialDependencyError,
     MissingCredentialEncryptionKeyError,
@@ -93,7 +98,7 @@ async def get_conversations():
         metadata={"component": "api", "endpoint": "/api/v1/conversations"},
     ) as observation:
         try:
-            conversations = orchestrator.get_conversations()
+            conversations = await offload_blocking_call(orchestrator.get_conversations)
             update_observation(observation, output={"conversation_count": len(conversations)})
             return [ConversationResponse(**conv) for conv in conversations]
         except Exception as e:
@@ -112,10 +117,13 @@ async def create_conversation(request: ConversationCreate):
         metadata={"component": "api", "endpoint": "/api/v1/conversations"},
     ) as observation:
         try:
-            conversation_id = orchestrator.create_conversation(request.title or "New Conversation")
+            conversation_id = await offload_blocking_call(
+                orchestrator.create_conversation,
+                request.title or "New Conversation",
+            )
 
             # Get the created conversation details
-            conversations = orchestrator.get_conversations()
+            conversations = await offload_blocking_call(orchestrator.get_conversations)
             conversation = next((c for c in conversations if c["id"] == conversation_id), None)
 
             if not conversation:
@@ -142,7 +150,10 @@ async def get_conversation_messages(conversation_id: str):
         metadata={"component": "api", "endpoint": "/api/v1/conversations/{conversation_id}/messages"},
     ) as observation:
         try:
-            messages = orchestrator.get_conversation_history(conversation_id)
+            messages = await offload_blocking_call(
+                orchestrator.get_conversation_history,
+                conversation_id,
+            )
             update_observation(observation, output={"messages_count": len(messages)})
             return [MessageResponse(**msg) for msg in messages]
         except Exception as e:
@@ -160,7 +171,7 @@ async def get_available_tools():
         metadata={"component": "api", "endpoint": "/api/v1/tools"},
     ) as observation:
         try:
-            tools = orchestrator.get_available_tools()
+            tools = await offload_blocking_call(orchestrator.get_available_tools)
             update_observation(observation, output={"tools_count": len(tools)})
             return [ToolInfo(**tool) for tool in tools]
         except Exception as e:
@@ -313,8 +324,10 @@ async def get_observability_summary():
         metadata={"component": "api", "endpoint": "/api/v1/observability/summary"},
     ) as observation:
         try:
-            counters = db_ops.get_runtime_counters()
-            database_summary = db_ops.get_observability_summary()
+            counters, database_summary = await offload_blocking_calls(
+                BlockingCall(db_ops.get_runtime_counters),
+                BlockingCall(db_ops.get_observability_summary),
+            )
 
             tool_usage = {
                 key.removeprefix("orchestrator.tool_calls.").removesuffix(".total"): value
@@ -455,7 +468,10 @@ async def get_documents():
         metadata={"component": "api", "endpoint": "/api/v1/documents"},
     ) as observation:
         try:
-            documents = doc_processor.get_documents(user_id="default")
+            documents = await offload_blocking_call(
+                doc_processor.get_documents,
+                user_id="default",
+            )
 
             document_infos = [
                 DocumentInfo(
@@ -492,7 +508,11 @@ async def delete_document(document_id: str):
         metadata={"component": "api", "endpoint": "/api/v1/documents/{document_id}"},
     ) as observation:
         try:
-            success = doc_processor.delete_document(document_id, user_id="default")
+            success = await offload_blocking_call(
+                doc_processor.delete_document,
+                document_id,
+                user_id="default",
+            )
 
             if not success:
                 raise HTTPException(status_code=404, detail="Document not found")

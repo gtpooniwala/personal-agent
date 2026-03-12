@@ -40,6 +40,9 @@ def _sql_string_literals(values):
 class Conversation(Base):
     """Conversation model for storing chat sessions."""
     __tablename__ = "conversations"
+    __table_args__ = (
+        Index("ix_conversations_user_id_updated_at", "user_id", "updated_at"),
+    )
     
     id = Column(String, primary_key=True, default=generate_id)
     title = Column(String, nullable=False)
@@ -56,6 +59,9 @@ class Conversation(Base):
 class Message(Base):
     """Message model for storing individual chat messages."""
     __tablename__ = "messages"
+    __table_args__ = (
+        Index("ix_messages_conversation_id_timestamp", "conversation_id", "timestamp"),
+    )
     
     id = Column(String, primary_key=True, default=generate_id)
     conversation_id = Column(String, ForeignKey("conversations.id"), nullable=False)

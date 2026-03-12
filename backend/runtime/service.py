@@ -40,6 +40,7 @@ from backend.runtime.orchestration import (
     OrchestrationAttempt,
     OrchestrationExecutionPlane,
 )
+from backend.runtime.blocking import offload_blocking_call
 from backend.runtime.store import RunNotFoundError, RunStore
 
 logger = logging.getLogger(__name__)
@@ -99,12 +100,12 @@ class RuntimeService:
             },
             metadata={"component": "runtime"},
         ) as observation:
-            run = self._run_store.create_run(
+            run = await self._create_run_record(
                 conversation_id=conversation_id,
                 message=request.message,
                 selected_documents=selected_documents,
             )
-            self._run_store.append_event(
+            await self._append_run_event(
                 run_id=run.run_id,
                 event_type=RUN_EVENT_QUEUED,
                 status=RUN_STATUS_QUEUED,
@@ -143,13 +144,13 @@ class RuntimeService:
         )
 
     async def get_run_status(self, run_id: str) -> Dict[str, object]:
-        run = self._run_store.get_run(run_id)
+        run = await self._get_run_record(run_id)
         return run.to_status_payload()
 
     async def get_run_events(
         self, *, run_id: str, after: Optional[str], limit: int
     ) -> Dict[str, object]:
-        events, next_after, has_more = self._run_store.list_events(
+        events, next_after, has_more = await self._list_run_events(
             run_id=run_id,
             after=after,
             limit=limit,
@@ -188,7 +189,7 @@ class RuntimeService:
                     max_attempts=3,
                 )
                 if lease is None:
-                    self._mark_run_failed(
+                    await self._mark_run_failed(
                         run_id=execution.run_id,
                         error_message=SESSION_BUSY_MESSAGE,
                     )
@@ -234,13 +235,13 @@ class RuntimeService:
                             },
                             exc_info=True,
                         )
-                        current_run = self._run_store.get_run(execution.run_id)
+                        current_run = await self._get_run_record(execution.run_id)
                         if current_run.status not in RUN_TERMINAL_STATUSES:
-                            self._run_store.update_run(
+                            await self._update_run_record(
                                 run_id=execution.run_id,
                                 status=RUN_STATUS_RETRYING,
                             )
-                        self._run_store.append_event(
+                        await self._append_run_event(
                             run_id=execution.run_id,
                             event_type=RUN_EVENT_RETRYING,
                             status=RUN_STATUS_RETRYING,
@@ -248,7 +249,7 @@ class RuntimeService:
                         )
 
                 try:
-                    final_run = self._run_store.get_run(execution.run_id)
+                    final_run = await self._get_run_record(execution.run_id)
                     update_observation(
                         observation,
                         output={"status": final_run.status, "run_id": execution.run_id},
@@ -273,7 +274,7 @@ class RuntimeService:
                     extra={"event": "runtime.run_crash", "run_id": execution.run_id},
                 )
                 try:
-                    self._mark_run_failed(
+                    await self._mark_run_failed(
                         run_id=execution.run_id,
                         error_message=GENERIC_RUNTIME_FAILURE_MESSAGE,
                     )
@@ -297,9 +298,7 @@ class RuntimeService:
                         pass
 
                 try:
-                    from backend.database.operations import db_ops
-
-                    db_ops.release_lease(lease_key, owner_id)
+                    await self._release_lease(lease_key, owner_id)
                 except Exception:
                     logger.exception(
                         "Failed to release lease",
@@ -322,8 +321,8 @@ class RuntimeService:
         if attempt == 1:
             update_run_kwargs["started_at"] = utcnow()
 
-        self._run_store.update_run(**update_run_kwargs)
-        self._run_store.append_event(
+        await self._update_run_record(**update_run_kwargs)
+        await self._append_run_event(
             run_id=execution.run_id,
             event_type=RUN_EVENT_STARTED,
             status=RUN_STATUS_RUNNING,
@@ -348,7 +347,7 @@ class RuntimeService:
 
         if result.get("error", False):
             error_message = result.get("response") or "Run failed"
-            self._mark_run_failed(
+            await self._mark_run_failed(
                 run_id=execution.run_id,
                 error_message=error_message,
             )
@@ -356,7 +355,7 @@ class RuntimeService:
 
         for action in result.get("orchestration_actions") or []:
             tool_name = action.get("tool") or "unknown"
-            self._run_store.append_event(
+            await self._append_run_event(
                 run_id=execution.run_id,
                 event_type=RUN_EVENT_TOOL_RESULT,
                 status=RUN_STATUS_RUNNING,
@@ -365,14 +364,14 @@ class RuntimeService:
             )
 
         response = result.get("response") or ""
-        self._run_store.update_run(
+        await self._update_run_record(
             run_id=execution.run_id,
             status=RUN_STATUS_SUCCEEDED,
             result=response,
             error=None,
             completed_at=utcnow(),
         )
-        self._run_store.append_event(
+        await self._append_run_event(
             run_id=execution.run_id,
             event_type=RUN_EVENT_SUCCEEDED,
             status=RUN_STATUS_SUCCEEDED,
@@ -389,15 +388,15 @@ class RuntimeService:
             )
         )
 
-    def _mark_run_failed(self, *, run_id: str, error_message: str) -> None:
-        self._run_store.update_run(
+    async def _mark_run_failed(self, *, run_id: str, error_message: str) -> None:
+        await self._update_run_record(
             run_id=run_id,
             status=RUN_STATUS_FAILED,
             error=error_message,
             result=None,
             completed_at=utcnow(),
         )
-        self._run_store.append_event(
+        await self._append_run_event(
             run_id=run_id,
             event_type=RUN_EVENT_FAILED,
             status=RUN_STATUS_FAILED,
@@ -412,11 +411,13 @@ class RuntimeService:
         max_attempts: int = 3,
     ) -> Optional[Dict]:
         """Try to acquire a conversation lease with exponential backoff."""
-        from backend.database.operations import db_ops
-
         for attempt in range(max_attempts):
             try:
-                lease = db_ops.acquire_lease(lease_key, owner_id, LEASE_TTL_SECONDS)
+                lease = await self._acquire_lease(
+                    lease_key,
+                    owner_id,
+                    LEASE_TTL_SECONDS,
+                )
                 if lease is not None:
                     return lease
             except Exception:
@@ -445,12 +446,14 @@ class RuntimeService:
         interval_seconds: int,
     ) -> None:
         """Keep the conversation lease alive while the run is active."""
-        from backend.database.operations import db_ops
-
         try:
             while True:
                 await asyncio.sleep(interval_seconds)
-                result = db_ops.renew_lease(lease_key, owner_id, LEASE_TTL_SECONDS)
+                result = await self._renew_lease(
+                    lease_key,
+                    owner_id,
+                    LEASE_TTL_SECONDS,
+                )
                 if result is None:
                     logger.warning(
                         "Failed to renew lease",
@@ -497,3 +500,75 @@ class RuntimeService:
                     "conversation_id": conversation_id,
                 },
             )
+
+    async def _create_run_record(
+        self,
+        *,
+        conversation_id: str,
+        message: str,
+        selected_documents: Sequence[str],
+    ):
+        return await offload_blocking_call(
+            self._run_store.create_run,
+            conversation_id=conversation_id,
+            message=message,
+            selected_documents=selected_documents,
+        )
+
+    async def _get_run_record(self, run_id: str):
+        return await offload_blocking_call(self._run_store.get_run, run_id)
+
+    async def _update_run_record(self, **kwargs):
+        return await offload_blocking_call(self._run_store.update_run, **kwargs)
+
+    async def _append_run_event(self, **kwargs):
+        return await offload_blocking_call(self._run_store.append_event, **kwargs)
+
+    async def _list_run_events(
+        self,
+        *,
+        run_id: str,
+        after: Optional[str],
+        limit: int,
+    ):
+        return await offload_blocking_call(
+            self._run_store.list_events,
+            run_id=run_id,
+            after=after,
+            limit=limit,
+        )
+
+    @staticmethod
+    def _db_ops():
+        from backend.database.operations import db_ops
+
+        return db_ops
+
+    async def _acquire_lease(
+        self,
+        lease_key: str,
+        owner_id: str,
+        ttl_seconds: int,
+    ) -> Optional[Dict]:
+        return await offload_blocking_call(
+            self._db_ops().acquire_lease,
+            lease_key,
+            owner_id,
+            ttl_seconds,
+        )
+
+    async def _renew_lease(
+        self,
+        lease_key: str,
+        owner_id: str,
+        ttl_seconds: int,
+    ) -> Optional[Dict]:
+        return await offload_blocking_call(
+            self._db_ops().renew_lease,
+            lease_key,
+            owner_id,
+            ttl_seconds,
+        )
+
+    async def _release_lease(self, lease_key: str, owner_id: str) -> None:
+        await offload_blocking_call(self._db_ops().release_lease, lease_key, owner_id)

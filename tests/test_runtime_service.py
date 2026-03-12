@@ -103,6 +103,20 @@ class RecordingRunStore(InMemoryRunStore):
         return super().update_run(**kwargs)
 
 
+class SlowReadRunStore(InMemoryRunStore):
+    def __init__(self, delay_seconds=0.15):
+        super().__init__()
+        self.delay_seconds = delay_seconds
+
+    def get_run(self, run_id: str):
+        time.sleep(self.delay_seconds)
+        return super().get_run(run_id)
+
+    def list_events(self, *, run_id: str, after, limit: int):
+        time.sleep(self.delay_seconds)
+        return super().list_events(run_id=run_id, after=after, limit=limit)
+
+
 @unittest.skipUnless(
     RUNTIME_SERVICE_TESTS_AVAILABLE,
     f"Runtime service test dependencies unavailable: {RUNTIME_SERVICE_IMPORT_ERROR}",
@@ -473,6 +487,59 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         event_types = [event["type"] for event in events["events"]]
         self.assertIn("succeeded", event_types)
 
+    async def test_get_run_status_offloads_slow_store_reads(self):
+        store = SlowReadRunStore()
+        run = store.create_run(
+            conversation_id="conv-slow-status",
+            message="hello",
+            selected_documents=[],
+        )
+        service = self._make_service(
+            orchestrator=SuccessfulOrchestrator(),
+            orchestrator_factory=build_factory(SuccessfulOrchestrator),
+            run_store=store,
+        )
+
+        status_task = asyncio.create_task(service.get_run_status(run.run_id))
+        await asyncio.sleep(0)
+
+        loop_latency = await self._measure_sleep_window()
+        status = await status_task
+
+        self.assertEqual(status["run_id"], run.run_id)
+        self.assertLess(loop_latency, 0.12, loop_latency)
+
+    async def test_get_run_events_offloads_slow_store_reads(self):
+        store = SlowReadRunStore()
+        run = store.create_run(
+            conversation_id="conv-slow-events",
+            message="hello",
+            selected_documents=[],
+        )
+        store.append_event(
+            run_id=run.run_id,
+            event_type="queued",
+            status="queued",
+            message="Run accepted",
+        )
+        service = self._make_service(
+            orchestrator=SuccessfulOrchestrator(),
+            orchestrator_factory=build_factory(SuccessfulOrchestrator),
+            run_store=store,
+        )
+
+        events_task = asyncio.create_task(
+            service.get_run_events(run_id=run.run_id, after=None, limit=100)
+        )
+        await asyncio.sleep(0)
+
+        loop_latency = await self._measure_sleep_window()
+        events = await events_task
+
+        self.assertEqual(events["run_id"], run.run_id)
+        self.assertEqual(len(events["events"]), 1)
+        self.assertLess(loop_latency, 0.12, loop_latency)
+
     async def test_submit_run_offloads_blocking_conversation_creation(self):
         started_event = threading.Event()
 
@@ -607,6 +674,12 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
                 return status
             await asyncio.sleep(0.01)
         self.fail(f"run {run_id} did not complete")
+
+    async def _measure_sleep_window(self, samples=5, delay=0.01):
+        started = time.perf_counter()
+        for _ in range(samples):
+            await asyncio.sleep(delay)
+        return time.perf_counter() - started
 
 
 if __name__ == "__main__":
