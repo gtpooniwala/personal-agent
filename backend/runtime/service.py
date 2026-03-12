@@ -371,6 +371,11 @@ class RuntimeService:
         )
         self._record_phase_timings(attempt_metadata.get("phase_timings"))
 
+        raw_actions = result.get("orchestration_actions")
+        normalized_actions = self._normalize_orchestration_actions(raw_actions)
+        normalized_result = dict(result)
+        normalized_result["orchestration_actions"] = normalized_actions
+
         if result.get("error", False):
             error_message = result.get("response") or "Run failed"
             await self._mark_run_failed(
@@ -381,8 +386,8 @@ class RuntimeService:
             return
 
         for action, tool_timing in zip(
-            result.get("orchestration_actions") or [],
-            self._match_tool_timings(result),
+            normalized_actions,
+            self._match_tool_timings(normalized_result),
         ):
             tool_name = action.get("tool") or "unknown"
             tool_metadata = {"attempt": attempt}
@@ -704,3 +709,19 @@ class RuntimeService:
                 continue
             matched.append(remaining.pop(match_index))
         return matched
+
+    @staticmethod
+    def _normalize_orchestration_actions(
+        raw_actions: object,
+    ) -> list[Dict[str, object]]:
+        if raw_actions is None:
+            return []
+        if not isinstance(raw_actions, list):
+            return []
+        normalized: list[Dict[str, object]] = []
+        for action in raw_actions:
+            if isinstance(action, dict):
+                normalized.append(action)
+            else:
+                normalized.append({})
+        return normalized

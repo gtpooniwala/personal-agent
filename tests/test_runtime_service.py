@@ -746,6 +746,18 @@ class TestRuntimeService(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(second_status["status"], "succeeded")
 
+    async def test_normalize_orchestration_actions_ignores_unexpected_shapes(self):
+        self.assertEqual(
+            RuntimeService._normalize_orchestration_actions({"tool": "calculator"}),
+            [],
+        )
+        self.assertEqual(
+            RuntimeService._normalize_orchestration_actions(
+                ["bad-shape", {"tool": "calculator"}]
+            ),
+            [{}, {"tool": "calculator"}],
+        )
+
     async def _wait_until_running(self, service, run_id):
         for _ in range(80):
             status = await service.get_run_status(run_id)
