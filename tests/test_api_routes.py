@@ -356,6 +356,7 @@ class TestAPIRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("access-control-allow-origin", response.headers)
 
+    @patch("backend.api.routes.offload_blocking_call", new_callable=AsyncMock)
     @patch("backend.api.routes.db_ops.delete_conversation")
     @patch("backend.api.routes.orchestrator.generate_conversation_title", new_callable=AsyncMock)
     @patch("backend.api.routes.orchestrator.get_conversations")
@@ -364,7 +365,11 @@ class TestAPIRoutes(unittest.TestCase):
         mock_get_conversations,
         mock_generate_conversation_title,
         mock_delete_conversation,
+        mock_offload_blocking_call,
     ):
+        mock_offload_blocking_call.side_effect = (
+            lambda func, *args, **kwargs: func(*args, **kwargs)
+        )
         mock_get_conversations.return_value = [
             {
                 "id": "conv-1",
@@ -379,9 +384,58 @@ class TestAPIRoutes(unittest.TestCase):
         payload = response.json()
         self.assertEqual(len(payload), 1)
         self.assertEqual(payload[0]["id"], "conv-1")
+        mock_offload_blocking_call.assert_awaited_once()
         mock_get_conversations.assert_called_once_with()
         mock_generate_conversation_title.assert_not_called()
         mock_delete_conversation.assert_not_called()
+
+    @patch("backend.api.routes.offload_blocking_calls", new_callable=AsyncMock)
+    def test_observability_summary_endpoint_parallelizes_independent_db_reads(
+        self,
+        mock_offload_blocking_calls,
+    ):
+        mock_offload_blocking_calls.return_value = (
+            {
+                "runtime.submit_run.requests_total": 4,
+                "runtime.execute_run.requests_total": 3,
+                "runtime.runs.succeeded_total": 2,
+                "runtime.runs.failed_total": 1,
+                "runtime.runs.queued_total": 4,
+                "api.runtime.chat_submit.requests_total": 5,
+                "api.documents.upload.requests_total": 6,
+                "api.conversations.list.requests_total": 7,
+                "runtime.execute_run.latency_ms_total": 120,
+                "runtime.execute_run.success_total": 3,
+                "api.runtime.chat_submit.latency_ms_total": 100,
+                "api.runtime.chat_submit.success_total": 5,
+                "api.documents.upload.latency_ms_total": 90,
+                "api.documents.upload.success_total": 3,
+                "orchestrator.tool_calls_total": 9,
+                "orchestrator.token_usage_total": 10,
+                "orchestrator.fallback_total": 1,
+                "orchestrator.process_request.latency_ms_total": 300,
+                "orchestrator.process_request.success_total": 3,
+                "orchestrator.langgraph.invoke.latency_ms_total": 150,
+                "orchestrator.langgraph.invoke.success_total": 3,
+                "orchestrator.tool_calls.search_documents.total": 4,
+            },
+            {
+                "latest_counter_update": "2026-03-12T10:00:00Z",
+                "totals": {"runs": 3, "events": 8, "conversations": 2},
+                "average_run_latency_ms": 42.5,
+                "run_status_counts": {"succeeded": 2, "failed": 1},
+                "recent_runs": [],
+            },
+        )
+
+        response = self.client.get("/api/v1/observability/summary")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["totals"]["runs"], 3)
+        self.assertEqual(payload["tool_usage"]["search_documents"], 4)
+        mock_offload_blocking_calls.assert_awaited_once()
+        self.assertEqual(len(mock_offload_blocking_calls.await_args.args), 2)
 
     def test_upload_document_rejects_non_pdf(self):
         response = self.client.post(
