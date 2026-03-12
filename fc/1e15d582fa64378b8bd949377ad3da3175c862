@@ -1,0 +1,45 @@
+backend/api/routes.py
+  0a7bd22d7814fed9 337,339-373,407,421-427,429,443
+backend/api/models.py
+  0a7bd22d7814fed9 240-307,319-320,322,324
+backend/orchestrator/core.py
+  0a7bd22d7814fed9 2-3,8-9,39-43,46-51,67-113,333,336-337,345,376,379,387,408,416,421-438,455,491,508-509,529-530
+tests/test_api_routes.py
+  0a7bd22d7814fed9 320-331,343-346,419-426,436-441,443,450-451,453,470-473
+backend/database/operations.py
+  0a7bd22d7814fed9 78-83,93,692,697-698,709
+tests/test_core_orchestrator.py
+  0a7bd22d7814fed9 399-514
+tests/test_database_operations.py
+  0a7bd22d7814fed9 311,318-321
+tests/test_runtime_store.py
+  0a7bd22d7814fed9 26-27,36-39
+backend/orchestrator/tool_registry.py
+  0a7bd22d7814fed9 1-2,5-6,21-82,169-171,183-184,187-194
+backend/runtime/store.py
+  0a7bd22d7814fed9 68,175,190,285,399,411,421,462,520
+backend/runtime/service.py
+  0a7bd22d7814fed9 37,54-59,256,321-322,332,335-343,349,368-372,384,388,391,393-395,402,418,435-436,450,622-711
+tests/test_runtime_service.py
+  0a7bd22d7814fed9 87-121,132-152,237-248,288-297
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.11",
+  "base_commit_sha": "fc1e15d582fa64378b8bd949377ad3da3175c862",
+  "prompts": {
+    "0a7bd22d7814fed9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ce3a9-ed8b-7472-9304-c0166e23e918",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 738,
+      "total_deletions": 42,
+      "accepted_lines": 682,
+      "overriden_lines": 0
+    }
+  }
+}
