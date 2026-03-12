@@ -13,7 +13,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: deploy-${{ github.workflow }}-${{ github.ref }}
+  group: deploy-${{ github.workflow }}-${{ github.event.workflow_run.head_branch || github.ref_name }}
   cancel-in-progress: false
 
 env:
@@ -32,7 +32,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-          fetch-depth: 0
 
       - name: Verify SHA is still HEAD of main
         id: verify_sha
@@ -91,15 +90,27 @@ jobs:
         if: steps.verify_sha.outputs.continue != 'false'
         env:
           SERVICE_URL: ${{ steps.deploy.outputs.url }}
+          AGENT_API_KEY: ${{ secrets.AGENT_API_KEY }}
         run: |
           MAX_RETRIES=5
           INITIAL_DELAY=5
           
           for attempt in $(seq 1 "$MAX_RETRIES"); do
-            HTTP_STATUS=$(curl -sS --connect-timeout 5 --max-time 10 -o /dev/null -w "%{http_code}" "$SERVICE_URL/api/v1/health" || echo "000")
+            if [ -n "$AGENT_API_KEY" ]; then
+              AUTH_HEADER="Authorization: Bearer $AGENT_API_KEY"
+            else
+              AUTH_HEADER="X-Dummy: dummy"
+            fi
+            if ! HTTP_STATUS=$(curl -sS --connect-timeout 5 --max-time 10 -H "$AUTH_HEADER" -o /dev/null -w "%{http_code}" "$SERVICE_URL/api/v1/health"); then
+              echo "curl command failed (network/DNS/timeout error)"
+              HTTP_STATUS="000"
+            fi
             
-            if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "401" ]; then
+            if [ "$HTTP_STATUS" = "200" ]; then
               echo "Deployment verified. Health check returned expected status ($HTTP_STATUS)."
+              exit 0
+            elif [ "$HTTP_STATUS" = "401" ] && [ -z "$AGENT_API_KEY" ]; then
+              echo "Deployment verified. Service is up and requires authentication, but no AGENT_API_KEY was provided to the workflow."
               exit 0
             fi
             
