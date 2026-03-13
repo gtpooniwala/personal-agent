@@ -174,3 +174,4 @@ backend/data/gmail/
 
 # Local support/config files (e.g. Claude Desktop MCP config)
 Support/
+.vercel
