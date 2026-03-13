@@ -12,8 +12,8 @@ export default function ToolsDashboard() {
     try {
       const tools = await apiCall("/tools/info");
       setAllTools(tools);
-    } catch {
-      // silently ignore — tools list is best-effort
+    } catch (err) {
+      console.error("Failed to load tools list:", err);
     } finally {
       setToolsLoading(false);
     }
