@@ -1,5 +1,7 @@
 # Personal Agent
 
+**Live Application:** [https://personal-agent-olive.vercel.app/](https://personal-agent-olive.vercel.app/)
+
 A local-first AI assistant platform built around a LangGraph orchestrator, a durable async runtime, and a Next.js frontend.
 
 This project demonstrates practical AI product engineering: orchestration patterns, modular tooling, RAG over user documents, and a production-style backend/frontend split.
