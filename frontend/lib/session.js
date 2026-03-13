@@ -8,6 +8,9 @@ async function getSecretKey() {
   if (!secret) {
     throw new Error("AUTH_SECRET is not set in environment variables.");
   }
+  if (secret.length < 32) {
+    throw new Error("AUTH_SECRET must be at least 32 characters long.");
+  }
 
   cachedSecretKey = await crypto.subtle.importKey(
     "raw",

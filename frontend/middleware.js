@@ -11,7 +11,7 @@ export async function middleware(request) {
   const publicPaths = ["/login", "/api/auth/logout"];
   const { pathname } = request.nextUrl;
   
-  if (publicPaths.some(p => pathname.startsWith(p) || pathname === p)) {
+  if (publicPaths.some(p => pathname === p || pathname.startsWith(p + "/"))) {
     return NextResponse.next();
   }
 

@@ -31,10 +31,10 @@ export default async function LoginPage({ searchParams }) {
   async function handleLogin(formData) {
     "use server";
     
-    const username = formData.get("username");
-    const password = formData.get("password");
+    const username = formData.get("username")?.toString().trim();
+    const password = formData.get("password")?.toString();
 
-    if (typeof username !== "string" || typeof password !== "string") {
+    if (!username || !password) {
       redirect("/login?error=invalid_request");
     }
     
