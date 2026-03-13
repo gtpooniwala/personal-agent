@@ -1,0 +1,31 @@
+backend/orchestrator/tool_registry.py
+  7a76eb0c62b860be 258
+frontend/components/DocumentsPanel.jsx
+  7a76eb0c62b860be 1,8,40,84-89,91-99,102,248-250
+backend/api/models.py
+  7a76eb0c62b860be 92-98
+frontend/components/ToolsDashboard.jsx
+  7a76eb0c62b860be 1-138
+backend/api/routes.py
+  7a76eb0c62b860be 5,182-199
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.11",
+  "base_commit_sha": "2194277b4e0ff7bda50c9e233ee8dfcc7c517c8a",
+  "prompts": {
+    "7a76eb0c62b860be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ccd6489-ed97-4fc9-af2c-9e0d599a143e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 190,
+      "total_deletions": 9,
+      "accepted_lines": 187,
+      "overriden_lines": 0
+    }
+  }
+}
