@@ -3,7 +3,7 @@ import { verifySession } from "@/lib/session";
 
 export async function middleware(request) {
   // If in development mode and AUTH_USERS is not set, bypass authentication
-  if (process.env.NODE_ENV === "development" && !process.env.AUTH_USERS) {
+  if (process.env.NODE_ENV === "development" && !process.env.AUTH_USERS && process.env.ALLOW_EMPTY_AUTH === "true") {
     return NextResponse.next();
   }
 
@@ -19,10 +19,10 @@ export async function middleware(request) {
   const sessionToken = request.cookies.get("pa_session")?.value;
   const session = await verifySession(sessionToken);
 
-  if (!session || session.exp < Date.now()) {
+  if (!session) {
     // If it's an API route, return 401
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
     }
     
     // Otherwise, redirect to login page
@@ -43,5 +43,5 @@ export async function middleware(request) {
 
 export const config = {
   // Run on all routes except static files
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|favicon.svg).*)"],
 };

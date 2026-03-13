@@ -9,9 +9,11 @@ function timingSafeEqual(a, b) {
     return false;
   }
   let mismatch = a.length === b.length ? 0 : 1;
-  const len = Math.min(a.length, b.length);
+  const len = Math.max(a.length, b.length);
   for (let i = 0; i < len; i += 1) {
-    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    const charA = i < a.length ? a.charCodeAt(i) : 0;
+    const charB = i < b.length ? b.charCodeAt(i) : 0;
+    mismatch |= charA ^ charB;
   }
   return mismatch === 0;
 }
@@ -28,11 +30,22 @@ export default async function LoginPage({ searchParams }) {
   const sp = await Promise.resolve(searchParams);
   const error = sp?.error;
 
+  const errorMapping = {
+    "invalid_credentials": "The username or password you entered is incorrect.",
+    "invalid_request": "Invalid request format.",
+  };
+  const errorMessage = error ? (errorMapping[error] || "An error occurred during sign in.") : null;
+
   async function handleLogin(formData) {
     "use server";
     
     const username = formData.get("username");
     const password = formData.get("password");
+
+    if (typeof username !== "string" || typeof password !== "string") {
+      redirect("/login?error=invalid_request");
+    }
+
     const hashedPassword = await hashPassword(password);
     
     const authUsersStr = process.env.AUTH_USERS || "";
@@ -74,7 +87,7 @@ export default async function LoginPage({ searchParams }) {
       
       redirect("/");
     } else {
-      redirect("/login?error=Invalid credentials");
+      redirect("/login?error=invalid_credentials");
     }
   }
 
@@ -90,9 +103,9 @@ export default async function LoginPage({ searchParams }) {
           </p>
         </div>
         
-        {error && (
+        {errorMessage && (
           <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded text-sm text-center">
-            {error}
+            {errorMessage}
           </div>
         )}
 

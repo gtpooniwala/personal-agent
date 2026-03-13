@@ -1,18 +1,22 @@
 const encoder = new TextEncoder();
+let cachedSecretKey = null;
 
 async function getSecretKey() {
+  if (cachedSecretKey) return cachedSecretKey;
+
   const secret = process.env.AUTH_SECRET;
   if (!secret) {
     throw new Error("AUTH_SECRET is not set in environment variables.");
   }
 
-  return await crypto.subtle.importKey(
+  cachedSecretKey = await crypto.subtle.importKey(
     "raw",
     encoder.encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign", "verify"]
   );
+  return cachedSecretKey;
 }
 
 function bufferToHex(buffer) {
@@ -63,7 +67,6 @@ export async function verifySession(token) {
     }
     return session;
   } catch (err) {
-    console.error("Session verification failed", err);
     return null;
   }
 }
