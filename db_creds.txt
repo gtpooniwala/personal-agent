@@ -1,3 +1,0 @@
-DB_PASSWORD=378ad95146e498d20b6d1ec3a4451fce72d316bbd6b6353b355f523011f0bfda
-DATABASE_URL=postgresql+psycopg://personal_agent:378ad95146e498d20b6d1ec3a4451fce72d316bbd6b6353b355f523011f0bfda@/personal_agent?host=/cloudsql/personal-agent-490102:europe-west2:personal-agent-db
-WIF_PROVIDER=projects/1058852183529/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
