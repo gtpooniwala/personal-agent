@@ -1,0 +1,23 @@
+frontend/components/ToolsDashboard.jsx
+  7a76eb0c62b860be 1,12,22,24,35,50,80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "0396a4e5aee2ee4b25b5f6aecccf3bcba64989be",
+  "prompts": {
+    "7a76eb0c62b860be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ccd6489-ed97-4fc9-af2c-9e0d599a143e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 8,
+      "accepted_lines": 7,
+      "overriden_lines": 0
+    }
+  }
+}
