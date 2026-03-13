@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.11",
+  "base_commit_sha": "e653413c95d4a5bb59e98bfdfff283651ec3068b",
+  "prompts": {
+    "a1992ad5f588058f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_31aaca425ffePb606KWK2cKX34",
+        "model": "google/gemini-3.1-pro-preview-customtools"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}
