@@ -51,6 +51,8 @@ export default async function LoginPage({ searchParams }) {
       const p = userConfig.slice(firstColonIdx + 1);
       
       const isUsernameMatch = timingSafeEqual(u, username);
+      // TODO: SECURITY DEBT - Replace this plaintext password comparison with a robust
+      // authentication flow (e.g. NextAuth/database) as tracked in Issue #204.
       const isPasswordMatch = timingSafeEqual(p, password);
       
       if (isUsernameMatch && isPasswordMatch) {
