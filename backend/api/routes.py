@@ -181,7 +181,11 @@ async def get_available_tools():
 
 @router.get("/tools/info", response_model=List[ToolInfoWithStatus])
 async def get_all_tools_info():
-    """Get all tools with active/inactive status."""
+    """Get all tools with active/inactive status.
+
+    Note: active status is evaluated against the shared orchestrator's user_id
+    (single-user deployment). Consistent with the existing GET /tools endpoint.
+    """
     with observe_operation(
         name="api.tools.info",
         counter_prefix="api.tools.info",

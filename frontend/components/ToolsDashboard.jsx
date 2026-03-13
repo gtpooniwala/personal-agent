@@ -11,7 +11,7 @@ export default function ToolsDashboard() {
   async function fetchTools() {
     try {
       const tools = await apiCall("/tools/info");
-      setAllTools(tools);
+      setAllTools([...tools].sort((a, b) => a.name.localeCompare(b.name)));
     } catch (err) {
       console.error("Failed to load tools list:", err);
     } finally {
