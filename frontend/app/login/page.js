@@ -18,14 +18,6 @@ function timingSafeEqual(a, b) {
   return mismatch === 0;
 }
 
-async function hashPassword(password) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
 export default async function LoginPage({ searchParams }) {
   const sp = await Promise.resolve(searchParams);
   const error = sp?.error;
@@ -45,8 +37,6 @@ export default async function LoginPage({ searchParams }) {
     if (typeof username !== "string" || typeof password !== "string") {
       redirect("/login?error=invalid_request");
     }
-
-    const hashedPassword = await hashPassword(password);
     
     const authUsersStr = process.env.AUTH_USERS || "";
     const users = authUsersStr.split(",").map(u => u.trim()).filter(Boolean);
@@ -61,7 +51,7 @@ export default async function LoginPage({ searchParams }) {
       const p = userConfig.slice(firstColonIdx + 1);
       
       const isUsernameMatch = timingSafeEqual(u, username);
-      const isPasswordMatch = timingSafeEqual(p, hashedPassword);
+      const isPasswordMatch = timingSafeEqual(p, password);
       
       if (isUsernameMatch && isPasswordMatch) {
         isValid = true;
