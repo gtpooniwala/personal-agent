@@ -32,6 +32,8 @@ export default function ToolsDashboard() {
     }
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchTools and fetchGmailStatus only
+  // reference stable setter functions; re-declaring them in deps would cause double-fetch on mount
   useEffect(() => {
     // Detect ?gmail=connected after OAuth redirect
     const params = new URLSearchParams(window.location.search);
@@ -56,6 +58,7 @@ export default function ToolsDashboard() {
 
   async function handleGmailDisconnect() {
     setGmailLoading(true);
+    setGmailError(null);
     try {
       await apiCall("/gmail/connection", { method: "DELETE" });
     } catch (err) {
