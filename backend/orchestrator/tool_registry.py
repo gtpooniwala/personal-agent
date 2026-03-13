@@ -255,7 +255,7 @@ class ToolRegistry:
         """Get list of all registered tool names."""
         return list(self._tools.keys())
     
-    def get_tool_info(self) -> List[Dict[str, str]]:
+    def get_tool_info(self) -> List[Dict[str, Any]]:
         """Get information about all registered tools."""
         active_tool_names = {tool.name for tool in self.get_available_tools()}
         return [

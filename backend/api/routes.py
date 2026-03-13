@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Query
 from fastapi.responses import RedirectResponse
 from backend.api.models import (
     ConversationCreate, ConversationResponse,
-    MessageResponse, ToolInfo, HealthResponse, DocumentUploadResponse,
+    MessageResponse, ToolInfo, ToolInfoWithStatus, HealthResponse, DocumentUploadResponse,
     DocumentListResponse, DocumentDeleteResponse, DocumentInfo,
     ObservabilitySummaryResponse,
     TitleGenerationResponse,
@@ -177,6 +177,24 @@ async def get_available_tools():
         except Exception as e:
             logger.error(f"Error getting tools: {str(e)}")
             raise HTTPException(status_code=500, detail="Failed to retrieve available tools")
+
+
+@router.get("/tools/info", response_model=List[ToolInfoWithStatus])
+async def get_all_tools_info():
+    """Get all tools with active/inactive status."""
+    with observe_operation(
+        name="api.tools.info",
+        counter_prefix="api.tools.info",
+        as_type="span",
+        metadata={"component": "api", "endpoint": "/api/v1/tools/info"},
+    ) as observation:
+        try:
+            tools = await offload_blocking_call(orchestrator.tool_registry.get_tool_info)
+            update_observation(observation, output={"tool_count": len(tools)})
+            return tools
+        except Exception as e:
+            logger.error(f"Error getting tools info: {str(e)}")
+            raise HTTPException(status_code=500, detail="Failed to retrieve tools info")
 
 
 @router.get("/health", response_model=HealthResponse)
