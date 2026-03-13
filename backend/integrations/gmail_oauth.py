@@ -161,7 +161,6 @@ def create_connect_url(*, user_id: str, return_to: Optional[str]) -> str:
     flow = _build_flow(state=state)
     authorization_url, _ = flow.authorization_url(
         access_type="offline",
-        include_granted_scopes="true",
         prompt="consent",
     )
     return authorization_url
