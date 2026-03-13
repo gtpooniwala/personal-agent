@@ -1,0 +1,27 @@
+frontend/.env.example
+  fd9ad92b1df23434 3
+frontend/.env.local.example
+  fd9ad92b1df23434 3
+frontend/app/login/page.js
+  fd9ad92b1df23434 54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.11",
+  "base_commit_sha": "68ad7286e4772352ccf59ca63af1aa009b73bb6a",
+  "prompts": {
+    "fd9ad92b1df23434": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_31b66ade5ffev8oCTY2sI4hvbu",
+        "model": "google/gemini-3.1-pro-preview-customtools"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 17,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
