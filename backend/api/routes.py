@@ -195,7 +195,7 @@ async def get_all_tools_info():
         try:
             tools = await offload_blocking_call(orchestrator.tool_registry.get_tool_info)
             update_observation(observation, output={"tool_count": len(tools)})
-            return tools
+            return [ToolInfoWithStatus(**tool) for tool in tools]
         except Exception as e:
             logger.error(f"Error getting tools info: {str(e)}")
             raise HTTPException(status_code=500, detail="Failed to retrieve tools info")

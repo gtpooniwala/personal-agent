@@ -5,6 +5,7 @@ export default function ToolsDashboard() {
   const [allTools, setAllTools] = useState([]);
   const [gmailStatus, setGmailStatus] = useState(null);
   const [toolsLoading, setToolsLoading] = useState(true);
+  const [toolsError, setToolsError] = useState(null);
   const [gmailLoading, setGmailLoading] = useState(true);
   const [gmailError, setGmailError] = useState(null);
 
@@ -14,6 +15,7 @@ export default function ToolsDashboard() {
       setAllTools([...tools].sort((a, b) => a.name.localeCompare(b.name)));
     } catch (err) {
       console.error("Failed to load tools list:", err);
+      setToolsError(err?.message ?? "Failed to load tools");
     } finally {
       setToolsLoading(false);
     }
@@ -74,7 +76,8 @@ export default function ToolsDashboard() {
       {/* All tools list */}
       <section>
         {toolsLoading && <p className="panel-note">Loading tools...</p>}
-        {!toolsLoading &&
+        {!toolsLoading && toolsError && <p className="panel-error">{toolsError}</p>}
+        {!toolsLoading && !toolsError &&
           allTools.map((tool) => (
             <div key={tool.name} className="tool-row">
               <span className="tool-name" title={tool.description}>
