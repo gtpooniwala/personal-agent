@@ -1,0 +1,29 @@
+backend/api/models.py
+  7a76eb0c62b860be 92-98
+backend/api/routes.py
+  7a76eb0c62b860be 5,182-199
+frontend/components/DocumentsPanel.jsx
+  7a76eb0c62b860be 1,8,40,84-89,91-99,102,248-250
+frontend/components/ToolsDashboard.jsx
+  7a76eb0c62b860be 1-138
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.11",
+  "base_commit_sha": "ce6d0f0d431e0c9ce2796929b829d45a5bacf0f6",
+  "prompts": {
+    "7a76eb0c62b860be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ccd6489-ed97-4fc9-af2c-9e0d599a143e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 189,
+      "total_deletions": 8,
+      "accepted_lines": 186,
+      "overriden_lines": 0
+    }
+  }
+}
