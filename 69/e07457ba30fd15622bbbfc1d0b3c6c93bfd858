@@ -1,0 +1,29 @@
+frontend/app/api/auth/logout/route.js
+  fd9ad92b1df23434 1,5-15
+frontend/middleware.js
+  fd9ad92b1df23434 14
+frontend/lib/session.js
+  fd9ad92b1df23434 11-13
+frontend/app/login/page.js
+  fd9ad92b1df23434 34-35,37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.11",
+  "base_commit_sha": "69e07457ba30fd15622bbbfc1d0b3c6c93bfd858",
+  "prompts": {
+    "fd9ad92b1df23434": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_31b66ade5ffev8oCTY2sI4hvbu",
+        "model": "google/gemini-3.1-pro-preview-customtools"
+      },
+      "human_author": "Gaurav Pooniwala <gtpooniwala@gmail.com>",
+      "messages": [],
+      "total_additions": 19,
+      "total_deletions": 5,
+      "accepted_lines": 19,
+      "overriden_lines": 0
+    }
+  }
+}
