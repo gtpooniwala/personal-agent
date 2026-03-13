@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { apiCall } from "@/lib/api";
 
 export default function ToolsDashboard() {
@@ -9,7 +9,7 @@ export default function ToolsDashboard() {
   const [gmailLoading, setGmailLoading] = useState(true);
   const [gmailError, setGmailError] = useState(null);
 
-  async function fetchTools() {
+  const fetchTools = useCallback(async () => {
     try {
       const tools = await apiCall("/tools/info");
       setAllTools([...tools].sort((a, b) => a.name.localeCompare(b.name)));
@@ -19,9 +19,9 @@ export default function ToolsDashboard() {
     } finally {
       setToolsLoading(false);
     }
-  }
+  }, []);
 
-  async function fetchGmailStatus() {
+  const fetchGmailStatus = useCallback(async () => {
     setGmailLoading(true);
     setGmailError(null);
     try {
@@ -32,10 +32,8 @@ export default function ToolsDashboard() {
     } finally {
       setGmailLoading(false);
     }
-  }
+  }, []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchTools and fetchGmailStatus only
-  // reference stable setter functions; re-declaring them in deps would cause double-fetch on mount
   useEffect(() => {
     // Detect ?gmail=connected after OAuth redirect
     const params = new URLSearchParams(window.location.search);
@@ -49,7 +47,7 @@ export default function ToolsDashboard() {
 
     fetchTools();
     fetchGmailStatus();
-  }, []);
+  }, [fetchTools, fetchGmailStatus]);
 
   function handleGmailConnect() {
     // return_to must be an origin registered in the backend's ALLOWED_ORIGINS env var.
@@ -79,6 +77,7 @@ export default function ToolsDashboard() {
         {!toolsLoading && toolsError && <p className="panel-error">{toolsError}</p>}
         {!toolsLoading && !toolsError &&
           allTools.map((tool) => (
+            // tool.name is unique — the registry uses a dict keyed by name
             <div key={tool.name} className="tool-row">
               <span className="tool-name" title={tool.description}>
                 {tool.name}
