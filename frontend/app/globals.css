@@ -1400,3 +1400,48 @@ button {
 *::-webkit-scrollbar-track {
   background: rgba(10, 35, 52, 0.36);
 }
+
+/* Right panel tab bar */
+.right-panel-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgba(10, 29, 43, 0.72);
+  border: 1px solid rgba(116, 178, 255, 0.14);
+}
+.right-panel-tab {
+  flex: 1;
+  border-radius: 9px;
+  padding: 8px 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  background: transparent;
+  transition: background 120ms ease, color 120ms ease;
+  border: none;
+}
+.right-panel-tab.active {
+  color: var(--text-primary);
+  background: rgba(23, 57, 82, 0.95);
+}
+
+/* Tools panel */
+.tools-panel-body { padding: 0 14px 14px; overflow-y: auto; display: grid; gap: 12px; }
+.tool-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(12, 37, 56, 0.7); font-size: 13px; }
+.tool-name { font-weight: 700; color: var(--text-primary); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tool-badge { flex: none; border-radius: 999px; padding: 4px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.tool-badge.active { color: #baf7cc; background: rgba(28, 79, 47, 0.34); border: 1px solid rgba(94, 241, 150, 0.28); }
+.tool-badge.inactive { color: var(--text-muted); background: rgba(18, 46, 66, 0.7); border: 1px solid rgba(109, 145, 166, 0.24); }
+
+/* Gmail card */
+.gmail-card { border-radius: 14px; border: 1px solid rgba(109, 145, 166, 0.24); background: rgba(12, 37, 56, 0.52); padding: 14px; display: grid; gap: 10px; }
+.gmail-card-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.gmail-card-label { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+.gmail-card-account { font-size: 12px; color: var(--text-muted); }
+.gmail-card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.gmail-connect-button { padding: 9px 14px; font-size: 13px; }
+.gmail-disconnect-button { padding: 9px 14px; font-size: 13px; background: rgba(110, 20, 29, 0.35); border-color: rgba(255, 109, 115, 0.32); color: #ffd7d9; }
+.gmail-disconnect-button:hover { background: rgba(155, 30, 42, 0.48); }
+

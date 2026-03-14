@@ -89,6 +89,11 @@ class ToolInfo(BaseModel):
     description: str = Field(..., description="Tool description")
 
 
+class ToolInfoWithStatus(ToolInfo):
+    """Tool info including active/inactive status."""
+    active: bool = Field(..., description="Whether tool is currently active")
+
+
 class GmailConnectionStatusResponse(BaseModel):
     """Status for the Gmail integration connection."""
 

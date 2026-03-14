@@ -255,14 +255,21 @@ class ToolRegistry:
         """Get list of all registered tool names."""
         return list(self._tools.keys())
     
-    def get_tool_info(self) -> List[Dict[str, str]]:
-        """Get information about all registered tools."""
+    def get_tool_info(self) -> List[Dict[str, Any]]:
+        """Get information about all registered tools including active status.
+
+        Returns a list of dicts with keys: name (str), description (str), active (bool).
+        """
         active_tool_names = {tool.name for tool in self.get_available_tools()}
+        # Snapshot after get_available_tools() so the list reflects any
+        # _sync_gmail_tool() mutations that just occurred (e.g. gmail_read becoming active).
+        # Broader thread-safety (concurrent threads) is tracked in issue #213.
+        all_items = list(self._tools.items())
         return [
             {
                 "name": name,
                 "description": getattr(tool, 'description', 'No description available'),
                 "active": name in active_tool_names,
             }
-            for name, tool in list(self._tools.items())
+            for name, tool in all_items
         ]

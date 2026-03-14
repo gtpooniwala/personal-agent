@@ -1,9 +1,11 @@
+import { useState } from "react";
 import {
   formatDocumentStatusLabel,
   formatFileSize,
   formatRelativeTime,
   truncateText,
 } from "@/lib/formatters";
+import ToolsDashboard from "@/components/ToolsDashboard";
 
 const DOCUMENT_STATUS_CLASSNAMES = new Set(["completed", "processing", "pending", "failed"]);
 
@@ -35,6 +37,7 @@ export default function DocumentsPanel({
   onDeleteDocument,
   fileInputRef,
 }) {
+  const [activeTab, setActiveTab] = useState("context");
   const selectedCount = selectedDocuments.size;
   const readyDocuments = documents.filter((doc) => doc.processed === "completed");
   const readyCount = readyDocuments.length;
@@ -78,13 +81,25 @@ export default function DocumentsPanel({
       {!isCollapsed && (
         <>
           <div className="panel-header">
-            <p className="eyebrow">Context</p>
-            <h2>Workspace Sidebar</h2>
+            <div className="right-panel-tabs">
+              <button
+                type="button"
+                className={`right-panel-tab ${activeTab === "context" ? "active" : ""}`}
+                onClick={() => setActiveTab("context")}
+              >
+                Context
+              </button>
+              <button
+                type="button"
+                className={`right-panel-tab ${activeTab === "tools" ? "active" : ""}`}
+                onClick={() => setActiveTab("tools")}
+              >
+                Tools
+              </button>
+            </div>
           </div>
-          <p className="panel-note context-panel-note">
-            Keep chat context, uploaded files, and future sidebar tools together in one place.
-          </p>
 
+          {activeTab === "context" && (
           <section className="context-section">
             <button
               type="button"
@@ -230,6 +245,9 @@ export default function DocumentsPanel({
               </>
             )}
           </section>
+          )}
+
+          {activeTab === "tools" && <ToolsDashboard />}
         </>
       )}
     </aside>
