@@ -53,6 +53,7 @@ export default function ToolsDashboard() {
     // return_to must be an origin registered in the backend's ALLOWED_ORIGINS env var.
     // Add any new deployment URLs there before enabling Gmail connect on that host.
     const returnTo = window.location.origin + window.location.pathname;
+    // Full browser navigation required — OAuth flow must follow redirects, not fetch.
     window.location.href = `/api/agent/gmail/connect?return_to=${encodeURIComponent(returnTo)}`;
   }
 
@@ -119,7 +120,7 @@ export default function ToolsDashboard() {
                 onClick={handleGmailConnect}
                 disabled={!gmailStatus.ready}
                 title={
-                  !gmailStatus.ready ? gmailStatus.reasons?.join("; ") ?? "Gmail not configured" : undefined
+                  !gmailStatus.ready ? gmailStatus?.reasons?.join("; ") ?? "Gmail not configured" : undefined
                 }
               >
                 Connect Gmail
@@ -136,7 +137,7 @@ export default function ToolsDashboard() {
           </div>
         )}
 
-        {!gmailLoading && gmailStatus?.reasons?.filter(Boolean).length > 0 && (
+        {!gmailLoading && gmailStatus?.reasons?.some(Boolean) && (
           <p className="panel-note" style={{ fontSize: "11px", marginTop: 0 }}>
             {gmailStatus.reasons.join(" · ")}
           </p>
