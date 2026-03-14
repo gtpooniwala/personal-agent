@@ -54,11 +54,7 @@ export default function ToolsDashboard() {
   function handleGmailConnect() {
     // return_to must be an origin registered in the backend's ALLOWED_ORIGINS env var.
     // Add any new deployment URLs there before enabling Gmail connect on that host.
-    const returnTo =
-      window.location.origin +
-      window.location.pathname +
-      window.location.search +
-      window.location.hash;
+    const returnTo = new URL(window.location.href).toString();
     // Full browser navigation required — OAuth flow must follow redirects, not fetch.
     window.location.href = `/api/agent/gmail/connect?return_to=${encodeURIComponent(returnTo)}`;
   }
