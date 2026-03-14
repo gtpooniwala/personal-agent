@@ -159,6 +159,11 @@ def create_connect_url(*, user_id: str, return_to: Optional[str]) -> str:
         expires_at=expires_at,
     )
     flow = _build_flow(state=state)
+    # Note: `include_granted_scopes` is intentionally omitted. When set to "true",
+    # Google merges scopes from other active OAuth sessions (e.g. the NextAuth login
+    # session) into the response. google-auth-oauthlib then rejects the callback
+    # because the returned scopes don't match the requested ones. Omitting it ensures
+    # the response contains only the scopes explicitly requested here (gmail.readonly).
     authorization_url, _ = flow.authorization_url(
         access_type="offline",
         prompt="consent",

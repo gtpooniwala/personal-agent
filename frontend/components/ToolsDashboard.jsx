@@ -55,9 +55,13 @@ export default function ToolsDashboard() {
   function handleGmailConnect() {
     // return_to must be an origin registered in the backend's ALLOWED_ORIGINS env var.
     // Add any new deployment URLs there before enabling Gmail connect on that host.
-    const returnTo = new URL(window.location.href).toString();
+    // Only forward the ?conversation= param (if present) so the active chat is restored
+    // after the OAuth round-trip without leaking arbitrary query params through the flow.
+    const returnTo = new URL(window.location.pathname, window.location.origin);
+    const conversationId = new URLSearchParams(window.location.search).get("conversation");
+    if (conversationId) returnTo.searchParams.set("conversation", conversationId);
     // Full browser navigation required — OAuth flow must follow redirects, not fetch.
-    window.location.href = `/api/agent/gmail/connect?return_to=${encodeURIComponent(returnTo)}`;
+    window.location.href = `/api/agent/gmail/connect?return_to=${encodeURIComponent(returnTo.toString())}`;
   }
 
   async function handleGmailDisconnect() {
@@ -66,10 +70,10 @@ export default function ToolsDashboard() {
     try {
       const status = await apiCall("/gmail/connection", { method: "DELETE" });
       setGmailStatus(status);
-      await fetchTools();
     } catch (err) {
       setGmailError(err?.message ?? "Failed to disconnect Gmail");
     } finally {
+      await fetchTools();
       setGmailLoading(false);
     }
   }
@@ -123,7 +127,7 @@ export default function ToolsDashboard() {
                 onClick={handleGmailConnect}
                 disabled={!gmailStatus.ready}
                 title={
-                  !gmailStatus?.ready ? gmailStatus?.reasons?.join("; ") ?? "Gmail not configured" : undefined
+                  !gmailStatus?.ready ? gmailStatus?.reasons?.join("; ") || "Gmail not configured" : undefined
                 }
               >
                 Connect Gmail
