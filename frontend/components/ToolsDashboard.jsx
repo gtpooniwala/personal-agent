@@ -10,6 +10,7 @@ export default function ToolsDashboard() {
   const [gmailError, setGmailError] = useState(null);
 
   const fetchTools = useCallback(async () => {
+    setToolsError(null);
     try {
       const tools = await apiCall("/tools/info");
       setAllTools(tools.sort((a, b) => a.name.localeCompare(b.name)));
@@ -52,7 +53,11 @@ export default function ToolsDashboard() {
   function handleGmailConnect() {
     // return_to must be an origin registered in the backend's ALLOWED_ORIGINS env var.
     // Add any new deployment URLs there before enabling Gmail connect on that host.
-    const returnTo = window.location.origin + window.location.pathname;
+    const returnTo =
+      window.location.origin +
+      window.location.pathname +
+      window.location.search +
+      window.location.hash;
     // Full browser navigation required — OAuth flow must follow redirects, not fetch.
     window.location.href = `/api/agent/gmail/connect?return_to=${encodeURIComponent(returnTo)}`;
   }
