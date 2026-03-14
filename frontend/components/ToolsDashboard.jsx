@@ -122,7 +122,7 @@ export default function ToolsDashboard() {
                 onClick={handleGmailConnect}
                 disabled={!gmailStatus.ready}
                 title={
-                  !gmailStatus.ready ? gmailStatus?.reasons?.join("; ") ?? "Gmail not configured" : undefined
+                  !gmailStatus?.ready ? gmailStatus?.reasons?.join("; ") ?? "Gmail not configured" : undefined
                 }
               >
                 Connect Gmail
