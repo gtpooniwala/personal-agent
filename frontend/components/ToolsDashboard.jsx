@@ -73,8 +73,11 @@ export default function ToolsDashboard() {
     } catch (err) {
       setGmailError(err?.message ?? "Failed to disconnect Gmail");
     } finally {
-      await fetchTools();
-      setGmailLoading(false);
+      try {
+        await fetchTools();
+      } finally {
+        setGmailLoading(false);
+      }
     }
   }
 
