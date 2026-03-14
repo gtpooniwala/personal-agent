@@ -260,12 +260,11 @@ class ToolRegistry:
 
         Returns a list of dicts with keys: name (str), description (str), active (bool).
         """
-        # Snapshot items before calling get_available_tools() so that any
-        # _sync_gmail_tool() mutation during refresh_runtime_capabilities()
-        # doesn't cause a concurrent modification during iteration.
+        active_tool_names = {tool.name for tool in self.get_available_tools()}
+        # Snapshot after get_available_tools() so the list reflects any
+        # _sync_gmail_tool() mutations that just occurred (e.g. gmail_read becoming active).
         # Broader thread-safety (concurrent threads) is tracked in issue #213.
         all_items = list(self._tools.items())
-        active_tool_names = {tool.name for tool in self.get_available_tools()}
         return [
             {
                 "name": name,
