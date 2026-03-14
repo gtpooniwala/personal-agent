@@ -10,6 +10,7 @@ export default function ToolsDashboard() {
   const [gmailError, setGmailError] = useState(null);
 
   const fetchTools = useCallback(async () => {
+    setToolsLoading(true);
     setToolsError(null);
     try {
       const tools = await apiCall("/tools/info");
