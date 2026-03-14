@@ -69,7 +69,7 @@ export default function ToolsDashboard() {
     try {
       const status = await apiCall("/gmail/connection", { method: "DELETE" });
       setGmailStatus(status);
-      fetchTools();
+      await fetchTools();
     } catch (err) {
       setGmailError(err?.message ?? "Failed to disconnect Gmail");
     } finally {

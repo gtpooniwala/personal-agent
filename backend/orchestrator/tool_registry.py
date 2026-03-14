@@ -263,6 +263,7 @@ class ToolRegistry:
         # Snapshot items before calling get_available_tools() so that any
         # _sync_gmail_tool() mutation during refresh_runtime_capabilities()
         # doesn't cause a concurrent modification during iteration.
+        # Broader thread-safety (concurrent threads) is tracked in issue #213.
         all_items = list(self._tools.items())
         active_tool_names = {tool.name for tool in self.get_available_tools()}
         return [
