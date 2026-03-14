@@ -256,7 +256,10 @@ class ToolRegistry:
         return list(self._tools.keys())
     
     def get_tool_info(self) -> List[Dict[str, Any]]:
-        """Get information about all registered tools."""
+        """Get information about all registered tools including active status.
+
+        Returns a list of dicts with keys: name (str), description (str), active (bool).
+        """
         active_tool_names = {tool.name for tool in self.get_available_tools()}
         return [
             {

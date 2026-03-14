@@ -12,7 +12,7 @@ export default function ToolsDashboard() {
   const fetchTools = useCallback(async () => {
     try {
       const tools = await apiCall("/tools/info");
-      setAllTools([...tools].sort((a, b) => a.name.localeCompare(b.name)));
+      setAllTools(tools.sort((a, b) => a.name.localeCompare(b.name)));
     } catch (err) {
       console.error("Failed to load tools list:", err);
       setToolsError(err?.message ?? "Failed to load tools");
@@ -62,6 +62,7 @@ export default function ToolsDashboard() {
     try {
       const status = await apiCall("/gmail/connection", { method: "DELETE" });
       setGmailStatus(status);
+      fetchTools();
     } catch (err) {
       setGmailError(err?.message ?? "Failed to disconnect Gmail");
     } finally {
@@ -135,7 +136,7 @@ export default function ToolsDashboard() {
           </div>
         )}
 
-        {!gmailLoading && gmailStatus?.reasons?.length > 0 && (
+        {!gmailLoading && gmailStatus?.reasons?.filter(Boolean).length > 0 && (
           <p className="panel-note" style={{ fontSize: "11px", marginTop: 0 }}>
             {gmailStatus.reasons.join(" · ")}
           </p>
