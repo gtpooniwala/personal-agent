@@ -260,6 +260,10 @@ class ToolRegistry:
 
         Returns a list of dicts with keys: name (str), description (str), active (bool).
         """
+        # Snapshot items before calling get_available_tools() so that any
+        # _sync_gmail_tool() mutation during refresh_runtime_capabilities()
+        # doesn't cause a concurrent modification during iteration.
+        all_items = list(self._tools.items())
         active_tool_names = {tool.name for tool in self.get_available_tools()}
         return [
             {
@@ -267,5 +271,5 @@ class ToolRegistry:
                 "description": getattr(tool, 'description', 'No description available'),
                 "active": name in active_tool_names,
             }
-            for name, tool in list(self._tools.items())
+            for name, tool in all_items
         ]

@@ -29,6 +29,7 @@ export default function ToolsDashboard() {
       const status = await apiCall("/gmail/status");
       setGmailStatus(status);
     } catch (err) {
+      setGmailStatus(null);
       setGmailError(err?.message ?? "Failed to load Gmail status");
     } finally {
       setGmailLoading(false);
